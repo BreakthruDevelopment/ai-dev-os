@@ -7,13 +7,13 @@ template_repo: 30-apps-template
 
 apps:
   - n: 1
-    repo: 01-task-manager
-    name: "Task Manager"
+    repo: 01-build-tracker
+    name: "Portfolio Build Tracker"
     subdomain: app1.breakthruventures.ai
     live_cloud: aws
-    client_need: "Team productivity tools"
-    ai_feature: "Natural-language task entry and auto-prioritizing"
-    notable: "Multi-tenant workspaces, RBAC"
+    client_need: "Engineering ops and release management"
+    ai_feature: "Daily health summary per app; flags stalled builds, failing CI and free-tier limits"
+    notable: "GitHub and cloud webhooks, status state machine, public read-only board"
     status: planned
   - n: 2
     repo: 02-notes-kb
@@ -178,13 +178,13 @@ apps:
     notable: "HIPAA-style controls: audit, encryption, consent"
     status: planned
   - n: 20
-    repo: 20-build-tracker
-    name: "Portfolio Build Tracker"
+    repo: 20-task-manager
+    name: "Task Manager"
     subdomain: app20.breakthruventures.ai
     live_cloud: oci
-    client_need: "Engineering ops and release management"
-    ai_feature: "Daily health summary per app; flags stalled builds, failing CI and free-tier limits"
-    notable: "GitHub and cloud webhooks, status state machine, public read-only board"
+    client_need: "Team productivity tools"
+    ai_feature: "Natural-language task entry and auto-prioritizing"
+    notable: "Multi-tenant workspaces, RBAC"
     status: planned
   - n: 21
     repo: 21-meeting-notes

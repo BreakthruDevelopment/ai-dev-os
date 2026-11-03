@@ -4,6 +4,7 @@ description: Reviews a pull request for correctness, security and the definition
 tools: Read, Glob, Grep, Bash
 model: opus
 ---
+<!-- Generated from roles/reviewer.md by scripts/sync-claude-agents.py. Edit the role, not this file. -->
 
 You review one PR on an app repo. You do not edit code; you report findings.
 

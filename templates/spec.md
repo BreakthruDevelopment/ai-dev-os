@@ -47,9 +47,12 @@ Who would hire this out, what they need, and the roles in the app (for example c
 
 ## Issues
 
-- [ ] `claude` — schema and migration
-- [ ] `claude` — data functions, route handlers, server actions, integration tests
-- [ ] `claude` — AI feature, fixture, evals
-- [ ] `grok` — pages and components (375px and desktop)
-- [ ] `grok` — smoke test for the main flow
-- [ ] `grok` — Terraform for two clouds
+Each issue names a role and carries a harness label; add each to the project board.
+
+- [ ] `[fullstack-builder]` `claude` — schema and migration
+- [ ] `[fullstack-builder]` `claude` — data functions, route handlers, server actions, integration tests
+- [ ] `[ai-builder]` `claude` — AI feature, fixture, evals
+- [ ] `[ui-builder]` `grok` — pages and components (375px and desktop)
+- [ ] `[ui-builder]` `grok` — smoke test for the main flow
+- [ ] `[devops]` `grok` — Terraform for AWS and Azure
+- [ ] `[devops]` `jules` — Terraform for Google Cloud and Oracle Cloud

@@ -1,0 +1,278 @@
+# The 30 apps. Source of truth for repo names, subdomains and the cloud each app is live on.
+# Cloud rotates by day: AWS, Azure, Google Cloud, Oracle Cloud. The other three are proven by `terraform plan`.
+domain: breakthruventures.ai
+github_org: BreakthruDevelopment
+repo_topic: 30-apps-30-days
+template_repo: 30-apps-template
+
+apps:
+  - n: 1
+    repo: 01-task-manager
+    name: "Task Manager"
+    subdomain: app1.breakthruventures.ai
+    live_cloud: aws
+    client_need: "Team productivity tools"
+    ai_feature: "Natural-language task entry and auto-prioritizing"
+    notable: "Multi-tenant workspaces, RBAC"
+    status: planned
+  - n: 2
+    repo: 02-notes-kb
+    name: "Notes and Knowledge Base"
+    subdomain: app2.breakthruventures.ai
+    live_cloud: azure
+    client_need: "Internal wikis"
+    ai_feature: "RAG search over notes with citations"
+    notable: "pgvector, per-user document ACLs"
+    status: planned
+  - n: 3
+    repo: 03-expense-tracker
+    name: "Expense Tracker"
+    subdomain: app3.breakthruventures.ai
+    live_cloud: gcp
+    client_need: "Finance tools"
+    ai_feature: "Receipt photo to structured expense"
+    notable: "File uploads to object storage, signed URLs"
+    status: planned
+  - n: 4
+    repo: 04-habit-tracker
+    name: "Habit and Goal Tracker"
+    subdomain: app4.breakthruventures.ai
+    live_cloud: oci
+    client_need: "Consumer wellness apps"
+    ai_feature: "Weekly progress coach summary"
+    notable: "Web push notifications, time-series tables"
+    status: planned
+  - n: 5
+    repo: 05-budget-planner
+    name: "Personal Budget Planner"
+    subdomain: app5.breakthruventures.ai
+    live_cloud: aws
+    client_need: "Personal finance and fintech"
+    ai_feature: "Auto-categorize transactions and explain monthly cash flow"
+    notable: "Bank sync via Plaid sandbox, encrypted tokens"
+    status: planned
+  - n: 6
+    repo: 06-read-later
+    name: "Bookmark and Read-Later"
+    subdomain: app6.breakthruventures.ai
+    live_cloud: azure
+    client_need: "Content apps"
+    ai_feature: "Summarize and auto-tag saved links"
+    notable: "Background jobs, rate limiting"
+    status: planned
+  - n: 7
+    repo: 07-appointment-booking
+    name: "Appointment Booking"
+    subdomain: app7.breakthruventures.ai
+    live_cloud: gcp
+    client_need: "Salons, clinics, consultants"
+    ai_feature: "Chat assistant that books open slots (tool use)"
+    notable: "Availability engine, OAuth calendar sync"
+    status: planned
+  - n: 8
+    repo: 08-loan-portal
+    name: "Loan Application Portal"
+    subdomain: app8.breakthruventures.ai
+    live_cloud: oci
+    client_need: "Lending and banking"
+    ai_feature: "Summarize applicant financials and flag risks, with reasons"
+    notable: "Applicant vs underwriter roles, document vault, audit log"
+    status: planned
+  - n: 9
+    repo: 09-invoicing
+    name: "Invoicing"
+    subdomain: app9.breakthruventures.ai
+    live_cloud: aws
+    client_need: "Freelancer and agency billing"
+    ai_feature: "Generate invoice from project notes"
+    notable: "Stripe test mode, PDF generation"
+    status: planned
+  - n: 10
+    repo: 10-inventory
+    name: "Inventory Management"
+    subdomain: app10.breakthruventures.ai
+    live_cloud: azure
+    client_need: "Retail and warehouse"
+    ai_feature: "Reorder forecasts in plain language"
+    notable: "Barcode scan with the phone browser camera, optimistic locking"
+    status: planned
+  - n: 11
+    repo: 11-helpdesk
+    name: "Helpdesk Ticketing"
+    subdomain: app11.breakthruventures.ai
+    live_cloud: gcp
+    client_need: "Customer support"
+    ai_feature: "Auto-triage, suggested replies from KB"
+    notable: "Agent vs customer portals, SLA timers"
+    status: planned
+  - n: 12
+    repo: 12-restaurant-ordering
+    name: "Restaurant Ordering"
+    subdomain: app12.breakthruventures.ai
+    live_cloud: oci
+    client_need: "Food service"
+    ai_feature: "Menu Q&A and allergen guardrails"
+    notable: "Real-time order status"
+    status: planned
+  - n: 13
+    repo: 13-field-service
+    name: "Field Service Dispatch"
+    subdomain: app13.breakthruventures.ai
+    live_cloud: aws
+    client_need: "Trades and maintenance"
+    ai_feature: "Job notes to work order + parts list"
+    notable: "Offline-capable PWA, browser geolocation"
+    status: planned
+  - n: 14
+    repo: 14-real-estate
+    name: "Real Estate Listings"
+    subdomain: app14.breakthruventures.ai
+    live_cloud: azure
+    client_need: "Property marketplaces"
+    ai_feature: "Listing description writer + semantic search"
+    notable: "Geo queries, image pipeline"
+    status: planned
+  - n: 15
+    repo: 15-event-ticketing
+    name: "Event Ticketing and Check-in"
+    subdomain: app15.breakthruventures.ai
+    live_cloud: gcp
+    client_need: "Events"
+    ai_feature: "Attendee FAQ bot"
+    notable: "QR codes, check-in from a phone browser"
+    status: planned
+  - n: 16
+    repo: 16-lms
+    name: "Learning Management (LMS)"
+    subdomain: app16.breakthruventures.ai
+    live_cloud: oci
+    client_need: "Training and edtech"
+    ai_feature: "Quiz generation from course material"
+    notable: "Instructor vs learner roles"
+    status: planned
+  - n: 17
+    repo: 17-job-board-ats
+    name: "Job Board and ATS"
+    subdomain: app17.breakthruventures.ai
+    live_cloud: aws
+    client_need: "Recruiting"
+    ai_feature: "Resume parsing and candidate-job matching"
+    notable: "Bias guardrails, data retention rules"
+    status: planned
+  - n: 18
+    repo: 18-employee-onboarding
+    name: "Employee Onboarding"
+    subdomain: app18.breakthruventures.ai
+    live_cloud: azure
+    client_need: "HR"
+    ai_feature: "Policy Q&A assistant over handbook"
+    notable: "SSO-ready (OIDC), approvals workflow"
+    status: planned
+  - n: 19
+    repo: 19-patient-intake
+    name: "Patient Intake"
+    subdomain: app19.breakthruventures.ai
+    live_cloud: gcp
+    client_need: "Clinics"
+    ai_feature: "Intake form to structured summary"
+    notable: "HIPAA-style controls: audit, encryption, consent"
+    status: planned
+  - n: 20
+    repo: 20-build-tracker
+    name: "Portfolio Build Tracker"
+    subdomain: app20.breakthruventures.ai
+    live_cloud: oci
+    client_need: "Engineering ops and release management"
+    ai_feature: "Daily health summary per app; flags stalled builds, failing CI and free-tier limits"
+    notable: "GitHub and cloud webhooks, status state machine, public read-only board"
+    status: planned
+  - n: 21
+    repo: 21-meeting-notes
+    name: "Meeting Notes"
+    subdomain: app21.breakthruventures.ai
+    live_cloud: aws
+    client_need: "Productivity"
+    ai_feature: "Transcript to action items"
+    notable: "Audio upload, async processing queue"
+    status: planned
+  - n: 22
+    repo: 22-analytics-dashboard
+    name: "Analytics Dashboard"
+    subdomain: app22.breakthruventures.ai
+    live_cloud: azure
+    client_need: "BI and reporting"
+    ai_feature: "Ask-your-data (text to SQL, read-only)"
+    notable: "Row-level security, query sandboxing"
+    status: planned
+  - n: 23
+    repo: 23-marketplace
+    name: "Marketplace"
+    subdomain: app23.breakthruventures.ai
+    live_cloud: gcp
+    client_need: "Two-sided platforms"
+    ai_feature: "Listing moderation"
+    notable: "Buyer/seller roles, payments test mode"
+    status: planned
+  - n: 24
+    repo: 24-community-forum
+    name: "Community Forum"
+    subdomain: app24.breakthruventures.ai
+    live_cloud: oci
+    client_need: "Social and community"
+    ai_feature: "Toxicity moderation + thread summaries"
+    notable: "Abuse reporting, moderation queue"
+    status: planned
+  - n: 25
+    repo: 25-fitness-coaching
+    name: "Fitness Coaching"
+    subdomain: app25.breakthruventures.ai
+    live_cloud: aws
+    client_need: "Health and fitness"
+    ai_feature: "Workout plan generator with safety limits"
+    notable: "Coach-client relationships"
+    status: planned
+  - n: 26
+    repo: 26-property-management
+    name: "Property Management"
+    subdomain: app26.breakthruventures.ai
+    live_cloud: azure
+    client_need: "Landlords and HOAs"
+    ai_feature: "Maintenance request triage"
+    notable: "Tenant vs manager portals"
+    status: planned
+  - n: 27
+    repo: 27-donor-crm
+    name: "Nonprofit Donor CRM"
+    subdomain: app27.breakthruventures.ai
+    live_cloud: gcp
+    client_need: "Nonprofits"
+    ai_feature: "Donor outreach drafts and segmenting"
+    notable: "Consent and unsubscribe tracking"
+    status: planned
+  - n: 28
+    repo: 28-support-agent
+    name: "Customer Support Agent"
+    subdomain: app28.breakthruventures.ai
+    live_cloud: oci
+    client_need: "AI support deployments"
+    ai_feature: "Agent with tools: order lookup, refunds with approval"
+    notable: "Human-in-the-loop, tool permissioning"
+    status: planned
+  - n: 29
+    repo: 29-knowledge-assistant
+    name: "Internal Knowledge Assistant"
+    subdomain: app29.breakthruventures.ai
+    live_cloud: aws
+    client_need: "Enterprise RAG"
+    ai_feature: "Multi-source RAG with evals and citations"
+    notable: "Connector auth, per-doc permissions"
+    status: planned
+  - n: 30
+    repo: 30-ai-ops-console
+    name: "AI Ops Console"
+    subdomain: app30.breakthruventures.ai
+    live_cloud: azure
+    client_need: "AI platform operations"
+    ai_feature: "One view of the agent team: run logs, cost, eval scores and Grok Bot routines, joined with the Build Tracker"
+    notable: "Admin-only access, scoped API keys, usage metering"
+    status: planned

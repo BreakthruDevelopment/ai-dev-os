@@ -3,6 +3,9 @@
 This repo is the operating system for the **30 apps in 30 days** build: who does what, how work moves, and the
 rules every AI tool follows. Claude Code, Grok Build, Grok Bot, Codex and Jules all read this file.
 
+**New to the project?** Read [`BRIEFING.md`](BRIEFING.md) first: what we're building, every decision in force,
+and what's been dropped.
+
 ## 1. Repo safety (non-negotiable)
 
 The BreakthruDevelopment org holds other, unrelated applications that must never change.

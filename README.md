@@ -37,6 +37,7 @@ whichever harness has capacity.
 
 | Path | What it is |
 | --- | --- |
+| `BRIEFING.md` | Start here: the project, every decision in force, and what was dropped |
 | `AGENTS.md` | Rules every harness follows: repo safety, the role-to-harness map, how work moves |
 | `roles/` | The eight roles, harness-neutral: planner, full-stack, AI and UI builders, reviewer, devops, docs writer, ops monitor |
 | `.claude/agents/` | Claude Code subagents generated from `roles/` (`scripts/sync-claude-agents.py`) |

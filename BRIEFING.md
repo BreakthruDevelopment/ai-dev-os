@@ -3,7 +3,7 @@
 Read this first if you're an AI harness (or a person) joining the **30 apps in 30 days** build. It's the current
 state of every decision; the rules themselves are in [`AGENTS.md`](AGENTS.md).
 
-_Last updated: 2026-11-03 (Day 0)._
+_Last updated: 2026-11-04 (end of Day 0)._
 
 ## What we're building and why
 
@@ -20,11 +20,27 @@ The agent setup that builds them (this repo) is itself a portfolio piece: an AI 
 | Stack | Next.js + TypeScript, Postgres via Drizzle, Better Auth with `user`/`admin` roles, Tailwind. One container image per app. |
 | Starting point | Every app is created from [`30-apps-template`](https://github.com/BreakthruDevelopment/30-apps-template), which already has auth, roles, the AI gateway, tests, CI and a Dockerfile. |
 | AI in the apps | Every model call goes through the template's `generate()` gateway. Default model: Gemini, paid from Google AI Pro's monthly Google Cloud credit. Recorded demo answers when the quota runs out. Claude is an optional config switch. |
-| Clouds | Free tiers only. Each app is live on one cloud, rotating AWS → Azure → Google Cloud → Oracle by app number; the other three are proven with `terraform plan`. The Oracle Always Free VM is the permanent demo host. |
+| Clouds | Free tiers only. Each app is live on one cloud, rotating AWS → Azure → Google Cloud → Oracle by app number; listing more clouds for it in `apps.yaml` deploys it there too. The Oracle Always Free VM is the permanent demo host. Details below. |
+| Deploys | [`30-apps-infra`](https://github.com/BreakthruDevelopment/30-apps-infra): `apps.yaml` lists each app, its clouds and its exact image tag; changing it is how you deploy. Merging to `main` applies Azure, Google Cloud and Oracle from GitHub Actions. AWS is applied by Michael with one command in AWS CloudShell. Apps migrate their own database on startup. |
 | Domains | `appN.breakthruventures.ai` for app N. DNS stays at Network Solutions; records are added by hand (`runbooks/dns-network-solutions.md`). |
 | GitHub | Org `BreakthruDevelopment`. It also holds unrelated apps that must never be touched: only repos tagged `30-apps-30-days` are in scope. |
 | Budget | Nothing beyond the existing subscriptions (Claude, X/Grok, ChatGPT Plus, Google AI Pro) and cloud free tiers. No extra credits, no paid services. |
 | Order | App 1 is the **Build Tracker**, built first so it serves as mission control for the month. Full list in [`catalog.yaml`](catalog.yaml). |
+
+### The four clouds as built
+
+| Cloud | Region | App runs on | Database | Sign-in from GitHub |
+| --- | --- | --- | --- | --- |
+| AWS | us-east-2 only (account guardrail) | Lambda (Arm image) + API Gateway | Shared RDS db.t4g.micro, on Free plan credits | None: the guardrails block GitHub sign-in, so `deploy/aws.sh` runs in CloudShell |
+| Azure | Apps East US, database Central US | Container Apps, 0–1 replicas | Shared Flexible Server B1ms (free 12 months; East US isn't offered to this subscription) | Keyless OIDC |
+| Google Cloud | us-central1 | Cloud Run, 0–1 instances | Postgres on the always-free e2-micro VM, no public IP | Keyless OIDC |
+| Oracle | US West (Phoenix) | Docker + Caddy on the Always Free A1 VM (2 OCPU / 12 GB) | Postgres on the same VM | API key in the `production` environment secret |
+
+Account notes: AWS stays on the **Free plan** (can't bill; closes after 6 months), so don't upgrade it to remove the
+guardrails. The Google Cloud trial ended, so it's a paid account kept inside always-free limits, with budget alerts
+(a Cloud Run spend cap is recommended). Google Cloud is under `mparrott567@gmail.com`; the others use `dev@breakthruventures.ai`.
+The org uses immutable OIDC subject claims (`repo:BreakthruDevelopment@<id>/<repo>@<id>:…`); the bootstrap scripts
+trust both forms.
 
 **Dropped, don't bring back:** native mobile (Expo/React Native), app-store publishing, the Kylon platform,
 calling the Claude API from the apps, paid DNS, and running many agents in parallel inside one Claude session.
@@ -61,10 +77,13 @@ When a harness hits its usage limit, its issues are relabeled to another harness
 
 ## Where things stand
 
-- Done: the app template (tested end to end) and this repo (rules, roles, catalog, runbooks).
-- Waiting on Michael: cloud accounts, Google AI Pro + Jules, Codex and Grok connections to GitHub, the project board,
-  and repo settings (topics, template flag, branch protection). See [`runbooks/day-0.md`](runbooks/day-0.md).
-- Next: Terraform for the four clouds, then the template deployed live on all four. Day 1 starts after that.
+- Done (Day 0): the app template, this repo, the four cloud accounts, `30-apps-infra`, and the template app live and
+  passing its health check on all four clouds:
+  - AWS: https://v1uf5au310.execute-api.us-east-2.amazonaws.com
+  - Azure: https://app-template.salmonpebble-b870873b.eastus.azurecontainerapps.io
+  - Google Cloud: https://template-189497094271.us-central1.run.app
+  - Oracle: https://template.141-148-159-122.sslip.io
+- Next: Day 1, app 1 (Build Tracker), live on AWS, with the first `appN.breakthruventures.ai` record at Network Solutions.
 
 ## Where to read more
 
@@ -75,3 +94,4 @@ When a harness hits its usage limit, its issues are relabeled to another harness
 | What to build | [`catalog.yaml`](catalog.yaml), then `specs/NN-slug.md` |
 | How code must be written in an app | That app repo's `AGENTS.md` |
 | The day's routine | [`runbooks/daily.md`](runbooks/daily.md) |
+| How deploys work | [`30-apps-infra` README](https://github.com/BreakthruDevelopment/30-apps-infra#how-deploys-work) |

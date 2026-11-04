@@ -1,5 +1,6 @@
 # The 30 apps. Source of truth for repo names, subdomains and the cloud each app is live on.
-# Cloud rotates by day: AWS, Azure, Google Cloud, Oracle Cloud. The other three are proven by `terraform plan`.
+# Cloud rotates by day: AWS, Azure, Google Cloud, Oracle Cloud. Deploys happen by adding the app to apps.yaml in
+# 30-apps-infra; listing more clouds there runs it on those too.
 domain: breakthruventures.ai
 github_org: BreakthruDevelopment
 repo_topic: 30-apps-30-days

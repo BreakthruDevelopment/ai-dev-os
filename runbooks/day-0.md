@@ -21,7 +21,7 @@ Enter keys and passwords directly into the service or GitHub secrets, never into
 - [ ] **Gemini API key** from Google AI Studio, billed to the Google Cloud project. Until it's added, apps run with
       `ai: demo` (recorded answers).
 - [ ] **Budget alerts at $1** on AWS and Azure (Google Cloud done)
-- [ ] **Project board:** one GitHub Project across all app repos, with a Harness field (`claude`, `grok`, `codex`, `jules`)
+- [x] **Project board:** [30 Apps in 30 Days](https://github.com/users/BreakthruDevelopment/projects/1): Status (Todo / In Progress / In review / Done) and a Harness field (`claude`, `grok`, `codex`, `jules`); Board and table views. BreakthruDevelopment is a personal account, so the board lives under it rather than an org.
 
 ## Platform (Claude Code)
 

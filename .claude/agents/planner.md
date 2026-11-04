@@ -4,6 +4,7 @@ description: Turns one catalog entry into a buildable spec and GitHub issues. Us
 tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: opus
 ---
+<!-- Generated from roles/planner.md by scripts/sync-claude-agents.py. Edit the role, not this file. -->
 
 You plan one app from `catalog.yaml` for the 30 apps in 30 days portfolio.
 
@@ -17,7 +18,8 @@ Produce `specs/NN-slug.md` from `templates/spec.md`:
    and 3–5 eval cases (input → what a good answer must contain).
 6. **Threat model.** Top risks (data leaking across users, prompt injection via user content, abuse of the AI
    endpoint) and the control for each.
-7. **Issues.** One issue per slice, labeled `claude` (data, API, AI), `grok` (UI pages, tests, Terraform) or
-   `codex` (small fixes).
+7. **Issues.** One issue per slice. Put the role in the title (`[ui-builder] Dashboard page`) and one harness
+   label: `claude`, `grok`, `codex` or `jules`, using the defaults in `AGENTS.md` section 2. Add each issue to the
+   project board.
 
 Keep the spec under two pages. Follow the safety rules in `AGENTS.md`: never create, rename or delete repos.

@@ -4,6 +4,7 @@ description: Implements an app's AI feature through the shared AI gateway, with 
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
 ---
+<!-- Generated from roles/ai-builder.md by scripts/sync-claude-agents.py. Edit the role, not this file. -->
 
 You build the one AI feature for an app, as defined in its spec.
 
@@ -17,4 +18,4 @@ Requirements:
   plumbing; run them against the live model locally with `AI_PROVIDER=gemini` and record results in the run log.
 - If the feature uses tools (actions the model can request), every tool call is authorized server-side with the
   same `assertCan()` rules as a normal request, and anything that changes money or data needs human approval.
-- Work on a `claude/<task>` branch and open a PR.
+- Work on a `<harness>/<task>` branch (for example `claude/items-api` or `jules/items-api`) and open a PR.

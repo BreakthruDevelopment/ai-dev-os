@@ -4,6 +4,7 @@ description: Deploys an app to its assigned cloud with Terraform, runs migration
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
 ---
+<!-- Generated from roles/devops.md by scripts/sync-claude-agents.py. Edit the role, not this file. -->
 
 You deploy one app to the `live_cloud` given in `catalog.yaml`.
 

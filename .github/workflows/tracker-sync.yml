@@ -1,0 +1,93 @@
+name: Tracker sync
+
+# Drives the Portfolio Build Tracker (app 1), which runs on AWS Lambda and has no background jobs of its own.
+#   every 30 min  POST /api/sync           refresh the catalog and poll each active app's /api/health
+#   daily 06:07   POST /api/summaries/run  loop until nothing remains (max 6 calls, 10 s apart)
+# Repo secrets: TRACKER_URL (base URL, no trailing path) and TRACKER_SYNC_TOKEN (same value as the app's SYNC_TOKEN).
+# Until both are set the run prints a notice and succeeds, so the schedule doesn't fail before setup.
+# Minutes avoid :00, when GitHub's scheduler is busiest. The sync minutes (17, 47) never coincide with 06:07.
+
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+    - cron: "7 6 * * *"
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What to run
+        type: choice
+        options: [sync, summaries, both]
+        default: sync
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tracker-sync
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TRACKER_URL: ${{ secrets.TRACKER_URL }}
+      TRACKER_SYNC_TOKEN: ${{ secrets.TRACKER_SYNC_TOKEN }}
+      TASK: ${{ github.event_name == 'workflow_dispatch' && inputs.task || (github.event.schedule == '17,47 * * * *' && 'sync' || 'summaries') }}
+    steps:
+      - name: Call the tracker
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${TRACKER_URL:-}" ] || [ -z "${TRACKER_SYNC_TOKEN:-}" ]; then
+            echo "::notice::TRACKER_URL and TRACKER_SYNC_TOKEN are not both set as repository secrets; nothing to do yet."
+            exit 0
+          fi
+          base="${TRACKER_URL%/}"
+          case "$base" in
+            https://*) ;;
+            *) echo "::error::TRACKER_URL must start with https://"; exit 1 ;;
+          esac
+
+          out="$(mktemp)"
+
+          # POST to the tracker. Prints the JSON response (it holds no secrets); sets $code to the HTTP status.
+          # The token goes to curl on stdin as a config line, so it never appears in the process list or the log.
+          call() {
+            local rc=0
+            code="$(printf 'header = "Authorization: Bearer %s"\n' "$TRACKER_SYNC_TOKEN" |
+              curl -K - --fail-with-body -sS --max-time 30 -X POST \
+                -o "$out" -w '%{http_code}' "$base$1")" || rc=$?
+            echo "POST $1 -> HTTP ${code:-none} (curl exit $rc)"
+            cat "$out"
+            echo
+            return 0
+          }
+
+          run_sync() {
+            call /api/sync
+            if [ "$code" != "200" ]; then echo "::error::sync failed with HTTP $code"; return 1; fi
+          }
+
+          run_summaries() {
+            local i remaining
+            for i in 1 2 3 4 5 6; do
+              call /api/summaries/run
+              if [ "$code" != "200" ]; then echo "::error::summaries failed with HTTP $code"; return 1; fi
+              remaining="$(jq -r '.remaining' "$out" 2>/dev/null || true)"
+              case "$remaining" in
+                '' | *[!0-9]*) echo "::error::summaries response has no numeric 'remaining'"; return 1 ;;
+              esac
+              if [ "$remaining" -eq 0 ]; then echo "All summaries are done."; return 0; fi
+              if [ "$i" -lt 6 ]; then sleep 10; fi
+            done
+            echo "::warning::$remaining summaries still remaining after 6 calls; the next daily run continues."
+          }
+
+          case "$TASK" in
+            sync) run_sync ;;
+            summaries) run_summaries ;;
+            both) run_sync; run_summaries ;;
+            *) echo "::error::unknown task '$TASK'"; exit 1 ;;
+          esac

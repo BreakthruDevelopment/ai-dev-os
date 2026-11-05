@@ -30,6 +30,11 @@ gh repo create BreakthruDevelopment/07-appointment-booking --public --template B
 gh repo edit BreakthruDevelopment/07-appointment-booking --add-topic 30-apps-30-days
 ```
 
+4. Add the Build Tracker webhook so the repo's pushes, PRs and CI runs show on the board (Michael, with GitHub CLI signed in):
+   `TRACKER_URL=<tracker base URL> scripts/add-tracker-webhook.sh 07-appointment-booking`
+   (it asks for the webhook secret silently if `TRACKER_WEBHOOK_SECRET` isn't set, and refuses repos without the
+   topic, so do step 3 first). **Repos made from the template don't copy webhooks**, so this is needed for every new repo.
+
 ## Deploying the day's app
 
 Deploys live in [`30-apps-infra`](https://github.com/BreakthruDevelopment/30-apps-infra). Once the app's image is

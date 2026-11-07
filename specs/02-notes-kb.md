@@ -179,13 +179,13 @@ unless noted. **Order:** 1 and 2 first (in parallel); 3 needs 1; 4 needs 3; 5 ne
 4. **`[fullstack-builder] Note ACL, data functions, API and integration tests`** · `claude`
    Add `src/lib/acl.ts` (the readable/editable SQL fragments and the `canReadNote/canEditNote/canManageNote` policy;
    admin gets delete and metadata only) and `src/lib/notes.ts` (`listNotes(actor, tab, q)`, `getNote`, `createNote`,
-   `updateNote` with `updated_at` check, `deleteNote`, `shareNote`, `revokeShare`, `setVisibility`,
+   `updateNote` with `updated_at` check, `deleteNote`, `shareNote` (existing users only, by exact email; 30 shares per user per hour, then 429; same response whether or not the email exists), `revokeShare`, `setVisibility`,
    `listAllNoteMeta` for admin (title returned only for workspace or shared notes, `null` for private unshared ones), `keywordSearch`), each taking the actor, zod-validated, using the fragment. Wire the
    routes and server actions in "Pages and API" (not `/api/ask`, which is issue 5), with `errorResponse`. Leave a
    `reindexNote(note)` hook that issue 5 fills. Done when: `test/notes.integration.test.ts` proves private notes are
    404 to others and to admin (body), read shares can't edit (403), edit shares can't share or delete, workspace
    notes are readable by all users, revoke takes effect at once, admin can delete and list metadata without body (and without the title of a private unshared note),
-   note delete cascades chunks and shares, and the 100-note cap holds.
+   note delete cascades chunks and shares, the 100-note cap holds, and the 31st share in an hour is rejected.
 
 5. **`[ai-builder] Indexing, ACL-filtered retrieval and cited answers`** · `claude`
    Implement "AI feature": chunker with unit tests; `reindexNote` (hash diff, one `embed()` batch, daily cap, pending

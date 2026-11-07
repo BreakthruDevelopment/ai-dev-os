@@ -14,7 +14,7 @@ open**. This app shows that: per-note ACLs enforced in SQL, including inside vec
 | --- | --- |
 | Public (signed out) | Landing page with the demo-data warning; sign up / sign in |
 | `user` | Create notes; read notes they own, notes shared with them, workspace notes; edit their own and `edit`-shared notes; share their own notes; ask questions over what they can read |
-| `admin` | Everything a `user` can do on **their own** access, plus: list metadata of all notes (title, owner, visibility, share count, index status; never body or chunks), delete any note, reindex pending notes, see AI usage counters, the template's user management |
+| `admin` | Everything a `user` can do on **their own** access, plus: list metadata of all notes (owner, visibility, share count, index status, and the title only when the note is workspace or shared; a private note with no shares shows as "Private note"; never body or chunks), load the demo workspace, delete any note, reindex pending notes, see AI usage counters, the template's user management |
 
 **Admin does not read others' private notes.** "Private means private" is what a wiki client buys; admin access to
 content would be a database-level, audited break-glass action, not an app feature. So the template's `can()` (admin
@@ -68,7 +68,7 @@ share; manage (share, visibility, delete) = owner, plus delete by admin. Unreada
 | `/notes/new`, `/notes/[id]/edit` | page | user; edit ACL | Title, Markdown textarea with preview tab, visibility; optimistic concurrency on `updated_at` (409 on conflict) |
 | `/notes/[id]` | page | read ACL | Rendered Markdown (no raw HTML, safe links); owner sees share panel (add by email, read/edit, revoke) |
 | `/ask` | page | user | Question box; answer with inline `[1]` markers linked to sources; source list with titles; badge: live, demo or keyword |
-| `/admin` | page | admin | Notes metadata table, AI usage today vs caps, "Reindex pending", template user list |
+| `/admin` | page | admin | Notes metadata table (private titles masked), AI usage today vs caps, "Reindex pending", "Load demo workspace" (`POST /api/admin/demo`), template user list |
 | `GET/POST /api/notes`, `GET/PATCH/DELETE /api/notes/[id]` | route + actions | user (ACL per row) | CRUD; POST/PATCH re-chunk and embed changed chunks |
 | `PUT/DELETE /api/notes/[id]/shares` | route + actions | owner | `{email, permission}` / `{userId}`; can't share with yourself |
 | `GET /api/search?q=` | route | user | Keyword search (FTS) over readable notes, 20 results |
@@ -132,7 +132,7 @@ share; manage (share, visibility, delete) = owner, plus delete by admin. Unreada
 | Admin overreach | Admin sees metadata only; admin's ask uses the normal ACL; tested |
 | User enumeration via share-by-email | Signed-in only, same message shape, 30 shares per user per hour; acceptable for a single internal workspace |
 | Confidential data sent to a free-tier model | Banner and README: demo data only; no question text stored or logged |
-| Demo seed run against production | Refuses unless `DEMO_SEED=yes` and `APP_URL` is not `app2.breakthruventures.ai` or `*.azurecontainerapps.io` |
+| Demo seed run against production | The CLI refuses unless `DEMO_SEED=yes` and `APP_URL` is not `app2.breakthruventures.ai` or `*.azurecontainerapps.io`. On live, demo data comes only from the admin-only "Load demo workspace" button: it touches only the demo users' own notes, makes no demo user an admin, and gives demo users random passwords (nobody can sign in as them) |
 
 ## Issues
 
@@ -180,11 +180,11 @@ unless noted. **Order:** 1 and 2 first (in parallel); 3 needs 1; 4 needs 3; 5 ne
    Add `src/lib/acl.ts` (the readable/editable SQL fragments and the `canReadNote/canEditNote/canManageNote` policy;
    admin gets delete and metadata only) and `src/lib/notes.ts` (`listNotes(actor, tab, q)`, `getNote`, `createNote`,
    `updateNote` with `updated_at` check, `deleteNote`, `shareNote`, `revokeShare`, `setVisibility`,
-   `listAllNoteMeta` for admin, `keywordSearch`), each taking the actor, zod-validated, using the fragment. Wire the
+   `listAllNoteMeta` for admin (title returned only for workspace or shared notes, `null` for private unshared ones), `keywordSearch`), each taking the actor, zod-validated, using the fragment. Wire the
    routes and server actions in "Pages and API" (not `/api/ask`, which is issue 5), with `errorResponse`. Leave a
    `reindexNote(note)` hook that issue 5 fills. Done when: `test/notes.integration.test.ts` proves private notes are
    404 to others and to admin (body), read shares can't edit (403), edit shares can't share or delete, workspace
-   notes are readable by all users, revoke takes effect at once, admin can delete and list metadata without body,
+   notes are readable by all users, revoke takes effect at once, admin can delete and list metadata without body (and without the title of a private unshared note),
    note delete cascades chunks and shares, and the 100-note cap holds.
 
 5. **`[ai-builder] Indexing, ACL-filtered retrieval and cited answers`** · `claude`
@@ -202,8 +202,12 @@ unless noted. **Order:** 1 and 2 first (in parallel); 3 needs 1; 4 needs 3; 5 ne
    workspace (onboarding, PTO policy saying 5 days carry over, deploy runbook, incident postmortem, style guide, one
    containing a prompt-injection line), 8 private (1:1 notes, a customer note), 6 shared read or edit across users.
    Idempotent (demo users' notes are replaced); refuses unless `DEMO_SEED=yes` and `APP_URL` is not
-   `app2.breakthruventures.ai` or `*.azurecontainerapps.io`. Done when: running it twice gives the same 20 notes, all
-   indexed in demo mode, and a test covers the refusal rules.
+   `app2.breakthruventures.ai` or `*.azurecontainerapps.io`. Put the work in `src/lib/demo-workspace.ts`
+   (`loadDemoWorkspace(actor)`) shared by the CLI and an admin-only `POST /api/admin/demo` (`requireRole("admin")`,
+   Origin check, rate limit 1 per minute) so the live site can be populated from `/admin`: on that path no demo user is
+   admin (Ada becomes a normal user), demo users get random passwords nobody knows, and only demo users' notes are
+   touched. Done when: running it twice gives the same 20 notes, all indexed in demo mode; tests cover the CLI refusal
+   rules, the route rejecting non-admins, and real users' notes surviving a reload.
 
 7. **`[ui-builder] Notes list, editor, note view and sharing`** · `grok`
    Build `/`, `/notes` (tabs, keyword filter, visibility in text), `/notes/new` and `/notes/[id]/edit` (textarea,
@@ -215,8 +219,9 @@ unless noted. **Order:** 1 and 2 first (in parallel); 3 needs 1; 4 needs 3; 5 ne
 8. **`[ui-builder] Ask page and admin panel`** · `grok`
    Build `/ask` (question box with 500-char counter, answer with `[1]` markers linking to sources, source list,
    badge live/demo/keyword, refusal and rate-limit states, banner) and `/admin` (notes metadata table that becomes
-   cards at 375px, AI usage vs caps, "Reindex pending" showing `remaining`). Done when: both work at 375px, a refusal
-   shows no sources, and admin never sees note bodies.
+   cards at 375px, showing "Private note" when the title is `null`; AI usage vs caps; "Reindex pending" showing
+   `remaining`; "Load demo workspace" with a confirm step, calling issue 6's route). Done when: both work at 375px, a
+   refusal shows no sources, and admin never sees note bodies or private titles.
 
 9. **`[ui-builder] Smoke test for notes`** · `codex`
    Rewrite `scripts/smoke.sh`: wait up to 60 s for `/api/health` ok (cold starts); anonymous `GET /api/notes` is 401;

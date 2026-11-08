@@ -39,10 +39,12 @@ only (`count(*)`), never rows.
 **Platform constraints.** Oracle runs every OCI app as a long-lived Docker container behind Caddy on the Always Free
 A1 VM (2 OCPU / 12 GB, arm64), Postgres 17 (pgvector image) on the same VM, `DB_POOL_MAX` 5. No cold starts and no
 request timeout from the platform, but `web-push` calls still get a 10 s timeout each. The image is already built for
-arm64 by the template's publish workflow. Everything else the app needs from the host (secrets, a scheduler) is added
-in issues 1–2, because **the VM's agent today can't receive secrets** (README: "Oracle: not supported yet"; the
-Gemini key isn't wired either, so Oracle apps run on demo answers) **and can't be updated** (`metadata` is in
-`ignore_changes`, so agent changes only arrive with a host rebuild).
+arm64 by the template's publish workflow. **The app needs no secret from the host:** it makes its own VAPID keys
+(below). Two things it does need from the host are added in issues 1–2 **without rebuilding the VM** (Michael's call:
+the risk of losing A1 capacity is unacceptable). One is a scheduler. The other is the Gemini key, which isn't wired on
+Oracle today, so Oracle apps run on demo answers. Today the agent **can't be updated**: `metadata` is in
+`ignore_changes`, and SSH is off. Issue 1 turns on OCI Run Command, and Michael pastes a prepared bootstrap script into
+it once. From then on the agent updates itself from `main`.
 
 **Free-tier Gemini is shared and prompts may be used by Google.** A banner on `/` and `/progress` says: demo data only,
 don't enter real health information. The README says the same.
@@ -51,15 +53,23 @@ don't enter real health information. The README says the same.
 
 - **Protocol:** Web Push with VAPID through the `web-push` npm package (pure JS, aes128gcm payload encryption, ES256
   JWT). VAPID subject `mailto:dev@breakthruventures.ai` (`VAPID_SUBJECT`, not secret; Apple rejects subjects that
-  aren't `mailto:` or `https:`). Keys come from `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`; if either is missing, push
-  is **off**: `/api/health` says `push: "off"`, settings show "Reminders aren't set up on this server", and everything
-  else works. Rotating the keys invalidates every subscription (users turn reminders on again), so they're generated
-  once and kept.
-- **Keys, by hand, once:** `pnpm vapid:generate` (issue 5) prints a key pair locally using `web-push`'s generator;
-  nothing is written to disk or logged. Michael pastes them into the `30-apps-infra` `production` environment as
-  `HABIT_TRACKER_VAPID_PUBLIC_KEY` and `HABIT_TRACKER_VAPID_PRIVATE_KEY`; the names go in the app's `secrets` list in
-  `apps.yaml`. Issue 1 carries them to the VM through OCI Vault. The public key isn't secret, but keeping the pair
-  together means they can never drift apart.
+  aren't `mailto:` or `https:`).
+- **Keys: made by the app on first start, kept in its own database, never a secret anyone handles.**
+  `src/lib/vapid.ts` `getVapidKeys()` reads the single `app_settings` row. If the row is missing, it opens a transaction,
+  takes `pg_advisory_xact_lock(<fixed key>)`, reads again, and only if the row is still missing calls `web-push`'s
+  `generateVAPIDKeys()` and inserts it with `on conflict (id) do nothing`. Then it re-selects the row. However many
+  instances start at once, exactly one pair is written and all of them use it. Startup warms it from
+  `instrumentation.ts` after migrations, and the first push use also loads it lazily. The result is cached in memory
+  per process. Only the **public** key leaves the server (`GET /api/push/config`). The private key is never logged,
+  returned or put in env. If generation fails (database down), `/api/health` says `push: "off"`, settings say
+  "Reminders aren't available right now", and everything else works.
+  **Trade-offs:** (1) Rotating means deleting the row and restarting the app. That invalidates **every** subscription:
+  rows whose `vapid_key_id` no longer matches are pruned, and users turn reminders on again. (2) A database restore
+  brings back the same keys, so existing subscriptions keep working after a restore. A copy of the database restored
+  elsewhere could also send to production subscribers, which is one more reason the seed refuses production-like hosts.
+  (3) The private key is stored in plain text, in the same database and backups as user data. Anyone who can read the
+  database could send notifications from this origin. That's acceptable for a demo: Postgres is reachable only on the
+  compose network.
 - **Service worker** (`public/sw.js`, static, scope `/`, served with `Cache-Control: no-cache` and
   `Content-Type: application/javascript` via `next.config.ts` headers): `push` → parse `{title, body, url, tag}` and
   always call `showNotification` (Chrome and Safari require a visible notification for every push; `tag:
@@ -89,7 +99,8 @@ don't enter real health information. The README says the same.
   **404 or 410 → delete the row at once**; 429 → stop sending to that host for this run; 413/400 → log, keep; other
   errors and timeouts → `failure_count + 1`; rows with 10 consecutive failures or no success in 60 days are deleted.
 - **What triggers sends: a cron sidecar container on the VM, not a scheduled GitHub Action.** Issue 2 adds an optional
-  `cron:` key to `apps.yaml`; for an OCI app with it, the agent adds a tiny `cron-<name>` compose service
+  `cron:` key to `apps.yaml`. It reaches the VM through the agent's self-update from issue 1, not a rebuild. For an OCI
+  app with the key, the agent adds a tiny `cron-<name>` compose service
   (`curlimages/curl`, pinned, ~5 MB RAM) that every 5 minutes POSTs `http://app-<name>:3000/api/cron/reminders` over
   the compose network with `Authorization: Bearer $CRON_SECRET`. The agent generates `CRON_SECRET` per app on the host
   and puts it in both env files, like `BETTER_AUTH_SECRET`: it never leaves the VM and Michael never handles it.
@@ -125,7 +136,7 @@ don't enter real health information. The README says the same.
 | --- | --- | --- |
 | A1 VM CPU/RAM | Already running for the template; app container ~250 MB, sidecar ~5 MB, one cron POST per 5 min | Inside the 2 OCPU / 12 GB Always Free allowance |
 | Postgres disk (on the 100 GB boot volume) | 20 active / 50 total habits per user; one row per habit per day; backfill ≤7 days; 200 check-in writes per user per hour | ~60 B per check-in: even 1,000 active users ≈ 450 MB a year |
-| OCI Vault | Software-protected key (free), 2 app secrets + shared `GEMINI_API_KEY` | 3 of 150 Always Free secrets |
+| OCI IAM, Run Command | One dynamic group, one policy, one plugin; Run Command is used once by hand, then kept for break-glass | No charge (IAM and Oracle Cloud Agent plugins aren't metered) |
 | Egress | Push payloads <1 KB; pages | Far under 10 TB |
 | Push services (FCM, Mozilla, Apple, WNS) | VAPID needs no account or Firebase project; one reminder per user per day; `PUSH_DAILY_CAP` 2,000 app-wide; test push 3 per user per hour | Free |
 | Gemini | One summary per user per ISO week, ≤2 regenerations, current and previous week only, 6 per user per hour, `COACH_DAILY_CAP` 200 app-wide; no call for an empty week | Free tier |
@@ -140,6 +151,7 @@ don't enter real health information. The README says the same.
 | `user_settings` | PK `user_id` FK cascade, `time_zone` text default `UTC`, `reminder_time` time null (null = no reminders), `last_reminder_on` date null, `updated_at` | `user_id` | Check: reminder 05:00–21:00 on a 15-minute boundary. Partial index (`reminder_time`) where not null. Row created on first sign-in |
 | `push_subscription` | `id` uuid, `endpoint` text unique ≤1,024, `p256dh` (base64url, 65 bytes decoded), `auth` (16 bytes), `device_label` ≤60 (from User-Agent on the server), `vapid_key_id` char(8) (hash prefix of the public key, so a rotation can prune), `created_at`, `last_success_at`, `failure_count`, `last_status` | `user_id` FK user, cascade | Index (`user_id`). ≤5 per user |
 | `coach_summary` | PK (`user_id`, `iso_week` char(8) `YYYY-Www`), `data` jsonb (validated output), `stats` jsonb (what was shown to the model, no names), `mode` (`live`, `demo`, `skipped`, `fallback`), `input_hash` char(64), `regenerations` smallint, `generated_at` | `user_id` FK user, cascade | One row per user per ISO week in their time zone |
+| `app_settings` | PK `id` smallint default 1, check `id = 1` (single row), `vapid_public_key`, `vapid_private_key`, `vapid_key_id` char(8), `created_at` | — (app-wide) | Written only by `getVapidKeys()` under the advisory lock. Read only server-side, and no route returns the private key |
 | `daily_usage` | PK (`day`, `kind` `push`/`coach`/`demo_load`), `count` | — | App-wide daily caps (app 3's `usage.ts`) |
 | `rate_event` | `id`, `kind` (`checkin`, `habit_write`, `subscribe`, `test_push`, `coach`, `tz_change`, `demo_load`), `at` | `user_id` FK user, cascade | Per-user sliding windows |
 
@@ -190,7 +202,7 @@ Migration `--name habits-schema` (Drizzle can't express `INCLUDE`; add it with a
 | `POST /api/cron/reminders` | route | internal: `Authorization: Bearer CRON_SECRET` (timing-safe compare), no session | The reminder run; 404 when `CRON_SECRET` is unset |
 | `GET /api/coach?week=`, `POST /api/coach` | route + action | user | Cached summary or null; generate/regenerate `{week}` |
 | `POST /api/admin/demo` | route + action | admin | Demo workspace |
-| `GET /api/health` | route | public | Adds `push: "on" \| "off"` (never the key) |
+| `GET /api/health` | route | public | Adds `push: "on" \| "off"` (on once the VAPID row is loaded; never a key) |
 | `/manifest.webmanifest`, `/sw.js` | metadata route, static | public | PWA manifest; service worker |
 
 Every mutating route except the cron route: `requireUser()`/`requireRole()`, `requireSameOrigin()` and `readJson()`
@@ -265,7 +277,10 @@ with a 16 KB cap, zod at the boundary, `errorResponse()`. No `loading.tsx` or `<
 | SSRF through a push endpoint | `https:` plus a push-service host allow-list on subscribe; `web-push` called only with stored, validated endpoints; 10 s timeout |
 | Notification abuse or leaks | Pushes only go to the actor's own devices; one reminder per user per day, test 3/hour, app cap 2,000/day; counts only in payloads (lock screens); sign-out removes the device; payloads are encrypted end to end |
 | Public calls to the cron route | Caddy returns 404 for `/api/cron/*`; bearer token generated on the VM, timing-safe compare; 404 when unset; advisory lock and claim-before-send make repeats harmless |
-| Secrets exposure (VAPID private key, Gemini key) | Values only in GitHub `production` secrets and OCI Vault, passed one by one; on the VM in 0600 env files; never logged or sent to clients; issue 1 blocks containers from the instance metadata service (169.254.169.254) so an app can't use the host's instance principal to read other apps' secrets |
+| VAPID private key exposure | Kept only in `app_settings`, read server-side, never logged, never in env or a response. Postgres is reachable only on the compose network. The worst case is unwanted notifications from this origin, and rotation is "delete the row" (see trade-offs) |
+| Gemini key exposure | Michael types it into the bootstrap script in the OCI console, so it never goes to GitHub or to an agent. On the VM it's in the 0600 root-owned `shared.env`, and the script never echoes it. Run Command keeps plain-text scripts for 7 days, readable by anyone with command access in the compartment, including the CI deploy identity. So use a key made just for the Oracle host, which can be revoked on its own |
+| A container acting as the host | The new dynamic-group policy lets the instance principal poll Run Command. Agent v2 drops container traffic to the metadata service (169.254.169.254, `DOCKER-USER` chain), so an app can't get the host's token and claim or answer commands |
+| Agent self-update from `main` | No new trust: the agent already pulls `apps.yaml` from `main` and runs those images root-equivalent through Docker. The URL is pinned in the updater, the file must compile and pass `--check`, the previous version is kept, and 3 failed runs roll back. Recommend branch protection on `main` in `30-apps-infra` |
 | Cross-site use of a session (`*.breakthruventures.ai` apps are same-site) | `requireSameOrigin()` on every mutating route except cron |
 | Time-zone games (extra backfill days) | "Today" from the stored zone only; backfill window 7 days; 3 zone changes per day |
 | Abuse of Gemini and storage | Signed-in only; caps in the budget table; empty weeks skip the model; demo fallback; caps fail closed with a clear message |
@@ -275,36 +290,60 @@ with a 16 KB cap, zod at the boundary, `errorResponse()`. No `loading.tsx` or `<
 ## Issues
 
 Each issue names a role and carries one harness label; add each to the project board. Repo is `04-habit-tracker`
-unless noted. All app-repo issues are `claude` (Michael's call for this app); the infra issues are `claude` too, as in
-specs 02–03 (the default for Oracle Terraform is `jules`; relabel if Claude is short on capacity). **Order:** 1 and 3
+unless noted. **Every issue is `claude`, infra included** (Michael's call for this app; the default for Oracle
+Terraform is `jules`). No issue depends on a host rebuild. **Order:** 1 and 3
 first (in parallel; create the app repo from the template, which already has the design system, `generate()`, image
 input, `embed()` and the migration retry from `30-apps-template#14`, so no cherry-pick is needed); 2 needs 1; 4 needs
-3; 5 and 6 need 4; 7 needs 4 and 6; 8 and 9 need 4–6; 10 needs 8 and 9; 11 needs 1, 2 and the app merged and
-published; 12 last.
+3; 5 and 6 need 4; 7 needs 4 and 6; 8 and 9 need 4–6; 10 needs 8 and 9; 11 needs 1, 2, Michael's bootstrap
+paste and the app merged and published; 12 last.
 
-1. **`[devops] Oracle agent v2: self-update, per-app secrets and the Gemini key from OCI Vault`** · `claude` · repo **`30-apps-infra`**
-   Today the VM's agent can't be changed without a rebuild and can't receive secrets. In `stacks/oci`: a
-   `DEFAULT` (not virtual private) `oci_kms_vault` and a `SOFTWARE`-protected `oci_kms_key` (both Always Free), and one
-   `oci_vault_secret` per value: `<app>--<VAR>` for each name in an OCI app's `secrets` list, plus `shared--GEMINI_API_KEY`.
-   Values come from the `production` environment, mapped **one by one** in the Apply oci step into a tfvars JSON file
-   (README "Per-app secrets" pattern; delete it in an `always()` step); a missing value is skipped with a warning naming
-   it. Extend `bootstrap/oci.sh` (idempotent; Michael reruns it once in Cloud Shell) with a dynamic group
-   `30apps-host` (instances in the `30-apps` compartment) and a policy letting it `read secret-bundles` and `inspect
-   vaults` in that compartment only. The agent then (as root on the host, never in a container) reads secrets with
-   instance-principal auth (the OCI CLI in a venv installed by cloud-init; confirm on the day that it works on arm64
-   Ubuntu 24.04), writes them into the app's 0600 env file and `shared.env`, and restarts only apps whose values
-   changed. **Self-update:** each run also fetches `stacks/oci/files/agent.py` from the same raw `main` as `apps.yaml`,
-   checks it with `py_compile`, and atomically replaces itself if it differs (takes effect next run); log the old and
-   new sha256. Add an iptables `DOCKER-USER` rule (persisted) dropping container traffic to `169.254.169.254`. Add a
-   `workflow_dispatch` input `replace_oci_host` (default false) that adds `-replace=oci_core_instance.host`: **the
-   one-time rebuild** that installs agent v2 (Run Command isn't reliable on Ubuntu A1 images, and SSH is off). Only the
-   template runs on Oracle now, so its database is the only data lost; the public IP and the template's sslip URL change
-   (update `BRIEFING.md` and the tracker), and Cloudflare A records follow on the same apply. Document the capacity
-   risk (if A1 capacity is short, the apply loop retries ADs; rerun later). README: replace "Oracle: not supported yet"
-   and "isn't set up yet" with the new flow. Done when: after the rebuild, the template is healthy at its new URL with
-   `AI_PROVIDER=gemini`; a test secret on the template appears in its env file and not in `docker inspect` of any
-   other app; a container can't reach 169.254.169.254; a trivial agent change merged to `main` is running within 4
-   minutes with no rebuild; no secret value appears in workflow logs.
+1. **`[devops] Oracle host: Run Command plugin, IAM, bootstrap script and agent self-update`** · `claude` · repo **`30-apps-infra`**
+   **No host rebuild.** (a) **Terraform** (`stacks/oci/main.tf`). Add to `oci_core_instance.host` an `agent_config`
+   block with `are_all_plugins_disabled = false` and `is_management_disabled = false`, plus `plugins_config` entries:
+   `"Compute Instance Run Command"` set to `ENABLED`, and `"Compute Instance Monitoring"` set to `ENABLED` (Ubuntu's
+   default, kept explicit). Checked in provider source v8.29.0 (the stack pins `< 9.0`) and on `master`: `agent_config`
+   and its children have no `ForceNew`, and Update sends `UpdateInstanceAgentConfigDetails`, so the change is an
+   in-place update. `agent_config` isn't in `ignore_changes` (`source_details[0].source_id, metadata,
+   availability_domain`), so Terraform does apply it. Add `oci_identity_policy` `30apps-host-run-command` in the
+   `30-apps` compartment: `Allow dynamic-group 'Default'/'30apps-host' to use instance-agent-command-execution-family in
+   compartment id <compartment>`. Add the `oci_computeinstanceagent_instance_agent_plugins` data source for the host,
+   with output `run_command_status`. **The deploy identity can't create the dynamic group.** Dynamic groups live at the
+   tenancy level, and `30apps-deployers` may manage only the `30-apps` compartment. Widening it to `manage dynamic-groups
+   in tenancy` would let CI edit unrelated apps' groups, so don't. Instead, `bootstrap/oci.sh` gains an idempotent step:
+   create or update `30apps-host` with the rule `ALL {instance.id = '<apps-host OCID>'}`, looking up the host by display
+   name in the compartment. Michael reruns it once in Cloud Shell. The policy can be created by the compartment-scoped
+   deployer. If the apply returns NotAuthorized, move the statement into the same `oci.sh` step. IAM and agent plugins
+   carry no charge.
+   (b) **`stacks/oci/bootstrap/run-command.sh`**, pasted once into Console → Instance → Run command. Constraints:
+   **≤4 KB** (Run Command's plain-text limit; add a CI check with `wc -c` and `shellcheck`), and output **≤1 KB** (only
+   the last 1 KB is returned), so it ends with a few status lines. Steps, all idempotent:
+   1. Preflight: Run Command runs as `ocarun`. If not root, re-exec via `sudo -n`. If that fails, print `STOP: no root
+      (ocarun lacks sudo)` and exit having changed nothing.
+   2. Install `/opt/30apps/bin/update-agent` plus `30apps-agent-update.service` and `.timer` (every 3 min). The updater
+      fetches the pinned URL `https://raw.githubusercontent.com/BreakthruDevelopment/30-apps-infra/main/stacks/oci/files/agent.py`
+      (a constant in the updater, never read from `apps.yaml`), with a 256 KB cap. It runs `python3 -I -m py_compile`,
+      then `python3 -I agent.py --check` (a new flag: imports, validates constants, no side effects). If the sha256
+      differs, it copies the current file to `agent.py.prev` and swaps in the new one with `os.replace`. If the first 3
+      agent runs after a swap all fail, it restores `.prev` and records the bad sha so it isn't reinstalled until `main`
+      changes. JSON log lines with the old and new sha go to journald.
+   3. Near the top, `GEMINI_API_KEY=""`, which Michael fills in in the console. When it's non-empty, replace only that
+      line in `/opt/30apps/env/shared.env` (`umask 077`, root:root 0600, other lines kept). When it's empty, skip, so a
+      rerun never wipes it. Never echo it, and no `set -x`.
+   4. Run the updater once, then the agent, and print the agent sha, `key: set|unchanged`, `updater: active`, `ok`.
+   (c) **Agent v2** (`agent.py`, delivered by (b), and from then on by self-update) adds `--check` and re-applies
+   `iptables -C DOCKER-USER -d 169.254.169.254/32 -j DROP || iptables -I DOCKER-USER 1 …` every run, so containers
+   can't reach the metadata service (Caddy uses host networking and isn't affected). **Self-update is no new trust:** the
+   agent already pulls `apps.yaml` from `main` and runs those images root-equivalent through Docker. Recommend Michael
+   enable branch protection on `main` in `30-apps-infra`: require a PR and checks, block force-push and deletion.
+   README: replace "isn't set up yet" (Gemini on Oracle) with the bootstrap flow, and add a section "Oracle host: Run Command and self-update".
+   Done when: the plan shows `~ update in-place` on the host (never `-/+`), a second plan is empty, and
+   `run_command_status` is `RUNNING`; updater unit tests (local file URL) prove a syntax error or a failing `--check` is
+   rejected, `.prev` is kept, and 3 failures roll back; after Michael's paste the output ends in `ok`, a rerun changes
+   nothing, the template shows `AI_PROVIDER=gemini`, the key is in no output or log, a container can't reach
+   169.254.169.254, and a trivial agent change merged to `main` runs within 10 minutes (raw GitHub caches for ~5).
+   **If `run_command_status` isn't `RUNNING`, or the preflight prints `STOP`, stop and ask Michael** (see "Decisions
+   for Michael"). App 4 still deploys: push works, because keys come from the DB, but scheduled reminders and live
+   Gemini wait.
 
 2. **`[devops] Oracle scheduled jobs: cron key and internal sidecar`** · `claude` · repo **`30-apps-infra`**
    Add an optional `cron:` key to `apps.yaml` (document it in the header; only `oci` honours it): a list of
@@ -323,9 +362,8 @@ published; 12 last.
 3. **`[fullstack-builder] Schema, cleanup, settings and time zones`** · `claude`
    Add the tables in "Data model" (timestamptz(3), checks, composite FK, partial index, the custom covering-index
    migration), remove the `item` feature and `/dashboard`, update `NAV_LINKS`, `APP_TITLE` and
-   `requireRoleOrRedirect`, port the app 3 helpers listed above, add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
-   `VAPID_SUBJECT` (default `mailto:dev@breakthruventures.ai`), `CRON_SECRET`, `PUSH_DAILY_CAP` 2000 and
-   `COACH_DAILY_CAP` 200 to `env.ts` (all optional). Build `src/lib/time.ts` (`localToday(tz, now)`, `isoWeek(date)`,
+   `requireRoleOrRedirect`, port the app 3 helpers listed above, add `VAPID_SUBJECT` (default `mailto:dev@breakthruventures.ai`), `CRON_SECRET`, `PUSH_DAILY_CAP` 2000 and
+   `COACH_DAILY_CAP` 200 to `env.ts` (all optional; no VAPID keys in env). Build `src/lib/time.ts` (`localToday(tz, now)`, `isoWeek(date)`,
    week bounds, `isValidTimeZone`) and `src/lib/settings.ts` (get-or-create on first sign-in with the browser's zone,
    update with zone-change limit and reminder-time rules). Done when: migrations apply to an empty database; unit tests
    cover `localToday` around both 2026 US DST switches, Lord Howe, Kolkata and the ISO week of 2026-12-31 / 2027-01-01;
@@ -348,13 +386,16 @@ published; 12 last.
    Implement "Web push design": `public/sw.js`, `src/app/manifest.ts`, icons and `appleWebApp` metadata, headers in
    `next.config.ts`; `src/lib/push.ts` (`subscribe` with host allow-list, key validation, reassignment and the 5-device
    cap; `unsubscribe`; `sendToUser` with the status handling; `runReminders(now)` with the lock, claim and open-habit
-   count); the push routes and `POST /api/cron/reminders`; `pnpm vapid:generate` (prints a pair, writes nothing);
-   sign-out removes the device's subscription. Done when: `test/push.integration.test.ts`, with `web-push` stubbed,
+   count); `src/lib/vapid.ts` (`getVapidKeys()` with the advisory lock, the `instrumentation.ts` warm-up, pruning of
+   subscriptions whose `vapid_key_id` doesn't match); the push routes and `POST /api/cron/reminders`; sign-out removes
+   the device's subscription. Done when: `test/push.integration.test.ts`, with `web-push` stubbed,
    proves a reminder goes out once per local day across two runs, is skipped when everything is done or weekly goals
    are met, fires on time for users in Denver and Kolkata on the same run, works on both 2026 DST days, deletes the row
    on 404 and 410, keeps it on 500 and counts failures, refuses `https://evil.example/` and `http://` endpoints, moves an
    endpoint between users, caps devices at 5, stops at `PUSH_DAILY_CAP`, and answers 401 with a wrong token and 404
-   when `CRON_SECRET` is unset; the payload contains no habit name; a manual check on Chrome desktop and Android shows a
+   when `CRON_SECRET` is unset; the payload contains no habit name; 5 concurrent `getVapidKeys()` calls on separate
+   connections against an empty table return one identical pair and leave one row; deleting the row yields a new pair
+   and prunes old-key subscriptions; no response or log contains the private key; a manual check on Chrome desktop and Android shows a
    real test notification.
 
 6. **`[ai-builder] Weekly coach summary`** · `claude`
@@ -406,11 +447,10 @@ published; 12 last.
 11. **`[devops] Deploy app 4 to Oracle Cloud`** · `claude` · repo **`30-apps-infra`**
     Oracle already supports `domain`: the apply creates the Cloudflare A record to the VM and Caddy gets the certificate
     once DNS resolves, so the app goes straight to its final origin (push subscriptions and the service worker are
-    bound to the origin, so starting on sslip.io and moving would orphan them). After issues 1 and 2 are merged and the
-    VAPID secrets exist, open a PR adding `habit-tracker` (`title: Habit and Goal Tracker`, `clouds: [oci]`, `image:
+    bound to the origin, so starting on sslip.io and moving would orphan them). After issues 1 and 2 are merged and
+    Michael's bootstrap paste has printed `ok`, open a PR adding `habit-tracker` (`title: Habit and Goal Tracker`, `clouds: [oci]`, `image:
     ghcr.io/breakthrudevelopment/04-habit-tracker`, `sha-` tag of a published multi-arch image, `domain:
-    app4.breakthruventures.ai`, `ai: gemini`, `secrets: [VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY]`, `cron: [{path:
-    /api/cron/reminders, every_minutes: 5}]`) and map the two `HABIT_TRACKER_VAPID_*` secrets in the Apply oci step.
+    app4.breakthruventures.ai`, `ai: gemini`, `cron: [{path: /api/cron/reminders, every_minutes: 5}]`).
     Once deployed (the agent syncs within ~2 minutes of the apply), run the live smoke workflow, check `/api/health`
     shows `push: "on"`, the sidecar log shows a call every 5 minutes, logs show `ai.generate` task `weekly-coach`
     provider gemini, and a phone set to a reminder 10 minutes ahead receives it. Done when: smoke passes on
@@ -421,17 +461,45 @@ published; 12 last.
     admin-sees-counts-only decision, habits (yes/no, numeric, weekly goal, streak rules), local-date check-ins and the
     DST approach, how reminders work (permission flow, iOS Home Screen requirement, the cron sidecar, 404/410 cleanup,
     counts-only payloads), the coach (weekly cache, refresh cap, no-health-advice guardrails, "not advice"), the
-    free-tier budget table, demo-data-only warning, env vars (names only), `seed:demo`, `vapid:generate`,
+    free-tier budget table, demo-data-only warning, env vars (names only), VAPID keys generated into the database and
+    the rotation/restore trade-offs, `seed:demo`,
     `eval:coach`, delivery caveats (Android battery saver can delay; desktop Firefox only while open), and a two-minute
     demo script (Ben checks in on his phone, the streak ticks up, he turns on reminders and gets a test notification,
     opens Progress and generates his weekly summary; admin sees only counts). Done when: accurate against merged code,
     no secret values.
 
+## Michael by hand
+
+1. **Once, in Cloud Shell:** rerun `bootstrap/oci.sh` (idempotent) so it creates the `30apps-host` dynamic group,
+   which the CI identity isn't allowed to create. Do this before or with issue 1's merge, and allow up to 30 minutes
+   before the paste: that's how long a new dynamic group can take before the instance polls for commands.
+2. **Once, in the console:** Instance → Run command → paste `stacks/oci/bootstrap/run-command.sh`, typing a new Gemini
+   key, made just for the Oracle host, into its `GEMINI_API_KEY=""` line. Check that the output ends in `ok`.
+3. **DNS: nothing to do.** The Oracle apply creates the `app4` A record when the `CLOUDFLARE_API_TOKEN` secret exists,
+   as it does for app 3. Add it by hand only if that token is missing.
+
+## Decisions for Michael
+
+- **Branch protection on `main` in `30-apps-infra`** (recommended). The agent already runs what `main` says; now it
+  also runs `main`'s `agent.py`.
+- **The dynamic group means one Cloud Shell rerun** in addition to the console paste. The alternative is giving CI
+  `manage dynamic-groups in tenancy`, which isn't recommended because the org holds unrelated apps.
+- **If Run Command isn't available on the host.** Oracle's docs list only Oracle Linux, CentOS and Windows. Agent
+  1.61.0 (June 2026) added Ubuntu snap support, but no source confirms it on Ubuntu arm64. And if `ocarun` has no sudo,
+  the script can't become root. The fallback is to ship app 4 with push and test notifications but without scheduled
+  reminders or live Gemini, and revisit. A rebuild stays off the table.
+- **The Gemini key sits in Run Command history for 7 days**, visible to compartment admins and the CI identity, so use
+  a dedicated key.
+
 **Sources (checked 2026-11-08):** [OCI Always Free resources](https://docs.oracle.com/iaas/Content/FreeTier/resourceref.htm)
-(A1 2 OCPU / 12 GB, 200 GB block storage, 10 TB egress, Vault: software keys free, 150 secrets);
-[iOS web push requirements](https://pushpad.xyz/blog/ios-special-requirements-for-web-push-notifications) (Home Screen
-install, permission only from a user gesture); [GitHub Actions scheduled workflows](https://runhooks.app/blog/github-actions-scheduled-workflows-unreliable/)
-(delays and dropped runs, 5-minute minimum, 60-day disable in public repos);
-[OCI Run Command on Ubuntu](https://hashnode.com/posts/enable-run-command-plugin-for-ubuntu-based-vms-in-oci/68307fd991e9971aebaa2f8e)
-(plugin missing on an Ubuntu 24.04 A1 VM, so it's not relied on); `30-apps-infra` `stacks/oci`, `agent.py` and README
-on `main` (`d21a9bf`).
+(A1 2 OCPU / 12 GB, 200 GB block storage, 10 TB egress; no IAM or Run Command limits listed);
+[Running commands on an instance](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/runningcommands.htm)
+(supported OSes, `ocarun` and sudoers, 4 KB script / 1 KB output, 7-day retention, up to 30 min after joining a dynamic
+group); [Oracle Cloud Agent release notes](https://docs.oracle.com/iaas/Content/Compute/Tasks/manage-plugins.htm)
+(1.61.0: Run Command support for Ubuntu snap); [Run Command on Ubuntu 24.04 aarch64](https://hashnode.com/posts/enable-run-command-plugin-for-ubuntu-based-vms-in-oci/68307fd991e9971aebaa2f8e)
+(plugin missing with the older snap); [OCI Compute and Cloud Agent policies](https://oracle.hydrogen.sagittarius.connect.product.adaptavist.com/en-us/iaas/disaster-recovery/doc/compute-service-policies.html)
+(`instance-agent-command-execution-family` for the instance's dynamic group); `terraform-provider-oci`
+`internal/service/core/core_instance_resource.go` at `v8.29.0` and `master` (`agent_config` has no `ForceNew` and is
+sent on Update); [iOS web push requirements](https://pushpad.xyz/blog/ios-special-requirements-for-web-push-notifications);
+[GitHub Actions scheduled workflows](https://runhooks.app/blog/github-actions-scheduled-workflows-unreliable/);
+`30-apps-infra` `stacks/oci`, `bootstrap/oci.sh`, `agent.py` and README on `main` (`d21a9bf`).

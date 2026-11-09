@@ -6,10 +6,12 @@ Run by .github/workflows/create-app-repos.yml on pushes to main (and by hand). F
 - The repo doesn't exist: create it, public, from the template repo; add the topic, the harness labels and a
   `protect-main` ruleset (pull request required, CI must pass, no force pushes or deletion).
 - The repo exists with the topic: make sure the labels, topic and ruleset are there (adds only what's missing).
-- The repo exists without the topic: REFUSE and touch nothing. It may be one of the org's other applications.
+- The repo exists without the topic: REFUSE and touch nothing, unless GitHub says it was made from the template
+  (a run that stopped between creating it and tagging it). It may be one of the account's other applications.
+- The name redirects (a renamed or transferred repo) or GitHub answers with a different repo: REFUSE.
 
 It never renames, deletes, transfers or archives a repo, never changes a repo it didn't create or that lacks the
-topic, and never touches apps that aren't marked. Names must match the catalog's own rules (NN-slug).
+topic, and never touches apps that aren't marked. At most 4 new repos per run; the rest wait for the next run. Names must match the catalog's own rules (NN-slug).
 
   --dry-run   validate the catalog and print the plan; no token needed and nothing is called
   --check     validate only (used by the Check workflow)
@@ -35,7 +37,7 @@ LABELS = {  # harness labels the playbook uses (AGENTS.md section 3)
     "jules": ("1d76db", "Work for Jules"),
 }
 REQUIRED_CHECKS = ["Lint, test, build, smoke"]  # the template's CI job, which runs on every pull request
-MAX_CREATES_PER_RUN = 6
+MAX_CREATES_PER_RUN = 4  # new repos per run; apps stay marked, so only creations count
 
 
 def load_catalog(path="catalog.yaml"):
@@ -54,16 +56,25 @@ def load_catalog(path="catalog.yaml"):
         if name == template:
             sys.exit("the template repo can't be an app")
         marked.append(a)
-    if len(marked) > MAX_CREATES_PER_RUN:
-        sys.exit(f"{len(marked)} apps marked create_repo; at most {MAX_CREATES_PER_RUN} per run")
     return org, topic, template, marked
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A renamed or transferred repo answers its old name with a redirect to a different repo. Never follow it."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 class GitHub:
     def __init__(self, token):
         self.token = token
 
-    def call(self, method, path, body=None, ok=(200, 201, 204)):
+    def call(self, method, path, body=None):
+        """Returns (status, json or None). A 3xx comes back as its status, never followed."""
         req = urllib.request.Request(
             API + path,
             method=method,
@@ -76,7 +87,7 @@ class GitHub:
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with _OPENER.open(req, timeout=30) as r:
                 data = r.read()
                 return r.status, (json.loads(data) if data else None)
         except urllib.error.HTTPError as e:
@@ -85,35 +96,56 @@ class GitHub:
                 payload = json.loads(data) if data else None
             except ValueError:
                 payload = None
-            if e.code in ok:
-                return e.code, payload
             return e.code, payload
+        except urllib.error.URLError as e:
+            return 0, {"message": f"network error: {e.reason}"}
 
 
-def ensure_extras(gh, org, name, topic, created):
+def why(payload):
+    msg = (payload or {}).get("message") if isinstance(payload, dict) else None
+    return f": {msg}" if msg else ""
+
+
+def ensure_extras(gh, org, name, topic, created, from_template):
     """Topic, labels and ruleset. Adds what's missing; never removes or rewrites what's there."""
     status, data = gh.call("GET", f"/repos/{org}/{name}/topics")
     names = (data or {}).get("names", []) if status == 200 else []
     if topic not in names:
-        if not created:  # only a repo we just created may be given the topic
+        # Only a repo this workflow created (now, or in a run that stopped before the topic) may be given the topic.
+        if not (created or from_template):
             print(f"REFUSE {org}/{name}: exists without the topic {topic}; not touching it")
             return False
-        s, _ = gh.call("PUT", f"/repos/{org}/{name}/topics", {"names": sorted(set(names) | {topic})})
+        for attempt in range(5):  # a just-generated repo can briefly refuse writes
+            s, p = gh.call("PUT", f"/repos/{org}/{name}/topics", {"names": sorted(set(names) | {topic})})
+            if s == 200:
+                break
+            time.sleep(3)
         if s != 200:
-            print(f"ERROR {org}/{name}: setting the topic failed (HTTP {s})")
+            print(f"ERROR {org}/{name}: setting the topic failed (HTTP {s}{why(p)})")
             return False
         print(f"  topic {topic}")
 
+    ok = True
     s, existing = gh.call("GET", f"/repos/{org}/{name}/labels?per_page=100")
-    have = {l["name"] for l in existing or []} if s == 200 else set()
+    if s != 200:
+        print(f"ERROR {org}/{name}: listing labels failed (HTTP {s}{why(existing)})")
+        return False
+    have = {l["name"] for l in existing or []}
     for label, (color, desc) in LABELS.items():
         if label in have:
             continue
-        s, _ = gh.call("POST", f"/repos/{org}/{name}/labels", {"name": label, "color": color, "description": desc})
-        print(f"  label {label}" if s == 201 else f"  WARNING label {label}: HTTP {s}")
+        s, p = gh.call("POST", f"/repos/{org}/{name}/labels", {"name": label, "color": color, "description": desc})
+        if s == 201:
+            print(f"  label {label}")
+        else:
+            print(f"ERROR {org}/{name}: label {label} failed (HTTP {s}{why(p)})")
+            ok = False
 
     s, rulesets = gh.call("GET", f"/repos/{org}/{name}/rulesets")
-    if s == 200 and not any(r.get("name") == "protect-main" for r in rulesets or []):
+    if s != 200:
+        print(f"ERROR {org}/{name}: listing rulesets failed (HTTP {s}{why(rulesets)})")
+        return False
+    if not any(r.get("name") == "protect-main" for r in rulesets or []):
         s, _ = gh.call(
             "POST",
             f"/repos/{org}/{name}/rulesets",
@@ -139,14 +171,19 @@ def ensure_extras(gh, org, name, topic, created):
                         "type": "required_status_checks",
                         "parameters": {
                             "strict_required_status_checks_policy": False,
-                            "required_status_checks": [{"context": c} for c in REQUIRED_CHECKS],
+                            # 15368 is GitHub Actions: a commit status posted by anything else doesn't count.
+                            "required_status_checks": [{"context": c, "integration_id": 15368} for c in REQUIRED_CHECKS],
                         },
                     },
                 ],
             },
         )
-        print("  ruleset protect-main" if s == 201 else f"  WARNING ruleset protect-main: HTTP {s}")
-    return True
+        if s == 201:
+            print("  ruleset protect-main")
+        else:
+            print(f"ERROR {org}/{name}: ruleset protect-main failed (HTTP {s}{why(_)})")
+            ok = False
+    return ok
 
 
 def main():
@@ -167,11 +204,20 @@ def main():
         return 1 if marked else 0
     gh = GitHub(token)
     failed = False
+    creations = 0
     for a in marked:
         name = a["repo"]
         status, repo = gh.call("GET", f"/repos/{org}/{name}")
-        created = False
+        created = from_template = False
+        if 300 <= status < 400:
+            print(f"REFUSE {org}/{name}: the name redirects (renamed or transferred repo); not touching it")
+            failed = True
+            continue
         if status == 404:
+            if creations >= MAX_CREATES_PER_RUN:
+                print(f"LATER {org}/{name}: {MAX_CREATES_PER_RUN} repos created this run; rerun to continue")
+                continue
+            creations += 1
             s, _ = gh.call(
                 "POST",
                 f"/repos/{org}/{template}/generate",
@@ -184,26 +230,35 @@ def main():
                 },
             )
             if s != 201:
-                print(f"ERROR {org}/{name}: creating from {template} failed (HTTP {s})")
+                print(f"ERROR {org}/{name}: creating from {template} failed (HTTP {s}{why(_)})")
                 failed = True
                 continue
             created = True
             print(f"CREATED {org}/{name} from {org}/{template}")
-            for _ in range(30):  # the new repo's contents arrive asynchronously
+            for _ in range(60):  # the new repo's contents arrive asynchronously
                 s, _ = gh.call("GET", f"/repos/{org}/{name}/commits?per_page=1")
                 if s == 200:
                     break
                 time.sleep(2)
+            else:
+                print(f"WARNING {org}/{name}: still generating after 2 minutes; continuing")
         elif status == 200:
-            if repo.get("archived"):
-                print(f"SKIP {org}/{name}: archived")
+            if (repo.get("full_name", "").lower() != f"{org}/{name}".lower()
+                    or (repo.get("owner") or {}).get("login", "").lower() != org.lower()):
+                print(f"REFUSE {org}/{name}: GitHub answered with {repo.get('full_name')}; not touching it")
+                failed = True
                 continue
+            if repo.get("archived") or repo.get("fork"):
+                print(f"SKIP {org}/{name}: archived or a fork")
+                continue
+            from_template = ((repo.get("template_repository") or {}).get("full_name", "").lower()
+                             == f"{org}/{template}".lower())
             print(f"EXISTS {org}/{name}")
         else:
             print(f"ERROR {org}/{name}: lookup failed (HTTP {status})")
             failed = True
             continue
-        if not ensure_extras(gh, org, name, topic, created):
+        if not ensure_extras(gh, org, name, topic, created, from_template):
             failed = True
     return 1 if failed else 0
 

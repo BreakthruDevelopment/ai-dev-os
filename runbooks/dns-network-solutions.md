@@ -1,4 +1,9 @@
-# DNS records at Network Solutions
+# DNS records at Network Solutions (superseded)
+
+> **Superseded.** DNS for `breakthruventures.ai` is now hosted at **Cloudflare**, and each app's records are created
+> automatically by Terraform when it's deployed with a `domain` in `apps.yaml`. Nobody adds records by hand. See the
+> [`30-apps-infra` README, "Custom domains and DNS (Cloudflare)"](https://github.com/BreakthruDevelopment/30-apps-infra#custom-domains-and-dns-cloudflare).
+> This page is kept for history only; don't follow it.
 
 DNS for `breakthruventures.ai` stays at Network Solutions, and records are added by hand: one per app, about 30
 over the month. Existing records for the website and email are never edited.

@@ -11,7 +11,7 @@
 | Afternoon | Add the app to `apps.yaml` for the day's cloud (PR), smoke test after deploy | Claude Code (devops) |
 | Afternoon | AWS days only: run `deploy/aws.sh` in AWS CloudShell | Michael |
 | Evening | README and demo script | Docs (whoever has headroom) |
-| Evening | Review and merge; add the DNS record; post the app | Michael |
+| Evening | Review and merge; post the app (DNS records are created in Cloudflare by the deploy) | Michael |
 | Overnight | Queued issues → PRs | Codex, Jules, scheduled Claude Code |
 | Overnight | CI status, free-tier usage, stalled PRs → Build Tracker | Grok Bot (ops monitor) |
 

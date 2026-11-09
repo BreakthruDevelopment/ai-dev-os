@@ -63,7 +63,8 @@ When a harness hits its usage limit, Michael (or the planner) relabels its open 
 3. **Reviewer** plus Codex review each PR. CI must be green: lint, typecheck, tests, build, smoke.
 4. **DevOps** adds the app to `apps.yaml` in `30-apps-infra` for the day's `live_cloud` (a PR Michael merges; AWS runs from CloudShell), then runs the smoke test against the live URL. Migrations run when the app starts.
 5. **Docs writer** fills in the README from `templates/app-readme.md`.
-6. **Michael** reviews and merges, adds the DNS record (see `runbooks/dns-network-solutions.md`), posts the app.
+6. **Michael** reviews, merges and posts the app. DNS records are created in Cloudflare by Terraform on deploy
+   (`30-apps-infra` README, "Custom domains and DNS"); nobody adds them by hand.
 7. **Overnight:** Codex, Jules, Grok Bot and scheduled Claude Code tasks work queued issues into PRs; the ops monitor reports to the Build Tracker. Nothing merges without Michael.
 
 ## 5. Usage limits

@@ -43,7 +43,7 @@ whichever harness has capacity.
 | `.claude/agents/` | Claude Code subagents generated from `roles/` (`scripts/sync-claude-agents.py`) |
 | `catalog.yaml` | The 30 apps: repo name, subdomain, cloud, AI feature |
 | `templates/` | Spec, README and run-log templates |
-| `runbooks/` | Day 0 setup, the daily flow, DNS at Network Solutions |
+| `runbooks/` | Day 0 setup, the daily flow (DNS is created by the deploy at Cloudflare; the old Network Solutions runbook is kept, superseded) |
 | `specs/`, `runs/` | One spec and one run log per app |
 
 The app template lives in [`30-apps-template`](https://github.com/BreakthruDevelopment/30-apps-template).

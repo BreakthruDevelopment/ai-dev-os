@@ -1,6 +1,6 @@
 ---
 name: devops
-description: Deploys an app to its assigned cloud with Terraform, runs migrations, smoke-tests the live URL and prints the DNS record to add. Use after the app's PRs are merged.
+description: Deploys an app to its assigned cloud with Terraform, runs migrations, smoke-tests the live URL and confirms the custom domain works (DNS records are created by Terraform). Use after the app's PRs are merged.
 default_harness: claude-code
 claude_model: sonnet
 claude_tools: Read, Write, Edit, Glob, Grep, Bash
@@ -14,11 +14,16 @@ Steps:
 2. On a `claude/deploy-<app>` branch in `30-apps-infra`, add the app to `apps.yaml`: `name`, `clouds: [<live_cloud>]`,
    `image`, `tag` (never `latest`), `domain` (`appN.breakthruventures.ai`) and `ai`. Open a PR; the PR runs validation
    for all four stacks and read-only plans for Azure and Google Cloud. Michael merges.
-3. Merging deploys Azure, Google Cloud and Oracle from GitHub Actions; watch the run. For AWS, ask Michael to run
-   `deploy/aws.sh` in AWS CloudShell and read back its output.
+3. Merging deploys Azure, Google Cloud and Oracle from GitHub Actions; watch the run. AWS deploys itself: the
+   deployer Lambda pulls `main` within about 10 minutes (`aws-autodeploy.sh … status` shows the result); if it's
+   paused or failing, ask Michael to run `deploy/aws.sh` in AWS CloudShell as the fallback and read back its output.
+   Google Cloud: add a new app with `domain: null` first and set the domain in a second PR (infra README).
 4. The app migrates its own database on startup (`MIGRATE_ON_START=true`). Don't run migrations separately.
 5. Run `BASE_URL=<live url> scripts/smoke.sh` from the app repo.
-6. Print the exact DNS record for Network Solutions (see `runbooks/dns-network-solutions.md`): type, host, value.
+6. Check the custom domain: DNS for `breakthruventures.ai` is at Cloudflare, and the deploy creates the app's records
+   with Terraform (infra README, "Custom domains and DNS"). Nobody adds records by hand. Confirm
+   `https://appN.breakthruventures.ai/api/health` answers; if the apply reported a missing `CLOUDFLARE_API_TOKEN` or a
+   conflicting record, tell Michael exactly which.
 7. Record the deploy (cloud, URL, image tag, smoke result) in `runs/NN-slug.md` and set `status: deployed`
    in `catalog.yaml` via a PR.
 

@@ -57,7 +57,9 @@ cursor, count); remove(accessToken) }`.
   Flow: `POST /link/token/create` (products `transactions`, `country_codes: [US]`) → Plaid Link in the browser
   (`react-plaid-link`) → `public_token` → `POST /item/public_token/exchange` → encrypt and store `access_token`.
   Test login `user_good` / `pass_good`. Disconnect calls `/item/remove`, then deletes the secret row.
-- Health adds `bank: "demo" | "plaid"` (never a key). Until Michael adds the Plaid keys, live runs on `demo`.
+- Health adds `bank: "demo" | "plaid"` (never a key). **Decided: app 5 ships on the demo bank.** Plaid sandbox
+  switches on later, with no code change or deploy PR, when Michael adds the three values (day-0 M4). No issue waits on
+  the keys: every done-when below is met against the demo bank or a local stub Plaid server.
 
 ### Token encryption (decision)
 
@@ -231,7 +233,8 @@ wiring after 5.2); 5.5 after 5.2–5.4; 5.6 last.
    and exchange routes, `bank_item_secret` via T4's `envelope.ts`, `withAccessToken`, disconnect, health `bank`.
    Done when, against a local stub Plaid server: connect → sync → disconnect works; the log-capture test passes; a
    ciphertext moved to another row fails; missing or 31-byte `TOKEN_ENC_KEY` falls back to demo; mutation-during-
-   pagination restarts from the loop cursor. Manual: one real sandbox connect with Michael's keys, after 5.5.
+   pagination restarts from the loop cursor. (A real sandbox connect is a follow-up check for whenever the keys
+   exist, not part of done.)
 3. **5.3 `[ai-builder] Categorization and cash-flow explanation`** · `claude`
    Both tasks, `advice-guardrails.ts`, caching/caps, fixtures, evals, `pnpm eval:budget`. Done when evals pass, a
    second POST with unchanged data makes no call, the 3rd regeneration is 429, demo mode works with no network.
@@ -242,8 +245,9 @@ wiring after 5.2); 5.5 after 5.2–5.4; 5.6 last.
 5. **5.5 `[devops] Deploy app 5 to AWS`** · `claude` · repo **`30-apps-infra`**
    PR adding `budget-planner` (`clouds: [aws]`, published `sha-` tag, `domain: app5.breakthruventures.ai`, `ai: gemini`,
    `secrets: [PLAID_CLIENT_ID, PLAID_SECRET, TOKEN_ENC_KEY]`; Plaid switches on by itself only once all three exist).
-   After the deployer applies: live smoke, `/api/health` `bank` value recorded.
-   When Michael has added the keys: `aws-autodeploy.sh … deploy`, then one sandbox connect.
+   Done when the deployer has applied, live smoke passes on the demo bank, and `/api/health` shows `bank: "demo"`.
+   Later, outside this issue: once Michael adds the keys, `aws-autodeploy.sh … deploy` and one sandbox connect
+   (a comment on the closed issue is enough).
 6. **5.6 `[docs-writer] README for Personal Budget Planner`** · `jules`
    Problem, roles, provider flag, envelope encryption and the KMS trade-off, idempotency rules, AI guardrails,
    free-tier table, env var names, demo script (connect demo bank, recategorize Uber "always", set dining budget,

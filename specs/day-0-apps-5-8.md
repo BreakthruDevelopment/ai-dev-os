@@ -11,15 +11,15 @@ four specs, adds each to the board, and labels it.
 
 | Harness | Label | Work in this batch |
 | --- | --- | --- |
-| Claude Code | `claude` | Planner; template prep T1–T5; ai-builder for apps 5 and 8; reviewer on **every** PR; devops (one `apps.yaml` PR per app); readies PRs for Michael's merge |
+| Claude Code | `claude` | Planner; template prep T1–T5; T6 in `01-build-tracker`; ai-builder for apps 5 and 8; reviewer on **every** PR; devops (one `apps.yaml` PR per app); readies PRs for Michael's merge |
 | Jules | `jules` | fullstack-builder for apps 6, 7, 8; ai-builder for apps 6 and 7; docs-writer for all four READMEs |
 | Grok Build | `grok` | ui-builder for all four apps; an app's pages start once its first data/API PR is merged |
-| Codex | `codex` | fullstack-builder for app 5; **second review** on security-sensitive PRs only: T1, T2, T4, 6.2, 7.5, 7.9, 8.1, 8.2, 8.7 |
+| Codex | `codex` | fullstack-builder for app 5; **second review** on security-sensitive PRs only: T1, T2, T4, 6.2, 7.5, 8.1, 8.2 (and 7.9, 8.7 if they're ever opened) |
 | Grok Bot | — | No issues; keeps running the nightly ops report |
 
 **Merges are Michael's** (AGENTS.md §1). 5.2 is written by Codex, so its second look is a dedicated crypto/logging
-pass by the Claude reviewer instead of Codex reviewing its own code; the crypto primitive itself (T4) is Claude-written
-and Codex-reviewed.
+pass by the Claude reviewer instead of Codex reviewing its own code (**accepted by Michael**); the crypto primitive
+itself (T4) is Claude-written and Codex-reviewed.
 
 ## Template prep (repo `30-apps-template`, all `claude`)
 
@@ -59,7 +59,7 @@ Merged **before** the repos are created, so all four apps start with them. Each 
     intervalMs, concurrency })` from `instrumentation.ts` after `whenMigrated()`, `kick()` for `after()`, SIGTERM stop,
     `JOBS_WORKER=off` for tests.
   - README section **"Background work per cloud"**: Oracle (long-lived container, worker always on); Azure (worker runs
-    while a replica is up; any request wakes it; the tracker's health pings wake every app twice an hour); Google Cloud
+    only while visitors keep a replica up; nothing wakes it on a schedule, and the Build Tracker parks Azure apps); Google Cloud
     Run with `cpu_idle` and AWS Lambda (**no CPU after the response**: do the work inside the request with a budget,
     or use an external trigger). App 6 is the first user; app 21 (async queue) will reuse it.
   - Done when: lease-expiry reclaim, idempotent enqueue, two workers never run one job (concurrency test), backoff
@@ -74,8 +74,15 @@ Merged **before** the repos are created, so all four apps start with them. Each 
   - One-line-per-app PR to `catalog.yaml`; the PR check prints the plan. **Michael merges it after T1–T4 are merged and
     the token is set up**; the workflow creates all four (its cap is 4 per run).
 
-**Optional, only if Michael picks R1 option (b):** `T6 [fullstack-builder] Build Tracker: wake Azure apps once an
-hour` · `claude` · repo `01-build-tracker`.
+**Parallel item, already in progress:**
+
+- **T6 `[fullstack-builder] Build Tracker: Up/Down running state; Azure apps parked`** · `claude` · repo
+  **`01-build-tracker`** · **must be merged and deployed before 6.5** (resolves R1)
+  - Each app gets a running state, **Up** or **Down (parked)**. Azure apps default to Down and are **not
+    health-checked at all**, so the tracker never wakes them; only real visitors do. An admin can set an app Up
+    (health-checked as today) or press **Check now** for a single check.
+  - Done when: the scheduled sync makes no request to a Down app (tested), Check now does exactly one, and app 2 shows
+    Down by default after deploy.
 
 ## Order and dependencies
 
@@ -83,17 +90,18 @@ hour` · `claude` · repo `01-build-tracker`.
 T2 ─┬─ T4 ─┐
     ├─ T3 ─┼─ (T1) ─ T5 (Michael merges) ─ repos exist ─ planner opens issues
     └──────┘
+T6 (01-build-tracker, in parallel) ─────────────────── must be live before 6.5
 App 5:  5.1 ─┬─ 5.2 (T4) ─┐
              ├─ 5.3 ──────┼─ 5.5 deploy ─ 5.6 docs
-             └─ 5.4 UI ───┘            (Plaid keys: any time; then `deploy`)
+             └─ 5.4 UI ───┘            (Plaid keys: later, outside every issue; then `deploy`)
 App 6:  6.1 ─┬─ 6.2 (T3) ─ 6.3 ─┐
-             └─ 6.4 UI ─────────┴─ 6.5 deploy ─ 6.6 docs
+             └─ 6.4 UI ─────────┴─ 6.5 deploy (after T6) ─ 6.6 docs
 App 7:  7.1 ─ 7.2 ─┬─ 7.5 AI (T1) ─ 7.4 chat UI ─┐
              └─ 7.3 UI ─────────────────────────┴─ 7.6 deploy (domain null) ─ 7.7 domain ─ 7.10 docs
-             7.8 → 7.9 later (Google OAuth client)
+             (Google sync 7.8 → 7.9: later, not opened)
 App 8:  8.1 ─┬─ 8.2 ─┐
              ├─ 8.3 ─┼─ 8.5 deploy ─ Michael reboots VM ─ 8.6 docs
-             └─ 8.4 UI┘                 8.7 later (only if Oracle fixed)
+             └─ 8.4 UI┘                 (8.7: later, not opened; only if Oracle is fixed)
 ```
 
 If T1 isn't merged when the repos are created, 7.5 begins by copying `src/lib/ai/` from template `main` (it's
@@ -106,40 +114,30 @@ self-contained by T1's done-when); nothing else waits on T1.
 | M1 | Merge this spec PR | Now | Issues link to the specs on `main` |
 | M2 | Merge T1–T4 in `30-apps-template` as they go green | Day 1 morning | T5 |
 | M3 | One time, if not done: `protect-main` ruleset on `ai-dev-os` and the `REPO_CREATOR_TOKEN` environment secret (`runbooks/daily.md`). Then merge **T5** (approve the `repo-creator` run if you set yourself as reviewer) | Day 1 late morning | Every app issue |
-| M4 | **Plaid (app 5):** free Plaid account → sandbox `client_id` and sandbox secret; generate `TOKEN_ENC_KEY` with `openssl rand -base64 32`; store all three in CloudShell as `/30apps/budget-planner/PLAID_CLIENT_ID`, `…/PLAID_SECRET`, `…/TOKEN_ENC_KEY` with the README's silent `read -rsp` command; then `aws-autodeploy.sh` `bash -s -- deploy`. Never paste them into a chat | Any time; app 5 runs on its demo bank until then | Only the live Plaid connect |
-| M5 | **Google OAuth client (app 7, optional, later):** OAuth consent screen (External, Testing, add test users), Calendar API enabled, Web client with redirect `https://app7.breakthruventures.ai/api/auth/callback/google`; values into `30-apps-infra` `production` environment secrets | Only if you want 7.8–7.9 | 7.8, 7.9 |
-| M6 | **Oracle decision** (below), then **reboot the VM** after 8.5 merges (OCI console → `apps-host` → Reboot) | Day 2 | App 8 live |
+| M4 | **Plaid (app 5):** free Plaid account → sandbox `client_id` and sandbox secret; generate `TOKEN_ENC_KEY` with `openssl rand -base64 32`; store all three in CloudShell as `/30apps/budget-planner/PLAID_CLIENT_ID`, `…/PLAID_SECRET`, `…/TOKEN_ENC_KEY` with the README's silent `read -rsp` command; then `aws-autodeploy.sh` `bash -s -- deploy`. Never paste them into a chat | Later, whenever convenient; **app 5 ships on its demo bank** | No issue (Plaid switches on by itself) |
+| M5 | **Google OAuth client (app 7): not in this batch.** Only if Google sync is wanted later: OAuth consent screen (External, Testing, add test users), Calendar API enabled, Web client with redirect `https://app7.breakthruventures.ai/api/auth/callback/google`; values into `30-apps-infra` `production` environment secrets | Later | 7.8, 7.9 (not opened) |
+| M6 | **Reboot the VM** after 8.5 merges (OCI console → `apps-host` → Reboot) so Caddy loads app 8's site | Day 2 | App 8 live |
 | M7 | Make each new GHCR package public after its first publish (`runbooks/daily.md`) | After each app's first merge to `main` | Every deploy |
 | M8 | Review and merge app PRs; after 7.7, wait for the certificate and rerun the Terraform workflow on `main` | Throughout | — |
-| M9 | **R1 decision** (Azure grant) | Before app 6 deploys | Nothing hard |
+| M9 | Review and merge **T6** in `01-build-tracker` | Before 6.5 | 6.5 |
 
 DNS needs nothing by hand: all four clouds create the Cloudflare records on apply when the token exists, as for apps 1–4.
 
-## Decisions for Michael
+## Decisions (Michael, 2026-11-09)
 
-- **Oracle: fix once, or ship on the default?** Default (what the specs assume): app 8 ships with demo AI and
-  documents in Postgres, unencrypted at the app level, no malware scanning, and the VM reboot per new app. **Fix once
-  via the serial console** (GRUB recovery → root shell → a sudoers entry for `ocarun` or a self-updating agent, the
-  Gemini key in `shared.env`, per-app secrets): reboots the only host once, and then live AI on Oracle, issue 8.7
-  (document encryption), no more reboots per app. App 8's spec lists exactly what changes. A rebuild stays off the table.
-- **R1: Azure Container Apps grant.** Azure apps run with min 0 replicas, so they never get the idle rate: a woken
-  replica is billed at the active rate until the 300 s cooldown ends. The Build Tracker wakes **every** deployed app
-  in the catalog (not the template) in pairs twice an hour (:15/:17, :45/:47). Per Azure app that's about 7 min of
-  replica time per half hour, so roughly **150,000 vCPU-s and 300,000 GiB-s a month at 0.25 vCPU / 0.5 GiB**, against a
-  **subscription-wide** grant of 180,000 vCPU-s and 360,000 GiB-s. App 2 alone fits; **app 6 makes it about double the
-  grant**. By my estimate the overage is roughly $3–4 a month at the active rates ($0.000024 per vCPU-s, $0.000003 per
-  GiB-s; check the pricing page). It grows with every later Azure app (10, 14, 18, 22, 26, 30). That breaks the
-  no-charges rule once the $200 credit is gone. **Please check Cost Management → Container Apps meters.** Options:
-  (a) accept while the credit lasts and decide later; (b) **recommended:** T6, the tracker wakes Azure apps with one
-  ping an hour (≈54,000 vCPU-s and 108,000 GiB-s per app; three Azure apps fit); (c) the tracker stops waking Azure apps
-  and reports them as "asleep" until someone visits. App 6's design adds no wakes either way. Its retries just run
-  hourly instead of every half hour under (b).
-- **Plaid account:** signing up for Plaid's free sandbox gives Plaid your contact details; there's no billing
-  relationship in sandbox, and app 5 can't reach a billable environment by construction.
-- **Google Calendar sync:** worth doing given the 7-day refresh-token expiry while the OAuth app is in Testing?
-  ICS export already covers the demo.
-- **App 8 also on Google Cloud for live AI?** One line in `apps.yaml` (`clouds: [oci, gcp]`) would show live risk
-  summaries; demo loan files would then also sit in the Google Cloud VM's Postgres. Off by default.
+- **R1, Azure Container Apps grant: resolved by T6.** The problem: Azure apps run with min 0 replicas, so a woken
+  replica is billed at the active rate until the 300 s cooldown ends, and the tracker's paired health checks twice an
+  hour came to about 150,000 vCPU-s and 300,000 GiB-s a month per Azure app, against a subscription-wide grant of
+  180,000 vCPU-s and 360,000 GiB-s. With T6, Azure apps are parked (Down) and never health-checked, so Azure usage
+  follows real visits only. App 6's worker runs only while visitors keep it awake and doesn't rely on any ping.
+- **Oracle:** no fix decided, so app 8 ships on the default: demo AI, documents in Postgres, a VM reboot for the new
+  app. App 8's "If Oracle gets fixed" section stays as an optional later path (8.7 not opened).
+- **Plaid:** app 5 ships on the demo bank; Plaid sandbox switches on later when Michael adds the keys (M4). No issue
+  depends on the keys.
+- **Calendar:** app 7 has ICS export and the private feed only; Google Calendar sync stays later, with no issue in
+  these two days.
+- **Reviews:** Claude does the crypto/logging review of 5.2 (Codex wrote it).
+- **App 8 stays on Oracle only** (not also listed on Google Cloud).
 
 ## Two-day schedule
 
@@ -148,10 +146,10 @@ time. Jules runs several tasks at once, so its three fullstack tracks run in par
 
 | When | Claude Code | Jules | Grok Build | Codex | Michael |
 | --- | --- | --- | --- | --- | --- |
-| **Day 1 morning** | Open T1–T5 on the board; T2, T4, T3 (then T1) | — | — | Review T2, T4 | M1, M2, M9 |
-| **Day 1 midday** | T5 PR; once repos exist, open the 29 app issues (3 in "Later") | — | — | Review T1 | M3 |
+| **Day 1 morning** | Open T1–T5 on the board; T2, T4, T3 (then T1); T6 in parallel | — | — | Review T2, T4 | M1, M2 |
+| **Day 1 midday** | T5 PR; once repos exist, open the 26 app issues (7.8, 7.9, 8.7 aren't opened) | — | — | Review T1 | M3; M9 when T6 is ready |
 | **Day 1 afternoon** | Review PRs as they open | 8.1, 6.1, 7.1 in parallel | — | 5.1 | Merge reviewed PRs |
-| **Day 1 evening** | Reviews; 5.3 after 5.1 merges | — | 5.4 after 5.1 merges | Review 8.1 | Merge; M4 if ready |
+| **Day 1 evening** | Reviews; 5.3 after 5.1 merges | — | 5.4 after 5.1 merges | Review 8.1 | Merge |
 | **Overnight** | Scheduled task: 8.3 | 8.2, 6.2, 7.2 | 5.4 continues, 8.4 | 5.2 | — |
 | **Day 2 morning** | Reviews of overnight PRs (crypto pass on 5.2) | 6.3; 7.5 after 7.2 | 6.4, 7.3 | Review 8.2, 6.2 | Merge |
 | **Day 2 midday** | 5.5 (AWS), 8.5 (Oracle), 6.5 (Azure) | 7.5 continues | 8.4 finish; 7.4 after 7.5 | Review 7.5 | M6 reboot; M7 |
@@ -163,14 +161,15 @@ time. Jules runs several tasks at once, so its three fullstack tracks run in par
 When a harness hits its limit, **Michael or the planner relabels its open issues** to another harness that has
 headroom, following AGENTS.md §2 ("Can move to"); nobody buys credits. Where the load sits:
 
-- **Claude Code (highest risk):** five template/catalog PRs, two AI features, five deploy PRs and a review of every
+- **Claude Code (highest risk):** six template/catalog/tracker PRs (T1–T6), two AI features, five deploy PRs and a review of every
   PR (~35, on Opus). Reviews come first. Relief: 8.3 or 5.3 → `jules` (ai-builder may move to Jules); deploy PRs →
   any harness; docs are already on Jules.
-- **Jules:** 12 issues plus 2 later, including three fullstack tracks at once. Relief: 7.1/7.2 → `claude` or
-  `codex`; docs → whoever has headroom; 6.3/7.5 → `claude`.
+- **Jules:** 12 issues, including three fullstack tracks at once. **Agreed rule: if Jules stalls (limit hit, or no
+  PR on 7.1/7.2 by Day 1 evening), relabel 7.1 and 7.2 to `claude` or `codex`**, whichever has headroom. Other relief:
+  docs → whoever has headroom; 6.3/7.5 → `claude`.
 - **Grok Build:** five UI issues squeezed into about a day, because each waits for its app's data PR. Relief: one
   app's UI → `jules`.
-- **Codex:** two builds plus nine second reviews. If Codex runs out, the Claude reviewer covers second reviews with
+- **Codex:** two builds plus seven second reviews. If Codex runs out, the Claude reviewer covers second reviews with
   the security checklist and says so in the PR; 5.2 can move to `claude`.
-- If the batch slips, ship each app's core flow and move polish (Google sync, extra evals) to the next simpler app's
+- If the batch slips, ship each app's core flow and move polish (extra evals, UI polish) to the next simpler app's
   day, per `runbooks/daily.md`.

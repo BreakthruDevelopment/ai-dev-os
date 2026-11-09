@@ -58,7 +58,7 @@ credentials**, and **adding an app needs a VM reboot** so Caddy loads the new si
 `postgres` superuser with one shared password (known follow-up: per-app roles).
 
 **Demo data only.** Banner on every page and in the README: "This is a demo. Don't enter real financial information
-or upload real documents." Free-tier Gemini prompts (when live elsewhere) may be used by Google.
+or upload real documents." Free-tier Gemini prompts (if AI is ever live) may be used by Google.
 
 ### Document vault without object storage (decision)
 
@@ -175,7 +175,7 @@ Mutating routes: `requireUser()`/`requireRole()`, `requireSameOrigin()`, zod, `e
 ## AI feature
 
 - **Task name:** `loan-risk-summary`. **Claude** builds it (issue 8.3). **Demo answers on Oracle** (no key);
-  live wherever `GEMINI_API_KEY` exists (local, or if app 8 is also listed on Azure/Google Cloud).
+  live wherever `GEMINI_API_KEY` exists (locally, or on Oracle if the host is ever fixed; app 8 is deployed on Oracle only).
 - **Rules first, model second.** `src/lib/risk-rules.ts` computes **metrics** (monthly income; estimated new payment
   by amortization at a fixed demo APR per credit band, 9.9/14.9/21.9/29.9/24.9% for unknown; DTI with the new
   payment; loan-to-annual-income; months employed; documents present by kind) and **rule flags**, each with a code,
@@ -242,10 +242,11 @@ Mutating routes: `requireUser()`/`requireRole()`, `requireSameOrigin()`, zod, `e
 | Cross-site requests | `requireSameOrigin()`; uploads also check Origin |
 | Demo seed against production | Same refusal rules as apps 3–4 (`app8.breakthruventures.ai`, `*.sslip.io`, DB host `postgres`); live demo only via the admin button |
 
-## If Oracle gets fixed (Michael's open decision)
+## If Oracle gets fixed (optional, later)
 
-The spec ships as written on the default (demo AI, documents in Postgres). If Michael fixes the host once via the
-serial console (a root shell → a self-updating agent, the Gemini key in `shared.env`, per-app secrets), then:
+**What ships (the default, since no fix has been decided):** demo AI, documents in Postgres, and a VM reboot so
+Caddy loads the new site. App 8 runs on Oracle only; it isn't also listed on Google Cloud. If Michael ever fixes the
+host once via the serial console (a root shell → a self-updating agent, the Gemini key in `shared.env`, per-app secrets), then:
 
 | Change | Effort | Issue |
 | --- | --- | --- |
@@ -258,7 +259,7 @@ serial console (a root shell → a self-updating agent, the Gemini key in `share
 ## Issues
 
 Repo `08-loan-portal` unless noted. Order: 8.1 → 8.2 and 8.3 (parallel); 8.4 starts when 8.1 is merged (documents
-and risk panels after 8.2/8.3); 8.5 after 8.2–8.4, **then Michael reboots the VM**; 8.6 last; 8.7 only if Oracle is fixed.
+and risk panels after 8.2/8.3); 8.5 after 8.2–8.4, **then Michael reboots the VM**; 8.6 last.
 
 1. **8.1 `[fullstack-builder] Roles, applications, state machine, notes, audit log`** · `jules` · **2nd review: Codex**
    Underwriter role (permissions.ts, rbac.ts, `requireRole` variants, set-role hook), tables, `access.ts`, data
@@ -289,7 +290,7 @@ and risk panels after 8.2/8.3); 8.5 after 8.2–8.4, **then Michael reboots the 
    and its superuser limit, rules-first AI and fair-lending guardrails, demo-only warning, Oracle constraints and what
    changes if fixed, demo script (applicant uploads pay stub, underwriter claims, AI panel explains DTI, requests info,
    applicant replies, underwriter declines with codes, admin verifies the audit chain).
-7. **8.7 `[fullstack-builder] Encrypt stored documents`** · `jules` · **later, only if Oracle is fixed** · **2nd
-   review: Codex**
+**Count:** jules 3, claude 2 (+ review), grok 1; Codex second review on 8.1 and 8.2.
 
-**Count:** jules 3 (+1 later), claude 2 (+ review), grok 1; Codex second review on 8.1, 8.2 (and 8.7).
+**Later, not opened in this batch:** **8.7 `[fullstack-builder] Encrypt stored documents`** · `jules` · 2nd review:
+Codex. Opened only if the Oracle host is fixed (table above).

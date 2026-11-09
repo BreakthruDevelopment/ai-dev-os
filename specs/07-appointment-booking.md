@@ -32,8 +32,8 @@ customer and its provider. Admin sees counts only.
   DST); bookings with **database-enforced no-overlap**; customer and provider cancel; `.ics` per booking and a
   private subscribe feed per provider; the booking chat assistant on T1's tool loop with confirm-to-book; demo seed;
   every page at 375px.
-- **Out (today):** Google Calendar two-way sync (designed below as **later**, issues 7.8–7.9, blocked on Michael's
-  OAuth client); email/SMS confirmations and reminders (no mail service on the free stack; the `.ics` file is the
+- **Out (decided):** Google Calendar two-way sync (designed below as **later**; issues 7.8–7.9 aren't opened in
+  this batch and would need Michael's OAuth client); email/SMS confirmations and reminders (no mail service on the free stack; the `.ics` file is the
   confirmation); payments and deposits; rescheduling (cancel and rebook); recurring appointments; group classes;
   waitlists; multi-staff; guest booking without an account.
 
@@ -207,8 +207,8 @@ Mutating routes: `requireUser()`, `requireSameOrigin()`, `readJson()` 16 KB, zod
 ## Issues
 
 Repo `07-appointment-booking` unless noted. Order: 7.1 → 7.2; 7.3 after 7.1 (booking parts after 7.2); 7.5 after
-7.2 **and T1**; 7.4 after 7.5; 7.6 (`domain: null`) after 7.2–7.5; 7.7 after 7.6 is live; 7.10 last. 7.8–7.9 are
-**later**: put on the board in a "Later" column, not Todo, until Michael provides the OAuth client.
+7.2 **and T1**; 7.4 after 7.5; 7.6 (`domain: null`) after 7.2–7.5; 7.7 after 7.6 is live; 7.10 last. Calendar
+integration in this batch is ICS export and the private feed only.
 
 1. **7.1 `[fullstack-builder] Schema, provider setup and availability engine`** · `jules`
    Tables and the custom exclusion migration, profile/services/hours/overrides data functions and routes, public
@@ -239,15 +239,18 @@ Repo `07-appointment-booking` unless noted. Order: 7.1 → 7.2; 7.3 after 7.1 (b
 7. **7.7 `[devops] Custom domain for app 7`** · `claude` · repo **`30-apps-infra`**
    Set `domain: app7.breakthruventures.ai`; after the certificate is issued (15 min–24 h), rerun the Terraform workflow
    so `APP_URL` switches; live smoke on the custom domain.
-8. **7.8 `[devops] Per-app secrets on Google Cloud`** · `claude` · repo **`30-apps-infra`** · **later**
-   Wire `APPOINTMENT_BOOKING_GOOGLE_CLIENT_ID`, `…_GOOGLE_CLIENT_SECRET`, `…_TOKEN_ENC_KEY` per the README pattern
-   (named one by one, tfvars file removed in `always()`), plus `secrets:` in `apps.yaml`.
-9. **7.9 `[fullstack-builder] Google Calendar sync (optional)`** · `jules` · **later** · **2nd review: Codex**
-   The design above, behind "Connect Google Calendar" on `/provider`, off when the env vars are absent.
-10. **7.10 `[docs-writer] README for Appointment Booking`** · `jules`
+8. **7.10 `[docs-writer] README for Appointment Booking`** · `jules`
     Problem, provider-as-profile decision, availability rules and DST, exclusion constraints, `.ics`/feed, the
-    assistant's propose-and-confirm design, Google sync status and its 7-day Testing caveat, free-tier table, demo
+    assistant's propose-and-confirm design, Google sync as a later option and its 7-day Testing caveat, free-tier table, demo
     script (customer asks the assistant for Tuesday after 3, taps Confirm, a second customer can't take the slot,
     provider sees it in their calendar app via the feed).
 
-**Count:** jules 4 (+1 later), grok 2, claude 2 (+1 later, + review); Codex second review on 7.5 and 7.9.
+**Count:** jules 4, grok 2, claude 2 (+ review); Codex second review on 7.5.
+
+**Later, not opened in this batch** (numbers reserved; opened only if Michael wants Google sync and provides the
+OAuth client):
+- **7.8 `[devops] Per-app secrets on Google Cloud`** · `claude` · repo `30-apps-infra`: wire
+  `APPOINTMENT_BOOKING_GOOGLE_CLIENT_ID`, `…_GOOGLE_CLIENT_SECRET`, `…_TOKEN_ENC_KEY` per the README pattern (named one
+  by one, tfvars file removed in `always()`), plus `secrets:` in `apps.yaml`.
+- **7.9 `[fullstack-builder] Google Calendar sync (optional)`** · `jules` · 2nd review: Codex: the design above,
+  behind "Connect Google Calendar" on `/provider`, off when the env vars are absent.

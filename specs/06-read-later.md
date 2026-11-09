@@ -37,31 +37,38 @@ Flexible Server B1ms. No per-app secrets needed (Azure's aren't wired yet, and t
 
 ### Background jobs: the trigger (decision)
 
-**Chosen: an in-process worker that runs whenever a replica is up, kicked on enqueue; no new scheduler.**
+**Chosen: an in-process worker that runs only while the app is awake because someone is using it. No scheduler of
+any kind, and nothing depends on outside pings.** The Build Tracker parks Azure apps as Down and doesn't
+health-check them (day-0 T6), so real visitors are the only thing that wakes this app.
 
 - **Queue** (`job` table, template **T3** `src/lib/jobs`): claim with `update … where id = (select id from job where
   status='queued' and run_after <= now() order by run_after for update skip locked limit 1) returning *`, lease
-  `locked_until = now() + 60 s`; expired leases are reclaimable, so a replica that dies mid-job loses nothing.
-  Unique partial index (`link_id`, `kind`) where status in (`queued`, `running`) makes enqueue idempotent.
-- **Worker:** started from `instrumentation.ts` after T2's `whenMigrated()`; ticks every 10 s with concurrency 2; each
-  job time-boxed to 25 s; stops claiming on `SIGTERM`. A tick with no due jobs is one indexed query.
-- **Kick:** `POST /api/links` enqueues inside the save transaction, responds 202 at once, then runs `kick()` via
-  Next's `after()` so the job usually finishes within seconds while the user watches. The reader page polls
-  `GET /api/links/[id]` every 3 s (≤60 s); each poll is a request, so the replica stays up while someone waits.
-- **Stragglers (retries, jobs whose replica scaled in):** any request wakes the replica and the worker drains.
-  The **Build Tracker already calls every deployed app's `/api/health` in pairs at :15/:17 and :45/:47**, so with no
-  users at all, due retries run within ~30 min (~60 min if the tracker moves to hourly wakes, day-0 R1 option b).
-  The worker adds no wakes of its own.
-- **Why not the alternatives:**
-  - *Container Apps Jobs (cron):* new Terraform (`azurerm_container_app_job`), a second entrypoint the standalone
-    image doesn't have, and it draws on the same subscription-wide grant (180,000 vCPU-s / 360,000 GiB-s a month)
-    that the tracker's wakes already use heavily (see day-0 risk R1).
-  - *Google Cloud Scheduler (2 of 3 free jobs left in the shared billing account):* free and reliable, and needs no
-    token because a plain `GET /api/health` wake is enough with this design. **Kept as the fallback** if the tracker's
-    pings ever stop or get thinned (a 15-line addition to `stacks/gcp/scheduler.tf`), not added today.
-  - *GitHub Actions cron:* runs hours late and is disabled after 60 idle days.
-- Background work doesn't extend the replica's life (KEDA's HTTP scaler counts requests only), so the worker adds
-  no Azure usage beyond what requests already cause.
+  `locked_until = now() + 60 s`; expired leases can be reclaimed, so a job cut off when the replica scaled in loses
+  nothing and runs again on the next wake. A unique partial index (`link_id`, `kind`) where status in (`queued`,
+  `running`) makes enqueue idempotent.
+- **Worker:** started from `instrumentation.ts` after T2's `whenMigrated()`. It ticks every 10 s with concurrency 2,
+  each job is time-boxed to 25 s, and it stops claiming on `SIGTERM`. A tick with no due jobs is one indexed query.
+- **Start at once on save:** `POST /api/links` enqueues inside the save transaction, responds 202 straight away,
+  then runs `kick()` via Next's `after()`. Fetch and summary normally finish in seconds while the user watches. The
+  reader page and the inbox poll `GET /api/links/[id]` every 3 s while something is unfinished (≤2 min). Each poll is
+  a request, so the replica stays up as long as the user is looking.
+- **Drain while the user is around:** every signed-in page load and API request calls `kick()` (debounced to once
+  per 10 s per process), so due retries and leftovers from the last session run whenever anyone is using the app. The
+  replica stays up for the 300 s cooldown after the last request, which gives the worker a few more minutes.
+- **Saved just before the app sleeps:** if the replica scales in before a job finishes (or before a retry is due),
+  the link stays `queued` with the chip **"Finishes next time you open the app"**, and it completes on the next
+  visit, by the owner or anyone else. This is the accepted trade-off of scale-to-zero with no scheduler, and it's
+  stated in the README.
+- **Retries sized for user-driven wakes:** transient failures (network, timeout, 5xx, 429) back off **15 s, 1 min,
+  then 4 min**, so all three retries normally happen within one visit plus the cooldown. After the 4th failed attempt
+  the link is `failed` with a **Retry** button. A retry that comes due while the app is asleep just runs on the next
+  wake: `run_after` is a floor, not a deadline.
+- **Why not the alternatives:** Container Apps Jobs (new Terraform, an entrypoint the standalone image doesn't have,
+  and every run uses the subscription's Container Apps grant); a Cloud Scheduler wake job (every wake
+  spends grant time on a queue nobody is waiting on); GitHub Actions cron (runs hours late, disabled after 60 idle
+  days). None is needed: whenever a user wants a result, the app is awake.
+- Background work doesn't keep the replica alive (KEDA's HTTP scaler counts requests only), so the worker adds no
+  Azure usage beyond what visitors cause.
 
 ### SSRF-safe fetching (decision)
 
@@ -98,7 +105,7 @@ Flexible Server B1ms. No per-app secrets needed (Azure's aren't wired yet, and t
 | Queue | ≤50 queued jobs per user; app-wide ≤1,000 queued → 503 "Busy, try again shortly" | count on enqueue |
 | Fetches per target host | 1 in flight and ≥2 s apart per host across all users (`fetch_host.next_allowed_at`, claimed with `update … where next_allowed_at <= now()`); a busy host defers the job 5 s | so the app can't be used to flood a site |
 | Fetches app-wide | `FETCH_DAILY_CAP` 2,000 | `daily_usage` |
-| Retries | network, timeout, 5xx, 429 → back off 1 min, 5 min, 30 min, then `failed`; 4xx, `blocked_address`, `too_large`, `bad_content_type` → `failed` at once | job row |
+| Retries | network, timeout, 5xx, 429 → back off 15 s, 1 min, 4 min (4 attempts), then `failed` with a Retry button; a retry due while asleep runs on the next wake; 4xx, `blocked_address`, `too_large`, `bad_content_type` → `failed` at once | job row |
 | Manual retry | 3 per link per day | `rate_event` |
 | AI | 30 summaries per user per hour; ≤3 regenerations per link; `SUMMARY_DAILY_CAP` 300 | T2 helpers |
 | Sign-in | Better Auth's built-in limiter (in memory; fine at one replica) | template |
@@ -107,7 +114,7 @@ Flexible Server B1ms. No per-app secrets needed (Azure's aren't wired yet, and t
 
 | Resource | Control | Worst case per month |
 | --- | --- | --- |
-| Container Apps (subscription grant shared with every Azure app) | Max 1 replica; worker adds no wake time; polling only while a reader page is open | Dominated by the Build Tracker's wakes, ≈150,000 vCPU-s per Azure app per month, which with app 2 exceeds the grant (day-0 R1, decision for Michael) |
+| Container Apps (subscription grant shared with every Azure app) | Max 1 replica; awake only while visitors use it (the tracker parks Azure apps, day-0 T6); worker adds no wake time; polling only while something is unfinished | Proportional to real visits: each visit costs ~5 min of replica time after the last request (≈75 vCPU-s, 150 GiB-s), so ~2,400 separate visits a month fit in the grant on their own |
 | Postgres B1ms storage (32 GB, shared) | 100 KB text per link, ≤2,000 links per user | 1,000 heavy users ≈ 20 GB: cap revisited if usage appears; demo scale is MBs |
 | Egress | ≤2 MB per fetch, 2,000 fetches/day | ≤120 GB worst case; Azure's free outbound is 100 GB/month, so `FETCH_DAILY_CAP` drops to 1,500 if usage ever nears it |
 | Gemini | ≤8,000 chars per summary, caps above | Free tier |
@@ -140,7 +147,7 @@ Search, Admin.
 | `/settings` | page | user | Bookmarklet (`javascript:location.href='https://app6…/save?url='+encodeURIComponent(location.href)`) with install steps for iOS/Android |
 | `/admin` | page | admin | Counts, queue stats, caps, demo button, user management |
 | `GET/POST /api/links` | route + action | user | List (filters, keyset cursor, 50 per page); save `{url}` → 202 `{id, status}` or 200 existing |
-| `GET/PATCH/DELETE /api/links/[id]` | route + action | owner | GET also `kick()`s; PATCH `{archived?, favorite?, read?, tags?: string[] ≤10}` |
+| `GET/PATCH/DELETE /api/links/[id]` | route + action | owner | Every signed-in request `kick()`s (debounced); PATCH `{archived?, favorite?, read?, tags?: string[] ≤10}` |
 | `POST /api/links/[id]/retry` | route + action | owner | Re-enqueue a `failed` link |
 | `POST /api/links/[id]/summary` | route + action | owner | Regenerate (≤3) |
 | `GET /api/tags` | route | user | Own tags with counts |
@@ -205,7 +212,7 @@ Mutating routes: `requireUser()`, `requireSameOrigin()`, `readJson()` 8 KB, zod,
 ## Issues
 
 Repo `06-read-later` unless noted. Order: 6.1 → 6.2 → 6.3; 6.4 starts when 6.1 is merged (status chips work against
-6.2's statuses once merged); 6.5 after 6.2–6.4; 6.6 last.
+6.2's statuses once merged); 6.5 after 6.2–6.4 **and day-0 T6** (Azure apps parked in the tracker); 6.6 last.
 
 1. **6.1 `[fullstack-builder] Schema, links, tags, search, rate limits, admin counts, demo seed`** · `jules`
    Tables, URL normalization, save/list/patch/delete/tags/search data functions and routes (save enqueues a `fetch`
@@ -214,10 +221,10 @@ Repo `06-read-later` unless noted. Order: 6.1 → 6.2 → 6.3; 6.4 starts when 6
    `test/links.integration.test.ts` covers owner/other/admin, duplicate save, cross-user tag attach failing at the FK,
    save limits, the 51st queued job refused.
 2. **6.2 `[fullstack-builder] Job worker, SSRF-safe fetcher and extraction`** · `jules` · **2nd review: Codex**
-   T3 worker wiring (`after()` kick, instrumentation start, SIGTERM), `safe-fetch.ts`, per-host politeness,
+   T3 worker wiring (`after()` kick on save, debounced kick on every signed-in request, instrumentation start, SIGTERM), `safe-fetch.ts`, per-host politeness,
    extraction, retries/backoff, health `queue`. Done when tests (local HTTP fixtures plus a stub resolver) prove every
    blocked range, rebinding, redirect re-validation, size/time/content-type caps, retry schedule, lease expiry
-   reclaim, per-host spacing with two concurrent jobs, and that logs hold hosts only.
+   reclaim (a job left `running` by a killed process completes after a simulated restart), per-host spacing with two concurrent jobs, and that logs hold hosts only.
 3. **6.3 `[ai-builder] Summaries and auto-tags`** · `jules`
    The task, guardrails, `summarize` job handler, regeneration with caps, fixture, evals, `pnpm eval:summaries`.
    Done when evals pass and demo mode runs the full pipeline with no network.
@@ -227,9 +234,10 @@ Repo `06-read-later` unless noted. Order: 6.1 → 6.2 → 6.3; 6.4 starts when 6
 5. **6.5 `[devops] Deploy app 6 to Azure`** · `claude` · repo **`30-apps-infra`**
    PR adding `read-later` (`clouds: [azure]`, `sha-` tag, `domain: app6.breakthruventures.ai`, `ai: gemini`). After
    apply: live smoke; save a real public article and see it reach `ready`; confirm `curl`-ing a link to
-   `http://169.254.169.254/` and `http://168.63.129.16/` ends `failed`/`blocked_address`.
+   `http://169.254.169.254/` and `http://168.63.129.16/` ends `failed`/`blocked_address`; confirm the Build Tracker lists
+   app 6 as Down (parked, not health-checked) and "Check now" reports it healthy.
 6. **6.6 `[docs-writer] README for Bookmark and Read-Later`** · `jules`
-   Problem, roles, the job design and why it suits scale-to-zero, the SSRF controls, limits table, AI guardrails,
-   free-tier table, demo script (save from phone via bookmarklet, watch it go ready, search, retag).
+   Problem, roles, the job design (runs while visitors keep the app awake; a link saved just before it sleeps
+   finishes on the next visit), the SSRF controls, limits table, AI guardrails, free-tier table, demo script (save from phone via bookmarklet, watch it go ready, search, retag).
 
 **Count:** jules 4, grok 1, claude 1 (+ review); Codex second review on 6.2.

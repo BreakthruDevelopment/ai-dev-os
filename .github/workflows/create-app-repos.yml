@@ -1,0 +1,55 @@
+# Creates the app repos that catalog.yaml marks with `create_repo: true` (scripts/create-app-repos.py):
+# public, from the template, with the 30-apps-30-days topic, the harness labels and a protect-main ruleset.
+# Existing repos without the topic are refused and never touched. Nothing is renamed, deleted or archived.
+#
+# Pull requests only validate and print the plan (no token). The token is used only on pushes to main and manual
+# runs from main. REPO_CREATOR_TOKEN is a fine-grained token Michael creates (runbooks/daily.md), stored in the
+# `repo-creator` environment, which only main may use: a branch or pull request can't read it, even if it edits
+# this file.
+
+name: Create app repos
+
+on:
+  pull_request:
+    paths: ["catalog.yaml", "scripts/create-app-repos.py", ".github/workflows/create-app-repos.yml"]
+  push:
+    branches: [main]
+    paths: ["catalog.yaml", "scripts/create-app-repos.py", ".github/workflows/create-app-repos.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: create-app-repos
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - name: Plan (no token, nothing created)
+        run: python3 scripts/create-app-repos.py --dry-run
+
+  create:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: repo-creator
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - name: Create or complete marked repos
+        env:
+          REPO_CREATOR_TOKEN: ${{ secrets.REPO_CREATOR_TOKEN }}
+        run: python3 scripts/create-app-repos.py

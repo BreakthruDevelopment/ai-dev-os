@@ -20,6 +20,8 @@ jobs:
       - run: pip install pyyaml
       - name: Claude subagents match roles/
         run: python3 scripts/sync-claude-agents.py --check
+      - name: Repo creation marks are valid
+        run: python3 scripts/create-app-repos.py --check
       - name: Catalog is valid
         run: |
           python3 - <<'PY'

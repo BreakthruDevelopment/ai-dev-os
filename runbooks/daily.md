@@ -2,7 +2,7 @@
 
 | When | Step | Who |
 | --- | --- | --- |
-| Start | Create the app repo from the template (see below) and tag it | Michael |
+| Start | Mark the app `create_repo: true` in `catalog.yaml`; the workflow creates and tags the repo (see below) | Claude Code |
 | Morning | Spec + issues (role in title, harness label) on the board | Claude Code (planner) |
 | Midday | Data/API PR and AI feature PR | Claude Code, overflow to Jules |
 | Midday | UI pages PR | Grok Build |
@@ -17,23 +17,45 @@
 
 ## Creating the day's repo
 
-`30-apps-template` is a GitHub template repository. Each morning:
+Repos are created by the **Create app repos** workflow (`scripts/create-app-repos.py`), not by hand:
 
-1. On GitHub: **BreakthruDevelopment/30-apps-template → Use this template → Create a new repository**.
-2. Owner `BreakthruDevelopment`, name from `catalog.yaml` (for example `07-appointment-booking`), Public.
-3. Add the topic `30-apps-30-days` and turn on branch protection for `main` (require a PR and passing checks).
+1. Open a PR in this repo that sets `create_repo: true` on the app in `catalog.yaml`. The PR's check prints what it
+   would create; nothing happens yet.
+2. Merge it. On `main`, the workflow creates `BreakthruDevelopment/<repo>` from `30-apps-template` (public), adds the
+   topic `30-apps-30-days`, the harness labels (`claude`, `grok`, `codex`, `jules`) and a `protect-main` ruleset
+   (pull request required, `Lint, test, build, smoke` must pass, no force pushes or deletion).
+3. Leave `create_repo: true` in place: rerunning only fills in anything missing. A repo that exists **without** the
+   topic is refused and never touched, so the org's other applications are safe. Nothing is ever renamed, deleted
+   or archived.
 
-Or from a terminal with GitHub CLI signed in as Michael:
+The Build Tracker finds new apps on its own (it reads this catalog and promotes an app once its health check
+answers), so no webhook is needed.
 
-```bash
-gh repo create BreakthruDevelopment/07-appointment-booking --public --template BreakthruDevelopment/30-apps-template
-gh repo edit BreakthruDevelopment/07-appointment-booking --add-topic 30-apps-30-days
-```
+### One-time setup: `REPO_CREATOR_TOKEN` (Michael)
 
-4. Add the Build Tracker webhook so the repo's pushes, PRs and CI runs show on the board (Michael, with GitHub CLI signed in):
-   `TRACKER_URL=<tracker base URL> scripts/add-tracker-webhook.sh 07-appointment-booking`
-   (it asks for the webhook secret silently if `TRACKER_WEBHOOK_SECRET` isn't set, and refuses repos without the
-   topic, so do step 3 first). **Repos made from the template don't copy webhooks**, so this is needed for every new repo.
+A fine-grained personal access token, stored as an Actions secret in this repo:
+
+1. GitHub → your avatar → **Settings → Developer settings → Personal access tokens → Fine-grained tokens →
+   Generate new token**.
+2. **Resource owner:** `BreakthruDevelopment`. **Expiration:** your choice (90 days is reasonable; the workflow
+   says so when it stops working). **Repository access:** All repositories (it has to manage repos that don't
+   exist yet).
+3. **Repository permissions:** Administration **Read and write** (create repos, topics, rulesets), Contents
+   **Read-only** (read the template), Issues **Read and write** (labels), Metadata **Read-only** (required).
+   Nothing else.
+4. If the org requires approval for fine-grained tokens, approve it under the org's **Settings → Personal access
+   tokens → Pending requests**.
+5. In this repo: **Settings → Environments → New environment**, name `repo-creator`. Under **Deployment branches and
+   tags** choose **Selected branches and tags** and add the rule `main`. Then, in that environment, **Add environment
+   secret**: name `REPO_CREATOR_TOKEN`, paste the token. (An environment secret limited to `main` can't be read by
+   a branch or pull request, even one that edits the workflow; a plain repository secret could be.)
+
+This is the most powerful secret in the project: it can administer every repo in the org. The workflow only acts
+on catalog names, only from `main` (which is protected), and refuses repos without the topic, but the token
+itself could do more, so keep it nowhere else and revoke it if it ever leaks.
+
+By hand, if the workflow can't run: **30-apps-template → Use this template → Create a new repository**, owner
+`BreakthruDevelopment`, the catalog name, Public; then add the topic `30-apps-30-days`.
 
 ## Deploying the day's app
 

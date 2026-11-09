@@ -1,15 +1,16 @@
 name: Tracker sync
 
 # Drives the Portfolio Build Tracker (app 1), which runs on AWS Lambda and has no background jobs of its own.
-#   every 30 min  POST /api/sync           refresh the catalog and poll each active app's /api/health
 #   daily 06:07   POST /api/summaries/run  loop until nothing remains (max 6 calls, 10 s apart)
+#   on demand     POST /api/sync           (workflow_dispatch). The scheduled sync runs from Google Cloud Scheduler
+#                 (30-apps-infra stacks/gcp/scheduler.tf) in pairs at :15/:17 and :45/:47: GitHub delayed this cron
+#                 by hours, and an unpaired sync can make the tracker misjudge a sleeping app.
 # Repo secrets: TRACKER_URL (base URL, no trailing path) and TRACKER_SYNC_TOKEN (same value as the app's SYNC_TOKEN).
 # Until both are set the run prints a notice and succeeds, so the schedule doesn't fail before setup.
-# Minutes avoid :00, when GitHub's scheduler is busiest. The sync minutes (17, 47) never coincide with 06:07.
+# Minutes avoid :00, when GitHub's scheduler is busiest.
 
 on:
   schedule:
-    - cron: "17,47 * * * *"
     - cron: "7 6 * * *"
   workflow_dispatch:
     inputs:
@@ -33,7 +34,7 @@ jobs:
     env:
       TRACKER_URL: ${{ secrets.TRACKER_URL }}
       TRACKER_SYNC_TOKEN: ${{ secrets.TRACKER_SYNC_TOKEN }}
-      TASK: ${{ github.event_name == 'workflow_dispatch' && inputs.task || (github.event.schedule == '17,47 * * * *' && 'sync' || 'summaries') }}
+      TASK: ${{ github.event_name == 'workflow_dispatch' && inputs.task || 'summaries' }}
     steps:
       - name: Call the tracker
         shell: bash

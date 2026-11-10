@@ -45,6 +45,7 @@ apps:
     status: planned
   - n: 5
     repo: 05-budget-planner
+    create_repo: true
     name: "Personal Budget Planner"
     subdomain: app5.breakthruventures.ai
     live_cloud: aws
@@ -54,6 +55,7 @@ apps:
     status: planned
   - n: 6
     repo: 06-read-later
+    create_repo: true
     name: "Bookmark and Read-Later"
     subdomain: app6.breakthruventures.ai
     live_cloud: azure
@@ -63,6 +65,7 @@ apps:
     status: planned
   - n: 7
     repo: 07-appointment-booking
+    create_repo: true
     name: "Appointment Booking"
     subdomain: app7.breakthruventures.ai
     live_cloud: gcp
@@ -72,6 +75,7 @@ apps:
     status: planned
   - n: 8
     repo: 08-loan-portal
+    create_repo: true
     name: "Loan Application Portal"
     subdomain: app8.breakthruventures.ai
     live_cloud: oci

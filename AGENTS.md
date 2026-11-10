@@ -3,6 +3,9 @@
 This repo is the operating system for the **30 apps in 30 days** build: who does what, how work moves, and the
 rules every AI tool follows. Claude Code, Codex, Grok Build, Antigravity and Grok Bot all read this file.
 
+The process is called the **BreakthruSoftwareFactory**. Its five gates (spec, build, review, release, close-out),
+the definition of done and the required review are in [`FACTORY.md`](FACTORY.md); this file is its rulebook.
+
 **New to the project?** Read [`BRIEFING.md`](BRIEFING.md) first: what we're building, every decision in force,
 and what's been dropped.
 
@@ -15,7 +18,8 @@ The BreakthruDevelopment org holds other, unrelated applications that must never
 - Never force-push, delete, rename, transfer or archive a repo or branch.
 - Never push to `main`. Work on `<harness>/<task>` branches (`claude/…`, `codex/…`, `grok/…`, `antigravity/…`) and open a PR.
 - Never commit or paste secrets. Keys go into GitHub Actions secrets or a cloud secret manager, entered by Michael.
-- Merges to `main` are Michael's call.
+- Merges to `main` are Michael's call. Michael is the only merger and the only release approver; no agent merges,
+  approves a release or changes branch protection.
 
 ## 2. Models, harnesses and agents
 
@@ -77,16 +81,24 @@ harness's label**, and read the role file named in the title before starting. (`
 repos; nobody picks them up.)
 When a harness hits its usage limit, Michael (or the planner) relabels its open issues; nobody buys extra credits.
 
-## 4. Daily flow
+## 4. Daily flow (the BreakthruSoftwareFactory gates)
 
-1. **Planner** writes `specs/NN-slug.md` from `templates/spec.md`, opens one issue per slice with a role and a harness label, and adds them to the board.
-2. **Builders** open PRs against the app repo.
-3. **Reviewer** reviews each PR; Codex adds a second review on security-sensitive ones. CI must be green: lint, typecheck, tests, build, smoke.
+1. **Gate 1, spec. Planner** writes `specs/NN-slug.md` from `templates/spec.md`, opens one issue per slice with a role and a planned harness, marks security-sensitive slices, and adds them to the board. Michael approves the scope by merging the spec.
+2. **Gate 2, build. Builders** open PRs against the app repo from `<harness>/<task>` branches. CI must be green: lint, typecheck, tests, build, smoke.
+3. **Gate 3, review (required). Reviewer** (Claude Code) reviews every PR; Codex adds a second review on PRs labelled `security-sensitive`. Each posts a PR review ending in `Reviewer: claude-code` (or `codex`) and `Verdict: ready` or `Verdict: blocking`; the `Reviewer sign-off` check reads it. No merge without the reviewer check.
 4. **DevOps** adds the app to `apps.yaml` in `30-apps-infra` for the day's `live_cloud` (a PR Michael merges; AWS runs from CloudShell), then runs the smoke test against the live URL. Migrations run when the app starts.
 5. **Docs writer** fills in the README from `templates/app-readme.md`. Grok Bot drafts the launch posts and demo script from it.
 6. **Michael** reviews, merges and posts the app. DNS records are created in Cloudflare by Terraform on deploy
    (`30-apps-infra` README, "Custom domains and DNS"); nobody adds them by hand.
 7. **Overnight:** Codex and scheduled Claude Code tasks work queued issues into PRs; Grok Build and Antigravity work theirs whenever Michael starts the runner on his Mac. The ops monitor (a scheduled Claude Code task) posts to the `Ops report (nightly)` issue. Nothing merges without Michael.
+
+Steps 4 and 6 are **gate 4, release** (Michael merges, devops updates `apps.yaml`, live smoke). **Gate 5,
+close-out** is the run log in `runs/NN-slug.md`, the `catalog.yaml` status and `BRIEFING.md` "Where things stand",
+and Grok Bot's launch drafts (Michael posts).
+
+**Definition of done.** An app is done only with all four: a **filled README** (no template placeholder), a
+**live smoke** pass after the latest deploy, a **run log**, and **`status: done`** in `catalog.yaml`. Details in
+[`FACTORY.md`](FACTORY.md#definition-of-done).
 
 ## 5. Usage limits
 

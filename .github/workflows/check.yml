@@ -25,6 +25,7 @@ jobs:
       - name: Catalog is valid
         run: |
           python3 - <<'PY'
+          import os
           import yaml
           apps = yaml.safe_load(open("catalog.yaml"))["apps"]
           assert len(apps) == 30, f"expected 30 apps, got {len(apps)}"
@@ -34,6 +35,10 @@ jobs:
               assert a["repo"].startswith(f"{i:02d}-"), a["repo"]
               assert a["subdomain"] == f"app{i}.breakthruventures.ai", a["subdomain"]
               assert a["live_cloud"] == clouds[(i - 1) % 4], f"app {i} cloud"
+              # BreakthruSoftwareFactory statuses (FACTORY.md); done needs its run log
+              assert a.get("status") in ("planned", "building", "deployed", "done"), f"app {i} status {a.get('status')!r}"
+              if a["status"] == "done":
+                  assert os.path.exists(f"runs/{a['repo']}.md"), f"app {i} is done but runs/{a['repo']}.md is missing"
           assert len({a["repo"] for a in apps}) == 30, "duplicate repo names"
           print("catalog ok")
           PY

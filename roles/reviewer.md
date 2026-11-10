@@ -20,3 +20,17 @@ Check, in order:
 
 Report as a short list: blocking issues first (with file and line), then suggestions. Say plainly when it's ready
 to merge. Run `pnpm lint && pnpm typecheck && pnpm test` yourself; don't trust the PR description.
+
+**Your review is required** (BreakthruSoftwareFactory gate 3, `FACTORY.md`). Post it as a GitHub pull request review
+of type *Comment* on the PR's current head commit (`gh pr review <n> --comment --body-file <file>`), never only in
+chat or a plain comment, and end the body with exactly these two lines:
+
+```
+Reviewer: claude-code
+Verdict: ready
+```
+
+Use `Reviewer: codex` when you are Codex doing the second review, and `Verdict: blocking` when anything blocking is
+left. The `Reviewer sign-off` check reads these lines; a new push needs a new review. If the PR touches auth, roles
+or access, payments, tenancy, uploads, tokens or secrets, or AI tool calls that write data, make sure it carries the
+`security-sensitive` label so Codex's second review is required too. You never merge: Michael does.

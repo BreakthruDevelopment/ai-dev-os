@@ -1,6 +1,13 @@
 # The 30 apps. Source of truth for repo names, subdomains and the cloud each app is live on.
 # Cloud rotates by day: AWS, Azure, Google Cloud, Oracle Cloud. Deploys happen by adding the app to apps.yaml in
 # 30-apps-infra; listing more clouds there runs it on those too.
+#
+# status (BreakthruSoftwareFactory, see FACTORY.md "Catalog status values"):
+#   planned   in the catalog only
+#   building  repo exists, issues or PRs in flight, not in apps.yaml yet
+#   deployed  in 30-apps-infra apps.yaml and answering /api/health at its domain; close-out not finished
+#   done      meets the definition of done: filled README, live smoke, run log in runs/, this status
+# Statuses for apps 1-12 were set on 2026-11-10 from GitHub and live health checks (runs/retro-01-12.md).
 domain: breakthruventures.ai
 github_org: BreakthruDevelopment
 repo_topic: 30-apps-30-days
@@ -15,7 +22,7 @@ apps:
     client_need: "Engineering ops and release management"
     ai_feature: "Daily health summary per app; flags stalled builds, failing CI and free-tier limits"
     notable: "GitHub and cloud webhooks, status state machine, public read-only board"
-    status: planned
+    status: deployed
   - n: 2
     repo: 02-notes-kb
     name: "Notes and Knowledge Base"
@@ -24,7 +31,7 @@ apps:
     client_need: "Internal wikis"
     ai_feature: "RAG search over notes with citations"
     notable: "pgvector, per-user document ACLs"
-    status: planned
+    status: deployed
   - n: 3
     repo: 03-expense-tracker
     name: "Expense Tracker"
@@ -33,7 +40,7 @@ apps:
     client_need: "Finance tools"
     ai_feature: "Receipt photo to structured expense"
     notable: "File uploads to object storage, signed URLs"
-    status: planned
+    status: deployed
   - n: 4
     repo: 04-habit-tracker
     name: "Habit and Goal Tracker"
@@ -42,7 +49,7 @@ apps:
     client_need: "Consumer wellness apps"
     ai_feature: "Weekly progress coach summary"
     notable: "Web push notifications, time-series tables"
-    status: planned
+    status: deployed
   - n: 5
     repo: 05-budget-planner
     create_repo: true
@@ -52,7 +59,7 @@ apps:
     client_need: "Personal finance and fintech"
     ai_feature: "Auto-categorize transactions and explain monthly cash flow"
     notable: "Bank sync via Plaid sandbox, encrypted tokens"
-    status: planned
+    status: building
   - n: 6
     repo: 06-read-later
     create_repo: true
@@ -62,7 +69,7 @@ apps:
     client_need: "Content apps"
     ai_feature: "Summarize and auto-tag saved links"
     notable: "Background jobs, rate limiting"
-    status: planned
+    status: building
   - n: 7
     repo: 07-appointment-booking
     create_repo: true
@@ -72,7 +79,7 @@ apps:
     client_need: "Salons, clinics, consultants"
     ai_feature: "Chat assistant that books open slots (tool use)"
     notable: "Availability engine, OAuth calendar sync"
-    status: planned
+    status: building
   - n: 8
     repo: 08-loan-portal
     create_repo: true
@@ -82,7 +89,7 @@ apps:
     client_need: "Lending and banking"
     ai_feature: "Summarize applicant financials and flag risks, with reasons"
     notable: "Applicant vs underwriter roles, document vault, audit log"
-    status: planned
+    status: building
   - n: 9
     repo: 09-invoicing
     create_repo: true
@@ -92,7 +99,7 @@ apps:
     client_need: "Freelancer and agency billing"
     ai_feature: "Generate invoice from project notes"
     notable: "Stripe test mode, PDF generation"
-    status: planned
+    status: building
   - n: 10
     repo: 10-inventory
     create_repo: true
@@ -102,7 +109,7 @@ apps:
     client_need: "Retail and warehouse"
     ai_feature: "Reorder forecasts in plain language"
     notable: "Barcode scan with the phone browser camera, optimistic locking"
-    status: planned
+    status: building
   - n: 11
     repo: 11-helpdesk
     create_repo: true
@@ -112,7 +119,7 @@ apps:
     client_need: "Customer support"
     ai_feature: "Auto-triage, suggested replies from KB"
     notable: "Agent vs customer portals, SLA timers"
-    status: planned
+    status: building
   - n: 12
     repo: 12-restaurant-ordering
     create_repo: true
@@ -122,7 +129,7 @@ apps:
     client_need: "Food service"
     ai_feature: "Menu Q&A and allergen guardrails"
     notable: "Real-time order status"
-    status: planned
+    status: building
   - n: 13
     repo: 13-field-service
     name: "Field Service Dispatch"

@@ -1,5 +1,8 @@
 # Grok Build and Antigravity on Michael's Mac
 
+How two of the BreakthruSoftwareFactory's harnesses ([`FACTORY.md`](../FACTORY.md)) get their work: gate 2 (build).
+Every PR they open still needs gate 3, the required `Reviewer sign-off`, and Michael's merge.
+
 Grok Build (`grok`) and Google Antigravity (`agy`) are command-line agents that run on Michael's Mac. GitHub labels
 don't start them; [`scripts/run-harness.sh`](../scripts/run-harness.sh) does. It finds the issues labelled for that
 harness, works them one at a time in a local clone and opens a PR for each. Michael still merges everything.

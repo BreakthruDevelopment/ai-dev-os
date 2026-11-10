@@ -17,4 +17,4 @@ Requirements:
   plumbing; run them against the live model locally with `AI_PROVIDER=gemini` and record results in the run log.
 - If the feature uses tools (actions the model can request), every tool call is authorized server-side with the
   same `assertCan()` rules as a normal request, and anything that changes money or data needs human approval.
-- Work on a `<harness>/<task>` branch (for example `claude/items-api` or `jules/items-api`) and open a PR.
+- Work on a `<harness>/<task>` branch (for example `claude/items-api` or `antigravity/items-api`) and open a PR.

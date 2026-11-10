@@ -1,7 +1,7 @@
 ---
 name: docs-writer
 description: Writes an app's README and two-minute demo script once it's deployed. Use as the last step of each app's day.
-default_harness: any
+default_harness: grok-build
 claude_model: sonnet
 claude_tools: Read, Write, Edit, Glob, Grep
 ---

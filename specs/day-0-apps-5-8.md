@@ -6,6 +6,44 @@ Specs: [05 Budget Planner](05-budget-planner.md) (AWS) · [06 Read-Later](06-rea
 Apps 5–8 are built as one batch over two days across four harnesses. The repos exist and every issue is open;
 see [Issues as opened](#issues-as-opened) for the links.
 
+## 2026-11-09 reassignment
+
+Jules goes read-only after 2026-11-11 and shuts down on 2026-12-31 ([changelog](https://jules.google/docs/changelog/)),
+so its 12 issues moved the same day. Google Antigravity (its replacement) takes three on trial; Grok Build takes
+more, as Michael wants it used more. **This table overrides the Harness column in
+[Issues as opened](#issues-as-opened)** and the labels in each app spec. Codex's second reviews are unchanged
+(T1, T2, T4, 6.2, 7.5, 8.1, 8.2), and so is every issue not listed here.
+
+| Repo | Issue | Spec | Was | Now |
+| --- | --- | --- | --- | --- |
+| `05-budget-planner` | [#5](https://github.com/BreakthruDevelopment/05-budget-planner/issues/5) | 5.6 docs-writer | `jules` | `grok` |
+| `06-read-later` | [#1](https://github.com/BreakthruDevelopment/06-read-later/issues/1) | 6.1 fullstack-builder | `jules` | `grok` |
+| `06-read-later` | [#2](https://github.com/BreakthruDevelopment/06-read-later/issues/2) | 6.2 fullstack-builder | `jules` | `grok` |
+| `06-read-later` | [#3](https://github.com/BreakthruDevelopment/06-read-later/issues/3) | 6.3 ai-builder | `jules` | `claude` |
+| `06-read-later` | [#5](https://github.com/BreakthruDevelopment/06-read-later/issues/5) | 6.6 docs-writer | `jules` | `grok` |
+| `07-appointment-booking` | [#1](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/1) | 7.1 fullstack-builder | `jules` | `antigravity` |
+| `07-appointment-booking` | [#2](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/2) | 7.2 fullstack-builder | `jules` | `antigravity` |
+| `07-appointment-booking` | [#4](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/4) | 7.5 ai-builder | `jules` | `claude` |
+| `07-appointment-booking` | [#6](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/6) | 7.10 docs-writer | `jules` | `antigravity` |
+| `08-loan-portal` | [#1](https://github.com/BreakthruDevelopment/08-loan-portal/issues/1) | 8.1 fullstack-builder | `jules` | `grok` |
+| `08-loan-portal` | [#2](https://github.com/BreakthruDevelopment/08-loan-portal/issues/2) | 8.2 fullstack-builder | `jules` | `grok` |
+| `08-loan-portal` | [#5](https://github.com/BreakthruDevelopment/08-loan-portal/issues/5) | 8.6 docs-writer | `jules` | `grok` |
+
+Unchanged: 05 #1–#2 `codex`; every UI issue (5.4, 6.4, 7.3, 7.4, 8.4) `grok`; AI features 5.3 and 8.3 `claude`;
+template T1–T4 and the five deploy issues `claude`. New totals: `claude` 13, `grok` 12, `antigravity` 3, `codex` 2.
+
+**Labels are now the start signal.** Claude adds an issue's harness label only when its dependencies are merged,
+so some of these issues carry no label yet; that's expected. Grok Build and Antigravity are CLIs on Michael's Mac
+and work their labelled issues when he runs `scripts/run-harness.sh grok` or `… antigravity`
+([`runbooks/harnesses-on-mac.md`](../runbooks/harnesses-on-mac.md)); the script also skips any issue whose
+`## Dependencies` are still open. Codex and Claude Code pick up labels as before.
+
+**What changes in the plan below.** Grok Build now carries 12 issues, and runs only while Michael's Mac runs the
+script, so "overnight" Grok work needs the script left running. Relief if it falls behind: docs (5.6, 6.6, 8.6) →
+`antigravity`; 6.1/6.2 or 8.1/8.2 → `codex` or `claude`. Antigravity is on trial: **if it stalls (limit hit, or no
+PR on 7.1/7.2 by Day 1 evening), relabel 7.1 and 7.2 to `grok`, `claude` or `codex`**, whichever has headroom
+(this replaces the Jules rule below). The nightly ops report is a scheduled Claude Code task now, not Grok Bot.
+
 ## Issues as opened
 
 Opened 2026-11-09 by the planner, one harness label each, in dependency order (each body links the issues it
@@ -72,9 +110,12 @@ adds them by hand (or a harness with GraphQL does). Not opened: T5 and T6 (done)
 | 7.7 | [#58](https://github.com/BreakthruDevelopment/30-apps-infra/issues/58) | `claude` | [devops] Custom domain for app 7 |
 | 8.5 | [#59](https://github.com/BreakthruDevelopment/30-apps-infra/issues/59) | `claude` | [devops] Deploy app 8 to Oracle Cloud |
 
-Totals: `jules` 12, `claude` 11, `grok` 5, `codex` 2 (30 issues: 26 app, 4 template).
+Totals as opened: `jules` 12, `claude` 11, `grok` 5, `codex` 2 (30 issues: 26 app, 4 template). After the
+[2026-11-09 reassignment](#2026-11-09-reassignment): `claude` 13, `grok` 12, `antigravity` 3, `codex` 2.
 
 ## Who does what
+
+As planned on Day 0; for current owners see the [2026-11-09 reassignment](#2026-11-09-reassignment).
 
 | Harness | Label | Work in this batch |
 | --- | --- | --- |
@@ -82,7 +123,7 @@ Totals: `jules` 12, `claude` 11, `grok` 5, `codex` 2 (30 issues: 26 app, 4 templ
 | Jules | `jules` | fullstack-builder for apps 6, 7, 8; ai-builder for apps 6 and 7; docs-writer for all four READMEs |
 | Grok Build | `grok` | ui-builder for all four apps; an app's pages start once its first data/API PR is merged |
 | Codex | `codex` | fullstack-builder for app 5; **second review** on security-sensitive PRs only: T1, T2, T4, 6.2, 7.5, 8.1, 8.2 (and 7.9, 8.7 if they're ever opened) |
-| Grok Bot | — | No issues; keeps running the nightly ops report |
+| Grok Bot | — | No issues; ran the nightly ops report (moved to a scheduled Claude Code task on 2026-11-09; Grok Bot now drafts launch posts) |
 
 **Merges are Michael's** (AGENTS.md §1). 5.2 is written by Codex, so its second look is a dedicated crypto/logging
 pass by the Claude reviewer instead of Codex reviewing its own code (**accepted by Michael**); the crypto primitive

@@ -206,6 +206,9 @@ Mutating routes: `requireUser()`, `requireSameOrigin()`, `readJson()` 16 KB, zod
 
 ## Issues
 
+> **Owners changed on 2026-11-09** (Jules is shutting down): the harness labels below are as first planned; the
+> current owner of each issue is in [`day-0-apps-5-8.md`, 2026-11-09 reassignment](day-0-apps-5-8.md#2026-11-09-reassignment).
+
 Repo `07-appointment-booking` unless noted. Order: 7.1 → 7.2; 7.3 after 7.1 (booking parts after 7.2); 7.5 after
 7.2 **and T1**; 7.4 after 7.5; 7.6 (`domain: null`) after 7.2–7.5; 7.7 after 7.6 is live; 7.10 last. Calendar
 integration in this batch is ICS export and the private feed only.

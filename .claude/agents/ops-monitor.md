@@ -16,6 +16,7 @@ For every repo tagged `30-apps-30-days`:
    a free allowance or any non-zero charge.
 
 Report:
-- Post one summary to the Build Tracker (app 1) using its ingest endpoint and token.
+- Post one summary as a comment on the `Ops report (nightly)` issue in `ai-dev-os` (the scheduled Claude Code task
+  runs at 5:37 AM Central), and to the Build Tracker (app 1) through its ingest endpoint when a token is available.
 - Comment on any stalled issue or PR with what's blocking it, and move nothing on the board yourself.
 - If an app is down or a charge appears, put that first in the summary.

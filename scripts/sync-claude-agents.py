@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate Claude Code subagents (.claude/agents/*.md) from the harness-neutral roles in roles/.
 
-roles/ is the single source of truth. Every harness reads the role files directly (Grok Build, Codex and Jules
-via AGENTS.md); Claude Code needs them in its own subagent format, which this script produces.
+roles/ is the single source of truth. Every harness reads the role files directly (Codex, Grok Build and
+Antigravity via AGENTS.md); Claude Code needs them in its own subagent format, which this script produces.
 
     python3 scripts/sync-claude-agents.py          # write .claude/agents/
     python3 scripts/sync-claude-agents.py --check  # exit 1 if .claude/agents/ is out of date (used in CI)

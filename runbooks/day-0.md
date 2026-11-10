@@ -17,14 +17,15 @@ Enter keys and passwords directly into the service or GitHub secrets, never into
       had ended, so it's a paid account kept inside always-free limits: budget `GoogleCloudCap` (alerts); a Cloud Run
       spend cap is recommended.
 - [x] **Oracle Cloud** (`dev@breakthruventures.ai`): home region US West (Phoenix).
-- [x] Codex, Grok Build, Grok Bot and Jules connected to GitHub
+- [x] Codex, Grok Build, Grok Bot and Jules connected to GitHub (Jules retired 2026-11-09, replaced by Antigravity on
+      Michael's Mac: `runbooks/harnesses-on-mac.md`)
 - [x] **Gemini API key:** free tier, from Google AI Studio in its own project `30-apps-gemini` (no billing, so it
       can't charge). Stored as the `GEMINI_API_KEY` secret in the infra repo's `production` environment (Azure,
       Google Cloud) and in AWS Parameter Store at `/30apps/gemini_api_key`. New-format keys start with `AQ.` and are
       53 characters. Oracle isn't wired yet, so Oracle apps give demo answers until before app 4.
 - [x] **Budget alerts at $1** on AWS (`BreakthruAWS`; verify the recipient email), Azure (`BreakthruAzure`) and
       Google Cloud. Oracle needs none: the trial account can't charge unless upgraded.
-- [x] **Project board:** [30 Apps in 30 Days](https://github.com/users/BreakthruDevelopment/projects/1): Status (Todo / In Progress / In review / Done) and a Harness field (`claude`, `grok`, `codex`, `jules`); Board and table views. BreakthruDevelopment is a personal account, so the board lives under it rather than an org.
+- [x] **Project board:** [30 Apps in 30 Days](https://github.com/users/BreakthruDevelopment/projects/1): Status (Todo / In Progress / In review / Done) and a Harness field (`claude`, `grok`, `codex`, `jules`; add an `antigravity` option, Jules is retired); Board and table views. BreakthruDevelopment is a personal account, so the board lives under it rather than an org.
 
 ## Platform (Claude Code)
 

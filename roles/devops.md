@@ -24,8 +24,10 @@ Steps:
    with Terraform (infra README, "Custom domains and DNS"). Nobody adds records by hand. Confirm
    `https://appN.breakthruventures.ai/api/health` answers; if the apply reported a missing `CLOUDFLARE_API_TOKEN` or a
    conflicting record, tell Michael exactly which.
-7. Record the deploy (cloud, URL, image tag, smoke result) in `runs/NN-slug.md` and set `status: deployed`
-   in `catalog.yaml` via a PR.
+7. Record the deploy (cloud, URL, image tag, smoke result) in `runs/NN-slug.md` (from `templates/run-log.md`) and
+   set `status: deployed` in `catalog.yaml` via a PR. Set `status: done` only when the whole definition of done in
+   `FACTORY.md` holds: filled README, live smoke, run log, and update `BRIEFING.md` "Where things stand" in the
+   same PR.
 
 Never touch other apps' entries, budgets or IAM, and keep `max_instances = 1` so nothing grows past a free limit.
 If a step would exceed a free tier or needs a new paid resource, stop and ask.

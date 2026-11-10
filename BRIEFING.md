@@ -3,7 +3,11 @@
 Read this first if you're an AI harness (or a person) joining the **30 apps in 30 days** build. It's the current
 state of every decision; the rules themselves are in [`AGENTS.md`](AGENTS.md).
 
-_Last updated: 2026-11-09 (harness line-up: Jules replaced by Antigravity, Grok Build and Antigravity run from Michael's Mac, ops monitor moved to a scheduled Claude Code task; DNS and AWS deploy lines refreshed)._
+The process that builds the apps is called the **BreakthruSoftwareFactory**: this playbook, its eight roles, the five
+daily gates (spec, build, review, release, close-out) and the definition of done, all in [`FACTORY.md`](FACTORY.md).
+
+_Last updated: 2026-11-10 (named the BreakthruSoftwareFactory; required review check; definition of done; "Where
+things stand" and `catalog.yaml` brought up to date with apps 1–12; run logs started)._
 
 ## What we're building and why
 
@@ -71,37 +75,68 @@ still open). Setup and safety trade-offs: [`runbooks/harnesses-on-mac.md`](runbo
 
 ## How work moves
 
-GitHub is the only shared memory. Harnesses never talk to each other.
+GitHub is the only shared memory. Harnesses never talk to each other. The steps below are the
+BreakthruSoftwareFactory's five gates ([`FACTORY.md`](FACTORY.md)): spec (1), build (2–3), review (3), release (4–5)
+and close-out (7).
 
 1. The **planner** turns the day's catalog entry into `specs/NN-slug.md` and opens issues. Each issue names a role
    in its title (`[ui-builder] Dashboard page`) and carries one harness label.
 2. Once its dependencies are merged, the issue gets its harness label. Each harness picks up only its own label,
    follows the named role file, and opens a PR from a `<harness>/<task>` branch.
-3. CI (lint, types, tests, build, smoke test) must pass; Claude Code reviews every PR, Codex the security-sensitive ones.
+3. CI (lint, types, tests, build, smoke test) must pass. **Review is required:** Claude Code reviews every PR, Codex
+   also reviews PRs labelled `security-sensitive`, and each posts a marked PR review that the `Reviewer sign-off`
+   check reads. No merge without it.
 4. **Michael merges.** Nothing reaches `main` any other way.
 5. The day's app is deployed to its cloud, smoke-tested at its live URL; its DNS record is created by the deploy.
 6. Overnight, Codex and scheduled Claude Code tasks work queued issues into PRs for Michael's morning review;
    Grok Build and Antigravity run whenever Michael starts the runner. The nightly ops report lands in the
    `Ops report (nightly)` issue.
-7. When an app is live, Grok Bot drafts its launch posts and demo script from the README for Michael to post.
+7. Close-out: the run log (`runs/NN-slug.md`), `catalog.yaml` status and this briefing are updated, and Grok Bot
+   drafts the launch posts and demo script from the README for Michael to post. An app is **done** only with a filled
+   README, a live smoke, a run log and `status: done` in the catalog.
 
 When a harness hits its usage limit, its issues are relabeled to another harness.
 
 ## Where things stand
 
-- Done (Day 0): the app template, this repo, the four cloud accounts, `30-apps-infra`, and the template app live and
-  passing its health check on all four clouds:
+_As of 2026-11-10, about 2:30 PM Central, from GitHub, `30-apps-infra` `apps.yaml` and live `/api/health` checks.
+Details and the honest gap list: [`runs/retro-01-12.md`](runs/retro-01-12.md)._
+
+- **Day 0 done** (2026-11-04): the app template, this repo, the four cloud accounts, `30-apps-infra`, and the
+  template app live on all four clouds (still in `apps.yaml`, tag `sha-99a8f86`):
   - AWS: https://v1uf5au310.execute-api.us-east-2.amazonaws.com
   - Azure: https://app-template.salmonpebble-b870873b.eastus.azurecontainerapps.io
   - Google Cloud: https://template-189497094271.us-central1.run.app
   - Oracle: https://template.141-148-159-122.sslip.io
-- Next: Day 1, app 1 (Build Tracker), live on AWS, with the first `appN.breakthruventures.ai` record (now created automatically in Cloudflare).
+- **Deployed (4):** health check `ok` at the custom domain, reporting the tag `apps.yaml` pins. Not yet `done`: no
+  live smoke result is recorded, and their run logs were only reconstructed on 2026-11-10.
+
+  | # | App | Cloud | Live | Tag |
+  | --- | --- | --- | --- | --- |
+  | 1 | Portfolio Build Tracker | AWS | https://app1.breakthruventures.ai | `sha-a4e6649` |
+  | 2 | Notes and Knowledge Base | Azure | https://app2.breakthruventures.ai | `sha-6675f0b` |
+  | 3 | Expense Tracker | Google Cloud | https://app3.breakthruventures.ai | `sha-811aac4` |
+  | 4 | Habit and Goal Tracker | Oracle | https://app4.breakthruventures.ai | `sha-c91ffc1` |
+
+- **Building (8):** apps 5–12 have repos (created 2026-11-09 Central, with the `protect-main` ruleset), green CI on
+  `main`, and open UI, fullstack, AI or README issues. None is in `apps.yaml` yet; their deploy issues are
+  `30-apps-infra` #55–#59 (apps 5–8, labelled `claude`) and #60–#64 (apps 9–12, not labelled yet).
+- **Planned (18):** apps 13–30 are catalog entries only. Not started.
+- **Close-out debt:** no app is `done`. The READMEs for app 06 and app 09 still have the template's "What this app
+  does" placeholder; apps 10–12 still carry template title or intro text; app 1's README header still says it is
+  going live. 01-build-tracker #9 (Jules README PR) and 04-habit-tracker #16 (unlabelled bug) are open.
+- **Protection gap:** `30-apps-template` and apps 01–04 have no branch protection, and `ai-dev-os`'s ruleset lists no
+  required check. See [`FACTORY.md`](FACTORY.md#branch-protection-as-it-stands-checked-2026-11-10).
+- **Next:** finish and deploy apps 5–12 through the five gates, clear the close-out debt, have Michael turn on the
+  `Reviewer sign-off` required check, then start apps 13–30.
 
 ## Where to read more
 
 | You need | Read |
 | --- | --- |
 | The rules | [`AGENTS.md`](AGENTS.md) |
+| The BreakthruSoftwareFactory: gates, definition of done, required review | [`FACTORY.md`](FACTORY.md) |
+| What happened on each app | [`runs/`](runs/), starting with [`retro-01-12.md`](runs/retro-01-12.md) |
 | Your role's instructions | [`roles/<role>.md`](roles/) |
 | What to build | [`catalog.yaml`](catalog.yaml), then `specs/NN-slug.md` |
 | How code must be written in an app | That app repo's `AGENTS.md` |

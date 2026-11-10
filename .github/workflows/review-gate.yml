@@ -1,0 +1,86 @@
+# BreakthruSoftwareFactory gate 3 (review): no merge without the reviewer's sign-off.
+#
+# Passes when the PR's head commit has a pull request review whose body carries the reviewer marker:
+#
+#     Reviewer: claude-code
+#     Verdict: ready
+#
+# PRs labelled `security-sensitive` also need the same marker from Codex (`Reviewer: codex`). The newest marked
+# review from each reviewer counts, and it must be on the current head commit, so a push after review needs a new
+# review. `Verdict: blocking` fails the check. Agents and Michael share one GitHub account, so reviews are matched
+# by marker, not by author: like the rest of the playbook, this guards against mistakes, not against that account.
+#
+# Michael still merges; this check only says whether the review happened. Reviews are posted as COMMENT reviews
+# (GitHub doesn't let an account approve its own PR), so required approvals stay at 0.
+#
+# ai-dev-os runs it directly. An app repo can call it (see runbooks/daily.md, "Review gate"):
+#     jobs:
+#       review:
+#         uses: BreakthruDevelopment/ai-dev-os/.github/workflows/review-gate.yml@main
+name: Review gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: review-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Reviewer sign-off
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.setFailed("Review gate only runs on pull_request and pull_request_review events.");
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const { data: current } = await github.rest.pulls.get({ owner, repo, pull_number: pr.number });
+            const head = current.head.sha;
+            const labels = current.labels.map((l) => l.name);
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner, repo, pull_number: pr.number, per_page: 100,
+            });
+
+            const marker = (body, key) => {
+              const m = (body || "").match(new RegExp(`^\\s*\\**${key}\\**\\s*:\\s*\\**\\s*([a-z-]+)`, "im"));
+              return m ? m[1].toLowerCase() : null;
+            };
+            const required = ["claude-code"];
+            if (labels.includes("security-sensitive")) required.push("codex");
+
+            const problems = [];
+            for (const who of required) {
+              const mine = reviews
+                .filter((r) => r.state !== "DISMISSED" && marker(r.body, "Reviewer") === who)
+                .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+              const last = mine[mine.length - 1];
+              if (!last) {
+                problems.push(`no review marked "Reviewer: ${who}" yet`);
+              } else if (last.commit_id !== head) {
+                problems.push(`${who}'s latest review is on ${last.commit_id.slice(0, 7)}, not the head ${head.slice(0, 7)}: review again`);
+              } else if (marker(last.body, "Verdict") !== "ready") {
+                problems.push(`${who}'s latest review says "Verdict: ${marker(last.body, "Verdict") || "missing"}"`);
+              } else {
+                core.info(`${who}: ready on ${head.slice(0, 7)} (${last.html_url})`);
+              }
+            }
+            if (problems.length) {
+              core.setFailed(`Review gate: ${problems.join("; ")}.`);
+            } else {
+              core.info(`Review gate passed for ${required.join(" + ")}. Michael merges.`);
+            }

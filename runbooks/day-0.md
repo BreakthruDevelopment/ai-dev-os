@@ -1,5 +1,8 @@
 # Day 0 setup
 
+Day 0 of the BreakthruSoftwareFactory ([`FACTORY.md`](../FACTORY.md)): the accounts, template and infra every gate
+relies on.
+
 Setup before Day 1. **Done on 2026-11-04:** the template app is live and healthy on all four clouds. This page
 records what was set up, so the same steps can be repeated or audited.
 

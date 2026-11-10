@@ -22,5 +22,10 @@ Produce `specs/NN-slug.md` from `templates/spec.md`:
    body, and a `## Dependencies` section linking the issues it waits on. Add the harness label only when those are
    merged: the label is the start signal (Grok Build and Antigravity pick up labelled issues through
    `scripts/run-harness.sh`). Add each issue to the project board.
+8. **Security-sensitive slices.** Mark each slice that touches auth, roles and access, payments, tenancy, uploads,
+   tokens or secrets, or AI tool calls that write data as needing a Codex second review, in the spec and the issue
+   body, so its PR gets the `security-sensitive` label.
+
+This is gate 1 of the BreakthruSoftwareFactory (`FACTORY.md`): Michael approves the scope by merging the spec PR.
 
 Keep the spec under two pages. Follow the safety rules in `AGENTS.md`: never create, rename or delete repos.

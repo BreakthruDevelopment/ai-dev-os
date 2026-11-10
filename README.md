@@ -1,6 +1,6 @@
 # AI Dev OS
 
-The operating system behind **30 apps in 30 days**: a team of AI agents running in five harnesses from four vendors that plans, builds,
+The operating system behind **30 apps in 30 days**, run as the **BreakthruSoftwareFactory**: a team of AI agents running in five harnesses from four vendors that plans, builds,
 reviews and deploys one production-shaped web app a day to AWS, Azure, Google Cloud or Oracle Cloud, with a human
 approving every release.
 
@@ -17,7 +17,7 @@ catalog.yaml ──► Planner (Claude) ──► spec + GitHub issues
   Full-stack (Grok Build, Codex, Antigravity)   AI builder (Claude)   UI builder (Grok Build)
               └──────────────► pull requests ◄──────────────────────┘
                                          │
-             Reviewer (Claude) + Codex on security PRs · CI: lint, types, tests, build, smoke
+   Reviewer (Claude, required check) + Codex on security PRs · CI: lint, types, tests, build, smoke
                                          │
                        DevOps (Claude): deploy to the day's cloud, smoke test live URL
                                          │
@@ -40,14 +40,15 @@ whichever harness has capacity.
 
 | Path | What it is |
 | --- | --- |
-| `BRIEFING.md` | Start here: the project, every decision in force, and what was dropped |
+| `BRIEFING.md` | Start here: the project, every decision in force, what was dropped, and where things stand |
+| `FACTORY.md` | The BreakthruSoftwareFactory: five gates, definition of done, required review, branch protection |
 | `AGENTS.md` | Rules every harness follows: repo safety, the role-to-harness map, how work moves |
 | `roles/` | The eight roles, harness-neutral: planner, full-stack, AI and UI builders, reviewer, devops, docs writer, ops monitor |
 | `.claude/agents/` | Claude Code subagents generated from `roles/` (`scripts/sync-claude-agents.py`) |
 | `catalog.yaml` | The 30 apps: repo name, subdomain, cloud, AI feature |
 | `templates/` | Spec, README and run-log templates |
 | `runbooks/` | Day 0 setup, running Grok Build and Antigravity on the Mac, the daily flow (DNS is created by the deploy at Cloudflare; the old Network Solutions runbook is kept, superseded) |
-| `specs/`, `runs/` | One spec and one run log per app |
+| `specs/`, `runs/` | One spec and one run log per app; `runs/retro-01-12.md` is the apps 1–12 retrospective |
 
 The app template lives in [`30-apps-template`](https://github.com/BreakthruDevelopment/30-apps-template).
 

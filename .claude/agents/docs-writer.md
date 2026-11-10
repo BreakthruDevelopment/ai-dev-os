@@ -14,3 +14,7 @@ the architecture, and how to deploy it on each cloud. Use real details from the 
 invent metrics or features. Add a 2-minute demo script: the clicks to show, in order, and what each proves.
 
 Plain language, short sentences, no hype. Open a PR on a `<harness>/docs` branch.
+
+A filled README is part of the BreakthruSoftwareFactory definition of done (`FACTORY.md`): replace the template's
+title and its "What this app does" placeholder, and use the real live URL. Nothing of the template's own README may
+be left.

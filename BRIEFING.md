@@ -3,7 +3,7 @@
 Read this first if you're an AI harness (or a person) joining the **30 apps in 30 days** build. It's the current
 state of every decision; the rules themselves are in [`AGENTS.md`](AGENTS.md).
 
-_Last updated: 2026-11-09 (DNS and AWS deploy lines refreshed; rest as of Day 0)._
+_Last updated: 2026-11-09 (harness line-up: Jules replaced by Antigravity, Grok Build and Antigravity run from Michael's Mac, ops monitor moved to a scheduled Claude Code task; DNS and AWS deploy lines refreshed)._
 
 ## What we're building and why
 
@@ -48,17 +48,26 @@ calling the Claude API from the apps, paid DNS, and running many agents in paral
 ## How the AI team is organized
 
 - A **model** does the thinking (Claude, Grok, OpenAI's Codex models, Gemini).
-- A **harness** wraps a model so it can act on code: Claude Code, Grok Build, Grok Bot, Codex, Jules.
+- A **harness** wraps a model so it can act on code: Claude Code, Codex, Grok Build, Antigravity, Grok Bot.
 - An **agent** is a role running inside a harness. The eight roles live in [`roles/`](roles/), written once and
   usable by any harness.
 
 | Harness | Subscription | Gets work by | Usually does |
 | --- | --- | --- | --- |
-| Claude Code | Claude | Issues labeled `claude` | Planning, data/API, AI feature, review, deploys |
-| Grok Build | X (Grok) | Issues labeled `grok` | UI pages and components; AWS and Azure Terraform |
-| Jules | Google AI Pro | Issues labeled `jules` | Google Cloud and Oracle Terraform; overflow |
-| Codex | ChatGPT Plus | Every PR (review) and issues labeled `codex` | Code review; small fixes |
-| Grok Bot | X (Grok) | Its nightly schedule | Ops report: CI, stalled work, app health, free-tier usage |
+| Claude Code | Claude | Issues labeled `claude`; scheduled tasks overnight | Planner, reviewer, AI builder, deploys, template changes; the nightly ops report (scheduled task, 5:37 AM Central, posted to the `Ops report (nightly)` issue in this repo) |
+| Codex | ChatGPT Plus (tightest limits) | Issues labeled `codex` | Fullstack on selected issues; second review on security-sensitive PRs |
+| Grok Build | X (SuperGrok) | Issues labeled `grok`, worked when Michael runs `scripts/run-harness.sh grok` on his Mac | UI pages, fullstack issues and READMEs; Michael wants it used more |
+| Antigravity | Google AI Pro | Issues labeled `antigravity`, worked when Michael runs `scripts/run-harness.sh antigravity` | Fullstack and docs, on trial |
+| Grok Bot | X (Grok) | Michael pastes in a live app's README and URL | Build-in-public drafts: an X post, a LinkedIn post and a two-minute demo script per app. No repo access, no secrets; Michael posts |
+
+**Jules is gone.** Google turns it read-only after 2026-11-11 and shuts it down on 2026-12-31
+([changelog](https://jules.google/docs/changelog/)); Google Antigravity replaces it. Its open issues were
+reassigned on 2026-11-09 ([`specs/day-0-apps-5-8.md`](specs/day-0-apps-5-8.md#2026-11-09-reassignment)).
+
+**Labels are the start signal.** Grok Build and Antigravity are CLIs on Michael's Mac, not GitHub apps, so a label
+doesn't trigger them. Claude adds a harness label only once an issue's dependencies are merged; the runner script
+then picks it up, works it in `~/30apps/<repo>` and opens a PR (it also skips anything whose dependencies are
+still open). Setup and safety trade-offs: [`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md).
 
 ## How work moves
 
@@ -66,12 +75,15 @@ GitHub is the only shared memory. Harnesses never talk to each other.
 
 1. The **planner** turns the day's catalog entry into `specs/NN-slug.md` and opens issues. Each issue names a role
    in its title (`[ui-builder] Dashboard page`) and carries one harness label.
-2. Each harness picks up only its own label, follows the named role file, and opens a PR from a
-   `<harness>/<task>` branch.
-3. CI (lint, types, tests, build, smoke test) must pass; Claude Code and Codex review.
+2. Once its dependencies are merged, the issue gets its harness label. Each harness picks up only its own label,
+   follows the named role file, and opens a PR from a `<harness>/<task>` branch.
+3. CI (lint, types, tests, build, smoke test) must pass; Claude Code reviews every PR, Codex the security-sensitive ones.
 4. **Michael merges.** Nothing reaches `main` any other way.
 5. The day's app is deployed to its cloud, smoke-tested at its live URL; its DNS record is created by the deploy.
-6. Overnight, harnesses with capacity work queued issues into PRs for Michael's morning review.
+6. Overnight, Codex and scheduled Claude Code tasks work queued issues into PRs for Michael's morning review;
+   Grok Build and Antigravity run whenever Michael starts the runner. The nightly ops report lands in the
+   `Ops report (nightly)` issue.
+7. When an app is live, Grok Bot drafts its launch posts and demo script from the README for Michael to post.
 
 When a harness hits its usage limit, its issues are relabeled to another harness.
 
@@ -94,4 +106,5 @@ When a harness hits its usage limit, its issues are relabeled to another harness
 | What to build | [`catalog.yaml`](catalog.yaml), then `specs/NN-slug.md` |
 | How code must be written in an app | That app repo's `AGENTS.md` |
 | The day's routine | [`runbooks/daily.md`](runbooks/daily.md) |
+| Running Grok Build and Antigravity | [`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md) |
 | How deploys work | [`30-apps-infra` README](https://github.com/BreakthruDevelopment/30-apps-infra#how-deploys-work) |

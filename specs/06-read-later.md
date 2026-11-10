@@ -211,6 +211,9 @@ Mutating routes: `requireUser()`, `requireSameOrigin()`, `readJson()` 8 KB, zod,
 
 ## Issues
 
+> **Owners changed on 2026-11-09** (Jules is shutting down): the harness labels below are as first planned; the
+> current owner of each issue is in [`day-0-apps-5-8.md`, 2026-11-09 reassignment](day-0-apps-5-8.md#2026-11-09-reassignment).
+
 Repo `06-read-later` unless noted. Order: 6.1 → 6.2 → 6.3; 6.4 starts when 6.1 is merged (status chips work against
 6.2's statuses once merged); 6.5 after 6.2–6.4 **and day-0 T6** (Azure apps parked in the tracker); 6.6 last.
 

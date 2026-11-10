@@ -34,7 +34,7 @@ LABELS = {  # harness labels the playbook uses (AGENTS.md section 3)
     "claude": ("6f42c1", "Work for Claude Code"),
     "grok": ("d93f0b", "Work for Grok Build"),
     "codex": ("0e8a16", "Work for Codex"),
-    "jules": ("1d76db", "Work for Jules"),
+    "antigravity": ("1d76db", "Work for Google Antigravity (replaced Jules)"),
 }
 REQUIRED_CHECKS = ["Lint, test, build, smoke"]  # the template's CI job, which runs on every pull request
 MAX_CREATES_PER_RUN = 4  # new repos per run; apps stay marked, so only creations count

@@ -47,12 +47,13 @@ Who would hire this out, what they need, and the roles in the app (for example c
 
 ## Issues
 
-Each issue names a role and carries a harness label; add each to the project board.
+Each issue names a role, its planned harness and a `## Dependencies` list; it gets the harness label (the start
+signal) once those are merged. Add each to the project board.
 
-- [ ] `[fullstack-builder]` `claude` — schema and migration
-- [ ] `[fullstack-builder]` `claude` — data functions, route handlers, server actions, integration tests
+- [ ] `[fullstack-builder]` `grok` — schema and migration
+- [ ] `[fullstack-builder]` `grok` — data functions, route handlers, server actions, integration tests
 - [ ] `[ai-builder]` `claude` — AI feature, fixture, evals
 - [ ] `[ui-builder]` `grok` — pages and components (375px and desktop)
 - [ ] `[ui-builder]` `grok` — smoke test for the main flow
 - [ ] `[devops]` `grok` — Terraform for AWS and Azure
-- [ ] `[devops]` `jules` — Terraform for Google Cloud and Oracle Cloud
+- [ ] `[devops]` `antigravity` — Terraform for Google Cloud and Oracle Cloud

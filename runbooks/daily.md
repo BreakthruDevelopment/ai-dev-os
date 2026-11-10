@@ -3,17 +3,20 @@
 | When | Step | Who |
 | --- | --- | --- |
 | Start | Mark the app `create_repo: true` in `catalog.yaml`; the workflow creates and tags the repo (see below) | Claude Code |
-| Morning | Spec + issues (role in title, harness label) on the board | Claude Code (planner) |
-| Midday | Data/API PR and AI feature PR | Claude Code, overflow to Jules |
+| Morning | Spec + issues (role in title, planned harness in the spec) on the board | Claude Code (planner) |
+| Through the day | Add an issue's harness label once its dependencies are merged (the start signal) | Claude Code |
+| Through the day | Run `scripts/run-harness.sh grok` (and `antigravity`) on the Mac; see `runbooks/harnesses-on-mac.md` | Michael |
+| Midday | Data/API PRs | Grok Build; Codex or Antigravity on the issues assigned to them |
+| Midday | AI feature PR; template changes | Claude Code |
 | Midday | UI pages PR | Grok Build |
-| Midday | Overflow builds; any infra change the app needs in `30-apps-infra` | Jules |
-| Afternoon | Review every PR; CI green | Claude Code (reviewer) + Codex |
+| Afternoon | Review every PR; CI green | Claude Code (reviewer); Codex second review on security-sensitive PRs |
 | Afternoon | Add the app to `apps.yaml` for the day's cloud (PR), smoke test after deploy | Claude Code (devops) |
 | Afternoon | AWS days only: run `deploy/aws.sh` in AWS CloudShell | Michael |
-| Evening | README and demo script | Docs (whoever has headroom) |
+| Evening | README and demo script | Grok Build (or Antigravity) |
+| Evening | Launch post drafts (X, LinkedIn) and a two-minute demo script from the README and live URL | Grok Bot, from what Michael pastes in |
 | Evening | Review and merge; post the app (DNS records are created in Cloudflare by the deploy) | Michael |
-| Overnight | Queued issues → PRs | Codex, Jules, scheduled Claude Code |
-| Overnight | CI status, free-tier usage, stalled PRs → Build Tracker | Grok Bot (ops monitor) |
+| Overnight | Queued issues → PRs | Codex and scheduled Claude Code tasks; Grok Build and Antigravity if the runner is left going |
+| 5:37 AM Central | CI status, stalled work, app health, free-tier usage → `Ops report (nightly)` issue in `ai-dev-os` | Scheduled Claude Code task (ops monitor) |
 
 ## Creating the day's repo
 
@@ -22,7 +25,7 @@ Repos are created by the **Create app repos** workflow (`scripts/create-app-repo
 1. Open a PR in this repo that sets `create_repo: true` on the app in `catalog.yaml`. The PR's check prints what it
    would create; nothing happens yet.
 2. Merge it. On `main`, the workflow creates `BreakthruDevelopment/<repo>` from `30-apps-template` (public), adds the
-   topic `30-apps-30-days`, the harness labels (`claude`, `grok`, `codex`, `jules`) and a `protect-main` ruleset
+   topic `30-apps-30-days`, the harness labels (`claude`, `codex`, `grok`, `antigravity`) and a `protect-main` ruleset
    (pull request required, `Lint, test, build, smoke` from GitHub Actions must pass, no force pushes or deletion).
    At most 4 new repos per run; rerun the workflow for more.
 3. Leave `create_repo: true` in place: reruns only fill in what's missing. A repo that exists **without** the topic is

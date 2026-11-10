@@ -215,6 +215,9 @@ Two tasks through `generate()`. **Claude** builds both (issue 5.3).
 
 ## Issues
 
+> **Owners changed on 2026-11-09** (Jules is shutting down): the harness labels below are as first planned; the
+> current owner of each issue is in [`day-0-apps-5-8.md`, 2026-11-09 reassignment](day-0-apps-5-8.md#2026-11-09-reassignment).
+
 Repo `05-budget-planner` unless noted. **2nd review: Codex** marks security-sensitive PRs (Claude reviews every
 PR). Order: 5.1 first (needs T2); then 5.2 (needs T4) and 5.3 in parallel; 5.4 starts when 5.1 is merged (Link
 wiring after 5.2); 5.5 after 5.2–5.4; 5.6 last.

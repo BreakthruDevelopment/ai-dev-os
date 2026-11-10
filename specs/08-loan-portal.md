@@ -258,6 +258,9 @@ host once via the serial console (a root shell → a self-updating agent, the Ge
 
 ## Issues
 
+> **Owners changed on 2026-11-09** (Jules is shutting down): the harness labels below are as first planned; the
+> current owner of each issue is in [`day-0-apps-5-8.md`, 2026-11-09 reassignment](day-0-apps-5-8.md#2026-11-09-reassignment).
+
 Repo `08-loan-portal` unless noted. Order: 8.1 → 8.2 and 8.3 (parallel); 8.4 starts when 8.1 is merged (documents
 and risk panels after 8.2/8.3); 8.5 after 8.2–8.4, **then Michael reboots the VM**; 8.6 last.
 

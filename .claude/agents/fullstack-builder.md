@@ -15,5 +15,5 @@ Work rules:
 - Generate a migration for every schema change (`pnpm db:generate --name <change>`).
 - Add integration tests in `test/` for every access rule (owner allowed, other user blocked, admin allowed).
 - Extend `scripts/smoke.sh` with the app's main flow.
-- Work on a `<harness>/<task>` branch (for example `claude/items-api` or `jules/items-api`) and open a PR. Never push to `main`.
+- Work on a `<harness>/<task>` branch (for example `claude/items-api` or `grok/items-api`) and open a PR. Never push to `main`.
 - Before opening the PR, run: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.

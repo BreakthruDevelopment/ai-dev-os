@@ -85,6 +85,7 @@ apps:
     status: planned
   - n: 9
     repo: 09-invoicing
+    create_repo: true
     name: "Invoicing"
     subdomain: app9.breakthruventures.ai
     live_cloud: aws
@@ -94,6 +95,7 @@ apps:
     status: planned
   - n: 10
     repo: 10-inventory
+    create_repo: true
     name: "Inventory Management"
     subdomain: app10.breakthruventures.ai
     live_cloud: azure
@@ -103,6 +105,7 @@ apps:
     status: planned
   - n: 11
     repo: 11-helpdesk
+    create_repo: true
     name: "Helpdesk Ticketing"
     subdomain: app11.breakthruventures.ai
     live_cloud: gcp
@@ -112,6 +115,7 @@ apps:
     status: planned
   - n: 12
     repo: 12-restaurant-ordering
+    create_repo: true
     name: "Restaurant Ordering"
     subdomain: app12.breakthruventures.ai
     live_cloud: oci

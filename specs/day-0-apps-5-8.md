@@ -3,9 +3,76 @@
 Specs: [05 Budget Planner](05-budget-planner.md) (AWS) · [06 Read-Later](06-read-later.md) (Azure) ·
 [07 Appointment Booking](07-appointment-booking.md) (Google Cloud) · [08 Loan Portal](08-loan-portal.md) (Oracle).
 
-Apps 5–8 are built as one batch over two days across four harnesses. Repos don't exist yet: **no issues are opened
-until the Create app repos workflow has made them** (step M3); then the planner opens every issue below and in the
-four specs, adds each to the board, and labels it.
+Apps 5–8 are built as one batch over two days across four harnesses. The repos exist and every issue is open;
+see [Issues as opened](#issues-as-opened) for the links.
+
+## Issues as opened
+
+Opened 2026-11-09 by the planner, one harness label each, in dependency order (each body links the issues it
+waits on). **Not on the project board:** the board's API is GraphQL-only, which this session can't use, so Michael
+adds them by hand (or a harness with GraphQL does). Not opened: T5 and T6 (done), and 7.8, 7.9 and 8.7 (later).
+
+**`30-apps-template`**
+
+| Spec | Issue | Harness | Title |
+| --- | --- | --- | --- |
+| T2 | [#17](https://github.com/BreakthruDevelopment/30-apps-template/issues/17) | `claude` | [fullstack-builder] Shared helpers every app has been porting |
+| T4 | [#18](https://github.com/BreakthruDevelopment/30-apps-template/issues/18) | `claude` | [fullstack-builder] Envelope encryption module |
+| T3 | [#19](https://github.com/BreakthruDevelopment/30-apps-template/issues/19) | `claude` | [fullstack-builder] Background jobs pattern |
+| T1 | [#20](https://github.com/BreakthruDevelopment/30-apps-template/issues/20) | `claude` | [ai-builder] Tool-use loop in generate() |
+
+**`05-budget-planner`**
+
+| Spec | Issue | Harness | Title |
+| --- | --- | --- | --- |
+| 5.1 | [#1](https://github.com/BreakthruDevelopment/05-budget-planner/issues/1) | `codex` | [fullstack-builder] Schema, categories, transactions, rules, budgets, cash flow, demo seed |
+| 5.2 | [#2](https://github.com/BreakthruDevelopment/05-budget-planner/issues/2) | `codex` | [fullstack-builder] Plaid sandbox provider and encrypted token storage |
+| 5.3 | [#3](https://github.com/BreakthruDevelopment/05-budget-planner/issues/3) | `claude` | [ai-builder] Categorization and cash-flow explanation |
+| 5.4 | [#4](https://github.com/BreakthruDevelopment/05-budget-planner/issues/4) | `grok` | [ui-builder] Overview, transactions, budgets, accounts and admin pages |
+| 5.6 | [#5](https://github.com/BreakthruDevelopment/05-budget-planner/issues/5) | `jules` | [docs-writer] README for Personal Budget Planner |
+
+**`06-read-later`**
+
+| Spec | Issue | Harness | Title |
+| --- | --- | --- | --- |
+| 6.1 | [#1](https://github.com/BreakthruDevelopment/06-read-later/issues/1) | `jules` | [fullstack-builder] Schema, links, tags, search, rate limits, admin counts, demo seed |
+| 6.2 | [#2](https://github.com/BreakthruDevelopment/06-read-later/issues/2) | `jules` | [fullstack-builder] Job worker, SSRF-safe fetcher and extraction |
+| 6.3 | [#3](https://github.com/BreakthruDevelopment/06-read-later/issues/3) | `jules` | [ai-builder] Summaries and auto-tags |
+| 6.4 | [#4](https://github.com/BreakthruDevelopment/06-read-later/issues/4) | `grok` | [ui-builder] Inbox, reader, search, tags, save page, settings and admin |
+| 6.6 | [#5](https://github.com/BreakthruDevelopment/06-read-later/issues/5) | `jules` | [docs-writer] README for Bookmark and Read-Later |
+
+**`07-appointment-booking`**
+
+| Spec | Issue | Harness | Title |
+| --- | --- | --- | --- |
+| 7.1 | [#1](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/1) | `jules` | [fullstack-builder] Schema, provider setup and availability engine |
+| 7.2 | [#2](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/2) | `jules` | [fullstack-builder] Bookings, cancellation, .ics and calendar feed |
+| 7.3 | [#3](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/3) | `grok` | [ui-builder] Provider setup, booking page, my bookings and admin |
+| 7.5 | [#4](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/4) | `jules` | [ai-builder] Booking assistant on the tool loop |
+| 7.4 | [#5](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/5) | `grok` | [ui-builder] Chat panel with confirm cards |
+| 7.10 | [#6](https://github.com/BreakthruDevelopment/07-appointment-booking/issues/6) | `jules` | [docs-writer] README for Appointment Booking |
+
+**`08-loan-portal`**
+
+| Spec | Issue | Harness | Title |
+| --- | --- | --- | --- |
+| 8.1 | [#1](https://github.com/BreakthruDevelopment/08-loan-portal/issues/1) | `jules` | [fullstack-builder] Roles, applications, state machine, notes, audit log |
+| 8.2 | [#2](https://github.com/BreakthruDevelopment/08-loan-portal/issues/2) | `jules` | [fullstack-builder] Document vault |
+| 8.3 | [#3](https://github.com/BreakthruDevelopment/08-loan-portal/issues/3) | `claude` | [ai-builder] Risk rules and AI risk summary |
+| 8.4 | [#4](https://github.com/BreakthruDevelopment/08-loan-portal/issues/4) | `grok` | [ui-builder] Applicant stepper, underwriter queue and review, admin and audit pages |
+| 8.6 | [#5](https://github.com/BreakthruDevelopment/08-loan-portal/issues/5) | `jules` | [docs-writer] README for Loan Application Portal |
+
+**`30-apps-infra`**
+
+| Spec | Issue | Harness | Title |
+| --- | --- | --- | --- |
+| 5.5 | [#55](https://github.com/BreakthruDevelopment/30-apps-infra/issues/55) | `claude` | [devops] Deploy app 5 to AWS |
+| 6.5 | [#56](https://github.com/BreakthruDevelopment/30-apps-infra/issues/56) | `claude` | [devops] Deploy app 6 to Azure |
+| 7.6 | [#57](https://github.com/BreakthruDevelopment/30-apps-infra/issues/57) | `claude` | [devops] Deploy app 7 to Google Cloud (default URL) |
+| 7.7 | [#58](https://github.com/BreakthruDevelopment/30-apps-infra/issues/58) | `claude` | [devops] Custom domain for app 7 |
+| 8.5 | [#59](https://github.com/BreakthruDevelopment/30-apps-infra/issues/59) | `claude` | [devops] Deploy app 8 to Oracle Cloud |
+
+Totals: `jules` 12, `claude` 11, `grok` 5, `codex` 2 (30 issues: 26 app, 4 template).
 
 ## Who does what
 
@@ -23,7 +90,9 @@ itself (T4) is Claude-written and Codex-reviewed.
 
 ## Template prep (repo `30-apps-template`, all `claude`)
 
-Merged **before** the repos are created, so all four apps start with them. Each is one PR.
+Each is one PR. The plan was to merge these **before** creating the repos, but the repos were created first (ai-dev-os PR #12), so
+they don't contain T1–T4. Each app's first issue that needs one ports it from template `main` once it's merged: T2 in
+5.1, 6.1, 7.1 and 8.1; T4 in 5.2; T3 in 6.2; T1 in 7.5. The issue bodies say so.
 
 - **T1 `[ai-builder] Tool-use loop in generate()`** · **2nd review: Codex** · needed by 7.5
   - `GenerateRequest` gains optional `tools: ToolDef[]`, `maxSteps` (default 4, max 6), `deadlineMs` (default 24,000)
@@ -146,8 +215,8 @@ time. Jules runs several tasks at once, so its three fullstack tracks run in par
 
 | When | Claude Code | Jules | Grok Build | Codex | Michael |
 | --- | --- | --- | --- | --- | --- |
-| **Day 1 morning** | Open T1–T5 on the board; T2, T4, T3 (then T1); T6 in parallel | — | — | Review T2, T4 | M1, M2 |
-| **Day 1 midday** | T5 PR; once repos exist, open the 26 app issues (7.8, 7.9, 8.7 aren't opened) | — | — | Review T1 | M3; M9 when T6 is ready |
+| **Day 1 morning** | T2, T4, T3 (then T1), opened as template #17–#20; T6 in parallel | — | — | Review T2, T4 | M1, M2 |
+| **Day 1 midday** | Repos created (ai-dev-os PR #12); the 26 app issues opened ([links](#issues-as-opened)) | — | — | Review T1 | M3; M9 when T6 is ready |
 | **Day 1 afternoon** | Review PRs as they open | 8.1, 6.1, 7.1 in parallel | — | 5.1 | Merge reviewed PRs |
 | **Day 1 evening** | Reviews; 5.3 after 5.1 merges | — | 5.4 after 5.1 merges | Review 8.1 | Merge |
 | **Overnight** | Scheduled task: 8.3 | 8.2, 6.2, 7.2 | 5.4 continues, 8.4 | 5.2 | — |

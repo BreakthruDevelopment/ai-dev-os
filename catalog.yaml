@@ -1,4 +1,4 @@
-# The 30 apps. Source of truth for repo names, subdomains and the cloud each app is live on.
+# The portfolio apps (32). Source of truth for repo names, subdomains and the cloud each app is live on.
 # Cloud rotates by day: AWS, Azure, Google Cloud, Oracle Cloud. Deploys happen by adding the app to apps.yaml in
 # 30-apps-infra; listing more clouds there runs it on those too.
 #
@@ -291,4 +291,22 @@ apps:
     client_need: "AI platform operations"
     ai_feature: "One view of the agent team: run logs, cost, eval scores and Grok Bot routines, joined with the Build Tracker"
     notable: "Admin-only access, scoped API keys, usage metering"
+    status: planned
+  - n: 31
+    repo: 31-cost-scaler
+    name: "Cloud Cost Scaler"
+    subdomain: app31.breakthruventures.ai
+    live_cloud: gcp
+    client_need: "Cloud cost planning and FinOps"
+    ai_feature: "Plain-language scaling and migration recommendation, grounded in priced scenarios from a normalized four-cloud price table"
+    notable: "Public price lists for AWS, Azure, Google Cloud and Oracle; current footprint read from 30-apps-infra apps.yaml; scenario builder for users, compute, containers, storage, identity and redundancy; break-even for moving clouds"
+    status: planned
+  - n: 32
+    repo: 32-purchase-orders
+    name: "Purchase Orders and Vendor Management"
+    subdomain: app32.breakthruventures.ai
+    live_cloud: oci
+    client_need: "Procurement and back office"
+    ai_feature: "Extract fields from uploaded quotes and invoices; three-way match explanations"
+    notable: "Spend-limit approval chains, PO to receipt to invoice matching, vendor records"
     status: planned

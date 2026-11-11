@@ -28,7 +28,7 @@ jobs:
           import os
           import yaml
           apps = yaml.safe_load(open("catalog.yaml"))["apps"]
-          assert len(apps) == 30, f"expected 30 apps, got {len(apps)}"
+          assert len(apps) == 32, f"expected 32 apps, got {len(apps)}"
           clouds = ["aws", "azure", "gcp", "oci"]
           for i, a in enumerate(apps, start=1):
               assert a["n"] == i, f"app {i} out of order"
@@ -39,6 +39,6 @@ jobs:
               assert a.get("status") in ("planned", "building", "deployed", "done"), f"app {i} status {a.get('status')!r}"
               if a["status"] == "done":
                   assert os.path.exists(f"runs/{a['repo']}.md"), f"app {i} is done but runs/{a['repo']}.md is missing"
-          assert len({a["repo"] for a in apps}) == 30, "duplicate repo names"
+          assert len({a["repo"] for a in apps}) == len(apps), "duplicate repo names"
           print("catalog ok")
           PY

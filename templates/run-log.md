@@ -21,7 +21,7 @@ BreakthruSoftwareFactory run log ([`FACTORY.md`](../FACTORY.md)). Link evidence;
 | 1 Spec: Michael approved scope | spec PR # | |
 | 2 Build: PRs merged with CI green | PR #, #, # | |
 | 3 Review: `Reviewer sign-off` green on every PR (Codex on security-sensitive) | review links | |
-| 4 Release: Michael merged, deployed, live smoke | apps.yaml PR #, smoke output | |
+| 4 Release: Michael approved going live, deployed, live smoke | apps.yaml PR #, smoke output | |
 | 5 Close-out: run log, catalog/briefing, launch drafts | catalog PR #; drafts given to Michael | |
 
 ## Who did what

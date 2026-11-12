@@ -6,8 +6,8 @@ state of every decision; the rules themselves are in [`AGENTS.md`](AGENTS.md).
 The process that builds the apps is called the **BreakthruSoftwareFactory**: this playbook, its eight roles, the five
 daily gates (spec, build, review, release, close-out) and the definition of done, all in [`FACTORY.md`](FACTORY.md).
 
-_Last updated: 2026-11-10 (named the BreakthruSoftwareFactory; required review check; definition of done; "Where
-things stand" and `catalog.yaml` brought up to date with apps 1–12; run logs started)._
+_Last updated: 2026-11-12 (agents may squash-merge app-repo PRs once CI and review are green; spec, `ai-dev-os`,
+and release/infra PRs stay with Michael). "Where things stand" below is still as of 2026-11-10._
 
 ## What we're building and why
 
@@ -85,12 +85,15 @@ and close-out (7).
    follows the named role file, and opens a PR from a `<harness>/<task>` branch.
 3. CI (lint, types, tests, build, smoke test) must pass. **Review is required:** Claude Code reviews every PR, Codex
    also reviews PRs labelled `security-sensitive`, and each posts a marked PR review that the `Reviewer sign-off`
-   check reads. No merge without it.
-4. **Michael merges.** Nothing reaches `main` any other way.
+   check reads. No merge without it. Once those checks are green on the current head, any harness may squash-merge
+   an **app-repo** PR (see [`AGENTS.md`](AGENTS.md)).
+4. **These stay with Michael:** spec PRs (gate 1, scope approval), changes to `ai-dev-os` itself, and anything that
+   takes an app live or changes deploy or infra secrets (including `30-apps-infra` PRs such as `apps.yaml`).
 5. The day's app is deployed to its cloud, smoke-tested at its live URL; its DNS record is created by the deploy.
-6. Overnight, Codex and scheduled Claude Code tasks work queued issues into PRs for Michael's morning review;
-   Grok Build and Antigravity run whenever Michael starts the runner. The nightly ops report lands in the
-   `Ops report (nightly)` issue.
+   Michael approves that release by merging the `apps.yaml` PR.
+6. Overnight, Codex and scheduled Claude Code tasks work queued issues into PRs, and may squash-merge app-repo PRs
+   that go green; Grok Build and Antigravity run whenever Michael starts the runner. The nightly ops report lands in
+   the `Ops report (nightly)` issue.
 7. Close-out: the run log (`runs/NN-slug.md`), `catalog.yaml` status and this briefing are updated, and Grok Bot
    drafts the launch posts and demo script from the README for Michael to post. An app is **done** only with a filled
    README, a live smoke, a run log and `status: done` in the catalog.

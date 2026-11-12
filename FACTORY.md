@@ -10,8 +10,9 @@ It was named and hardened on 2026-11-10, after apps 1–12 and before apps 13–
 
 ## Who does what
 
-Michael Parrott (Breakthru Ventures) is the only person who merges and the only release approver. Nothing reaches
-`main` in any repo another way.
+Michael Parrott (Breakthru Ventures) is the only release approver. He also merges spec PRs (gate 1, scope
+approval) and every change to this playbook (`ai-dev-os`). On app repos, any harness may squash-merge a PR once
+CI and the required review are green on the current head; the full rule is in [`AGENTS.md`](AGENTS.md).
 
 | Role (`roles/`) | Default harness | Notes |
 | --- | --- | --- |
@@ -39,8 +40,8 @@ Every app passes all five, in order. A gate is passed when its evidence is in Gi
 | --- | --- | --- | --- |
 | 1 | **Spec** | The planner writes `specs/NN-slug.md` (from `templates/spec.md`) and opens one issue per slice, each with a role in the title, a planned harness, `## Dependencies`, and a Codex second-review note where the slice is security-sensitive. | Michael has approved the scope (he merges the spec PR) and the issues exist. |
 | 2 | **Build** | Issues get their harness label once dependencies merge. Each harness opens PRs from `<harness>/<task>` branches. | CI is green on the PR: lint, types, tests, build, smoke (`Lint, test, build, smoke`). |
-| 3 | **Review** | Required. Claude Code (reviewer role) reviews every PR; Codex also reviews PRs labelled `security-sensitive`. Each posts a GitHub PR review ending in the reviewer marker (below). | The `Reviewer sign-off` check is green on the head commit. **No merge without it.** |
-| 4 | **Release** | Michael merges. DevOps adds or bumps the app in `30-apps-infra` `apps.yaml` (a PR Michael merges), the deploy runs, and DevOps runs `scripts/smoke.sh` against the live URL. | Live smoke passes at `https://appN.breakthruventures.ai` and `/api/health` answers. |
+| 3 | **Review** | Required. Claude Code (reviewer role) reviews every PR; Codex also reviews PRs labelled `security-sensitive`. Each posts a GitHub PR review ending in the reviewer marker (below). Once this gate and gate 2 are green on the current head, any harness may squash-merge an **app-repo** PR ([`AGENTS.md`](AGENTS.md)). | The `Reviewer sign-off` check is green on the head commit. **No merge without it.** |
+| 4 | **Release** | Michael approves going live. DevOps adds or bumps the app in `30-apps-infra` `apps.yaml` (a PR Michael merges), the deploy runs, and DevOps runs `scripts/smoke.sh` against the live URL. | Live smoke passes at `https://appN.breakthruventures.ai` and `/api/health` answers. |
 | 5 | **Close-out** | Run log written (`runs/NN-slug.md`), `catalog.yaml` status and `BRIEFING.md` "Where things stand" updated, README filled. Grok Bot drafts the X and LinkedIn posts and the two-minute demo script; Michael posts. | The definition of done below is met. |
 
 ### Gate 3 in detail: the reviewer marker
@@ -60,9 +61,11 @@ Codex uses `Reviewer: codex`. `Verdict: blocking` means changes are needed. The
 - if the PR is labelled `security-sensitive`, it needs the same from `codex`;
 - a push after review fails the check until the reviewer reviews again.
 
-This is a status check, not a human-approval count: required approvals stay at **0** and Michael still merges.
-Because all agents share one account, the marker guards against skipped reviews by mistake, not against that
-account; Michael's merge remains the control.
+This is a status check, not a human-approval count: required approvals stay at **0**. On app repos, a green
+`Reviewer sign-off` plus green CI on the current head is what allows a harness to squash-merge; it is not a
+substitute for those checks. Never bypass branch protection or use an admin merge. Because all agents share one
+account, the marker guards against skipped reviews by mistake, not against that account. Michael's merge remains
+the control for spec PRs, this repo, and release or infra changes.
 
 The planner marks a slice security-sensitive in the spec and issue (auth, roles and access, payments, tenancy, file
 upload, tokens or secrets handling, AI tool use that writes data). The builder or reviewer adds the

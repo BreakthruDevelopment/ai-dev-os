@@ -1,11 +1,12 @@
 # Grok Build and Antigravity on Michael's Mac
 
 How two of the BreakthruSoftwareFactory's harnesses ([`FACTORY.md`](../FACTORY.md)) get their work: gate 2 (build).
-Every PR they open still needs gate 3, the required `Reviewer sign-off`, and Michael's merge.
+Every PR they open still needs gate 3, the required `Reviewer sign-off`, and green CI before anyone merges.
 
 Grok Build (`grok`) and Google Antigravity (`agy`) are command-line agents that run on Michael's Mac. GitHub labels
 don't start them; [`scripts/run-harness.sh`](../scripts/run-harness.sh) does. It finds the issues labelled for that
-harness, works them one at a time in a local clone and opens a PR for each. Michael still merges everything.
+harness, works them one at a time in a local clone and opens a PR for each. The runner does not merge. Once CI
+and `Reviewer sign-off` are green, another harness may squash-merge an app-repo PR per [`AGENTS.md`](../AGENTS.md).
 
 A harness label is the **start signal**: Claude adds `grok` or `antigravity` to an issue only once the issues it
 depends on are merged. The script double-checks: it skips an issue whose `## Dependencies` section still lists an
@@ -250,9 +251,10 @@ getting in the way.
 **What protects you either way.** Deny rules match command text; they're not a sandbox, and a model that writes a
 script and runs it can get round them. A harness runs as you, with your GitHub sign-in, on your Mac. The real
 backstops sit outside the model: the clone can't push while the harness runs, the script pushes only the work
-branch, `main` on app repos 05+ needs a PR with green CI (add the ruleset to 01–04 before using them), and nothing
-merges without you. Don't run the script from a folder that holds other projects, keep `~/30apps` for these clones
-only, and read each PR's diff before merging.
+branch, and `main` on app repos 05+ needs a PR with green CI (add the ruleset to 01–04 before using them). The
+runner itself never merges. Once CI and `Reviewer sign-off` are green, another harness may squash-merge an
+app-repo PR per [`AGENTS.md`](../AGENTS.md); spec, `ai-dev-os`, and release or infra PRs still wait for you.
+Don't run the script from a folder that holds other projects, and keep `~/30apps` for these clones only.
 
 ## Sources
 

@@ -15,7 +15,20 @@
 # Reviews are posted as COMMENT reviews (GitHub doesn't let an account approve its own PR), so required
 # approvals stay at 0.
 #
-# ai-dev-os runs it directly. An app repo can call it (see runbooks/daily.md, "Review gate"):
+# Re-run after a review. A review fires `pull_request_review`, and that run passes, but GitHub's required check
+# keeps pointing at the earlier `pull_request` run, which failed for want of a review. So after a passing
+# `pull_request_review` run, the second step re-runs this workflow's latest `pull_request` run for the same head
+# commit (waiting for it first if it's still going), through the REST API with this job's GITHUB_TOKEN. That needs
+# `actions: write`. The re-run is a `pull_request` run again, so it never re-runs anything itself: no loop.
+# Concurrency is per PR *and* per event, so review runs and pull_request runs never cancel each other.
+#
+# ai-dev-os runs it directly. An app repo calls it (see runbooks/daily.md, "Review gate"). A called workflow can't
+# have more token permissions than its caller grants, so the caller must grant `actions: write` too, or the run
+# fails at startup:
+#     permissions:
+#       contents: read
+#       pull-requests: read
+#       actions: write
 #     jobs:
 #       review:
 #         uses: BreakthruDevelopment/ai-dev-os/.github/workflows/review-gate.yml@main
@@ -31,18 +44,22 @@ on:
 permissions:
   contents: read
   pull-requests: read
-
-concurrency:
-  group: review-gate-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  actions: write # re-run the pull_request run after a review (second step)
 
 jobs:
   review:
     name: Reviewer sign-off
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
+    # Job level so it also applies when called from an app repo. Split by event: a review run never cancels the
+    # pull_request run the required check reads (or its re-run), and vice versa. A newer push still supersedes an
+    # older pull_request run; review runs queue instead of cancelling, so each one gets to finish.
+    concurrency:
+      group: review-gate-${{ github.event.pull_request.number }}-${{ github.event_name }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
-      - uses: actions/github-script@v7
+      - id: gate
+        uses: actions/github-script@v7
         with:
           script: |
             const pr = context.payload.pull_request;
@@ -53,6 +70,7 @@ jobs:
             const { owner, repo } = context.repo;
             const { data: current } = await github.rest.pulls.get({ owner, repo, pull_number: pr.number });
             const head = current.head.sha;
+            core.setOutput("head", head);
             const labels = current.labels.map((l) => l.name);
             const reviews = await github.paginate(github.rest.pulls.listReviews, {
               owner, repo, pull_number: pr.number, per_page: 100,
@@ -85,4 +103,45 @@ jobs:
               core.setFailed(`Review gate: ${problems.join("; ")}.`);
             } else {
               core.info(`Review gate passed for ${required.join(" + ")}. Merge per AGENTS.md.`);
+            }
+
+      # Only after a passing review run. The re-run it starts is a pull_request run, which skips this step.
+      - name: Re-run the pull_request gate for this commit
+        if: success() && github.event_name == 'pull_request_review'
+        uses: actions/github-script@v7
+        env:
+          HEAD_SHA: ${{ steps.gate.outputs.head }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head = process.env.HEAD_SHA;
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+            try {
+              // This run's workflow: the caller's "Review gate" file in an app repo, this file in ai-dev-os.
+              const { data: self } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId });
+              let latest;
+              for (let i = 0; i < 12; i++) {
+                const { data } = await github.rest.actions.listWorkflowRuns({
+                  owner, repo, workflow_id: self.workflow_id, event: "pull_request", head_sha: head, per_page: 20,
+                });
+                latest = data.workflow_runs
+                  .filter((r) => r.head_sha === head && r.event === "pull_request")
+                  .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+                if (!latest || latest.status === "completed") break;
+                core.info(`pull_request run ${latest.id} is ${latest.status}; waiting for it to finish`);
+                await sleep(10000);
+              }
+              if (!latest) {
+                core.info(`No pull_request run of this workflow for ${head.slice(0, 7)}; nothing to re-run.`);
+              } else if (latest.status !== "completed") {
+                core.warning(`pull_request run ${latest.html_url} is still ${latest.status} after 2 minutes. If it fails, re-run it by hand.`);
+              } else if (latest.conclusion === "success") {
+                core.info(`pull_request run ${latest.html_url} already passed; nothing to re-run.`);
+              } else {
+                await github.request("POST /repos/{owner}/{repo}/actions/runs/{run_id}/rerun", { owner, repo, run_id: latest.id });
+                core.info(`Re-running pull_request run ${latest.html_url} (was ${latest.conclusion}) so the required check sees this review.`);
+              }
+            } catch (err) {
+              // The review itself passed; don't turn this run red over the convenience step.
+              core.warning(`Couldn't re-run the pull_request gate (${err.status || ""} ${err.message}). Re-run it by hand from the PR's Checks tab. App repos: the caller must grant actions: write.`);
             }

@@ -54,3 +54,7 @@ Live smoke checks that customers can't trigger or read triage or suggested repli
 - Two live smokes failed before the pass: 10:20 PM (TLS EOF on the new domain) and 11:13 PM (sign-up failed).
 - #15 failed CI on 2026-11-12 with an HTTP 429 on smoke sign-up (nightly ops report) before it was fixed and merged.
 - Launch drafts: unknown.
+
+## Update 2026-11-13
+
+README filled (11-helpdesk#18, merged). With the passing live smoke on the deployed version and this run log, the definition of done is met; status set to `done`.

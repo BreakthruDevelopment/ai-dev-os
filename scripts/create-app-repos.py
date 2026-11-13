@@ -3,8 +3,9 @@
 
 Run by .github/workflows/create-app-repos.yml on pushes to main (and by hand). For each marked app:
 
-- The repo doesn't exist: create it, public, from the template repo; add the topic, the harness labels and a
-  `protect-main` ruleset (pull request required, CI must pass, no force pushes or deletion).
+- The repo doesn't exist: create it, public, from the template repo; add the topic, the harness labels, the
+  `security-sensitive` label and a `protect-main` ruleset (pull request required, CI must pass, no force pushes or
+  deletion).
 - The repo exists with the topic: make sure the labels, topic and ruleset are there (adds only what's missing).
 - The repo exists without the topic: REFUSE and touch nothing, unless GitHub says it was made from the template
   (a run that stopped between creating it and tagging it). It may be one of the account's other applications.
@@ -13,8 +14,12 @@ Run by .github/workflows/create-app-repos.yml on pushes to main (and by hand). F
 It never renames, deletes, transfers or archives a repo, never changes a repo it didn't create or that lacks the
 topic, and never touches apps that aren't marked. At most 4 new repos per run; the rest wait for the next run. Names must match the catalog's own rules (NN-slug).
 
-  --dry-run   validate the catalog and print the plan; no token needed and nothing is called
-  --check     validate only (used by the Check workflow)
+  --dry-run       validate the catalog and print the plan; no token needed and nothing is called
+  --check         validate only (used by the Check workflow)
+  --labels-only   one-off for repos that already exist: add any missing labels (harness labels and
+                  `security-sensitive`) to app repos 01-12 that carry the topic, and nothing else: no repo is
+                  created and no topic or ruleset is touched. Run by hand with REPO_CREATOR_TOKEN set (a token with
+                  Issues read and write on those repos is enough). Repos without the topic are refused.
 
 Needs REPO_CREATOR_TOKEN (fine-grained token in the repo-creator environment, see runbooks/daily.md).
 """
@@ -35,7 +40,10 @@ LABELS = {  # harness labels the playbook uses (AGENTS.md section 3)
     "grok": ("d93f0b", "Work for Grok Build"),
     "codex": ("0e8a16", "Work for Codex"),
     "antigravity": ("1d76db", "Work for Google Antigravity (replaced Jules)"),
+    # Not a harness: marks PRs that need Codex's second review (FACTORY.md, gate 3; read by review-gate.yml)
+    "security-sensitive": ("b60205", "Needs a Codex second review"),
 }
+LABELS_ONLY_APPS = range(1, 13)  # --labels-only: the apps created before the label was part of this script
 REQUIRED_CHECKS = ["Lint, test, build, smoke", "review / Reviewer sign-off"]  # template CI plus the review-gate caller; both run on every pull request
 MAX_CREATES_PER_RUN = 4  # new repos per run; apps stay marked, so only creations count
 
@@ -106,6 +114,50 @@ def why(payload):
     return f": {msg}" if msg else ""
 
 
+def ensure_labels(gh, org, name):
+    """Adds each label in LABELS that's missing; never edits or removes one. True if all there, False if one
+    failed, None if the list couldn't be read."""
+    s, existing = gh.call("GET", f"/repos/{org}/{name}/labels?per_page=100")
+    if s != 200:
+        print(f"ERROR {org}/{name}: listing labels failed (HTTP {s}{why(existing)})")
+        return None
+    have = {l["name"].lower() for l in existing or []}  # GitHub label names are case-insensitive
+    ok = True
+    for label, (color, desc) in LABELS.items():
+        if label.lower() in have:
+            continue
+        s, p = gh.call("POST", f"/repos/{org}/{name}/labels", {"name": label, "color": color, "description": desc})
+        if s == 201:
+            print(f"  label {label}")
+        else:
+            print(f"ERROR {org}/{name}: label {label} failed (HTTP {s}{why(p)})")
+            ok = False
+    return ok
+
+
+def labels_only(gh, org, topic, apps):
+    """--labels-only: labels on existing, topic-tagged repos. Creates nothing, touches no topic or ruleset."""
+    failed = False
+    for a in apps:
+        name = a["repo"]
+        status, repo = gh.call("GET", f"/repos/{org}/{name}")
+        if status != 200:
+            print(f"SKIP {org}/{name}: lookup answered HTTP {status} (missing, renamed or no access); not touching it")
+            failed = failed or status != 404
+            continue
+        if (repo.get("full_name", "").lower() != f"{org}/{name}".lower() or repo.get("archived") or repo.get("fork")):
+            print(f"SKIP {org}/{name}: GitHub answered with {repo.get('full_name')}, or it's archived or a fork")
+            continue
+        if topic not in (repo.get("topics") or []):
+            print(f"REFUSE {org}/{name}: no {topic} topic; not touching it")
+            failed = True
+            continue
+        print(f"LABELS {org}/{name}")
+        if not ensure_labels(gh, org, name):
+            failed = True
+    return 1 if failed else 0
+
+
 def ensure_extras(gh, org, name, topic, created, from_template):
     """Topic, labels and ruleset. Adds what's missing; never removes or rewrites what's there."""
     status, data = gh.call("GET", f"/repos/{org}/{name}/topics")
@@ -125,21 +177,9 @@ def ensure_extras(gh, org, name, topic, created, from_template):
             return False
         print(f"  topic {topic}")
 
-    ok = True
-    s, existing = gh.call("GET", f"/repos/{org}/{name}/labels?per_page=100")
-    if s != 200:
-        print(f"ERROR {org}/{name}: listing labels failed (HTTP {s}{why(existing)})")
+    ok = ensure_labels(gh, org, name)
+    if ok is None:
         return False
-    have = {l["name"] for l in existing or []}
-    for label, (color, desc) in LABELS.items():
-        if label in have:
-            continue
-        s, p = gh.call("POST", f"/repos/{org}/{name}/labels", {"name": label, "color": color, "description": desc})
-        if s == 201:
-            print(f"  label {label}")
-        else:
-            print(f"ERROR {org}/{name}: label {label} failed (HTTP {s}{why(p)})")
-            ok = False
 
     s, rulesets = gh.call("GET", f"/repos/{org}/{name}/rulesets")
     if s != 200:
@@ -189,7 +229,19 @@ def ensure_extras(gh, org, name, topic, created, from_template):
 def main():
     dry = "--dry-run" in sys.argv
     check = "--check" in sys.argv
+    only_labels = "--labels-only" in sys.argv
     org, topic, template, marked = load_catalog()
+    if only_labels:
+        apps = [a for a in yaml.safe_load(open("catalog.yaml"))["apps"] if a["n"] in LABELS_ONLY_APPS]
+        if dry:
+            for a in apps:
+                print(f"would add missing labels ({', '.join(LABELS)}) to {org}/{a['repo']} if it has topic {topic}")
+            return 0
+        token = os.environ.get("REPO_CREATOR_TOKEN", "")
+        if not token:
+            print("REPO_CREATOR_TOKEN isn't set; nothing done.")
+            return 1
+        return labels_only(GitHub(token), org, topic, apps)
     if check:
         print(f"create_repo ok: {', '.join(a['repo'] for a in marked) or 'none marked'}")
         return 0

@@ -50,7 +50,7 @@ in `roles/`, as plain instructions. Claude Code gets them as subagents in `.clau
 | Codex | ChatGPT Plus (tightest limits) | An issue is labelled `codex` | Fullstack on selected issues; second review on security-sensitive PRs |
 | Grok Build | X (SuperGrok) | Michael runs `scripts/run-harness.sh grok` on his Mac | UI pages, fullstack issues, READMEs (used more from 2026-11-09) |
 | Antigravity | Google AI Pro | Michael runs `scripts/run-harness.sh antigravity` on his Mac | Fullstack and docs (on trial) |
-| Grok Bot | X (Grok) | Michael sends it an app's README and live URL | Launch posts and demo scripts; no repo access (below) |
+| Grok Bot | X (Grok) | Michael pastes in an issue, or an app's README and live URL | Backup builder when Grok Build is out of usage; launch posts and demo scripts (below) |
 
 Grok Build and Antigravity are CLIs on Michael's Mac, not GitHub apps: labels don't trigger them, the runner
 script does ([`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md)). Jules is gone: Google turns it
@@ -59,19 +59,27 @@ read-only after 2026-11-11 and shuts it down on 2026-12-31; Antigravity replaces
 | Role (`roles/`) | Default harness | Can move to |
 | --- | --- | --- |
 | `planner` | Claude Code | — |
-| `fullstack-builder` | Grok Build; Codex or Antigravity on the issues assigned to them; Claude Code for template changes | Claude Code, Codex, Antigravity |
+| `fullstack-builder` | Grok Build; Codex or Antigravity on the issues assigned to them; Claude Code for template changes | Claude Code, Codex, Antigravity, Grok Bot |
 | `ai-builder` | Claude Code | Antigravity, Grok Build |
-| `ui-builder` | Grok Build | Antigravity, Claude Code |
+| `ui-builder` | Grok Build | Antigravity, Claude Code, Grok Bot |
 | `reviewer` | Claude Code on every PR, plus Codex on security-sensitive PRs | — |
 | `devops` | Claude Code | any (Terraform changes in `30-apps-infra`: Grok Build or Antigravity) |
 | `docs-writer` | Grok Build | Antigravity, any |
 | `ops-monitor` | Claude Code scheduled task (nightly, 5:37 AM Central, posts to the `Ops report (nightly)` issue in this repo) | Claude Code session |
 
-**Grok Bot's job.** It can't push code and holds no secrets, so it does the build-in-public work: when an app goes
-live, Michael pastes its README and live URL into Grok Bot, which drafts an X post and a LinkedIn post (problem,
-what the app does, the AI feature, cloud, link, no invented numbers) and a two-minute demo script (the clicks in
-order and what each proves). Michael edits and posts them himself; Grok Bot never posts or opens accounts. It no
-longer runs the ops monitor.
+**Grok Bot's jobs.** It holds no secrets and never merges. It has two jobs:
+
+- **Backup builder.** When Grok Build is out of usage, Michael can paste a `grok`-labelled issue into Grok Bot,
+  which then works it as the `ui-builder` or `fullstack-builder` named in the title: it reads that role file and
+  the app repo's `AGENTS.md`, works on a `grok/<task>` branch and opens a PR. The PR goes through the same gates as
+  any other (CI, the required `Reviewer sign-off`, Codex on `security-sensitive`); another harness merges it once
+  green, per section 1. Michael doesn't also run `scripts/run-harness.sh grok` on an issue he has given Grok Bot.
+- **Launch posts.** When an app goes live, Michael pastes its README and live URL into Grok Bot, which drafts an X
+  post and a LinkedIn post (problem, what the app does, the AI feature, cloud, link, no invented numbers) and a
+  two-minute demo script (the clicks in order and what each proves). Michael edits and posts them himself; Grok
+  Bot never posts or opens accounts.
+
+It no longer runs the ops monitor.
 
 ## 3. GitHub is the single source of truth
 

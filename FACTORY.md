@@ -18,16 +18,18 @@ Michael's standing instruction. The full rule is in [`AGENTS.md`](AGENTS.md).
 | Role (`roles/`) | Default harness | Notes |
 | --- | --- | --- |
 | Planner | Claude Code | Specs and issues |
-| Full-stack builder | Grok Build, Codex or Antigravity, by issue | Claude Code for template changes and security-critical slices |
+| Full-stack builder | Grok Build, Codex or Antigravity, by issue | Claude Code for template changes and security-critical slices; Grok Bot as backup |
 | AI builder | Claude Code | |
-| UI builder | Grok Build | |
+| UI builder | Grok Build | Grok Bot as backup |
 | Reviewer | Claude Code on every PR; Codex second review on security-sensitive PRs | Required: see gate 3 |
 | DevOps | Claude Code | Deploys through `30-apps-infra` |
 | Docs writer | Grok Build or Antigravity | |
 | Ops monitor | Claude Code, scheduled task at 5:37 AM Central | Posts to the `Ops report (nightly)` issue |
 
-- **Grok Bot** is a harness with no repo access and no secrets. It drafts launch posts (X, LinkedIn) and a
-  two-minute demo script from what Michael pastes in; Michael posts.
+- **Grok Bot** holds no secrets and never merges. When Grok Build is out of usage, it builds issues Michael pastes
+  in (as `ui-builder` or `fullstack-builder`) on `grok/<task>` branches, opening PRs that pass the same gates as
+  everyone else's. It also drafts launch posts (X, LinkedIn) and a two-minute demo script from what Michael pastes
+  in; Michael posts.
 - **Antigravity replaced Jules** as of 2026-11-09.
 - **Labels are the start signal:** `claude`, `codex`, `grok`, `antigravity`. Grok Build and Antigravity are CLIs on
   Michael's Mac, run by `scripts/run-harness.sh` ([runbook](runbooks/harnesses-on-mac.md)).
@@ -70,8 +72,13 @@ the control for spec PRs; he can stop or reverse any other merge or deploy.
 
 The planner marks a slice security-sensitive in the spec and issue (auth, roles and access, payments, tenancy, file
 upload, tokens or secrets handling, AI tool use that writes data). The builder or reviewer adds the
-`security-sensitive` label to the PR. The label has to exist in the repo first (create it once per repo; it isn't
-created by `create-app-repos.py` yet).
+`security-sensitive` label to the PR. `create-app-repos.py` creates the label (red, "Needs a Codex second review")
+on every repo it creates or completes. For repos made before that, `python3 scripts/create-app-repos.py
+--labels-only` adds it to apps 01–12 (one-off, by hand, with `REPO_CREATOR_TOKEN` set; it touches labels only).
+
+After a marked review, the gate's `pull_request_review` run re-runs the PR's earlier `pull_request` run for the same
+commit, so the required check turns green without anyone clicking re-run. App repos' caller workflow must grant
+`actions: write` for that ([`runbooks/daily.md`](runbooks/daily.md#review-gate-turning-it-on)).
 
 ## Definition of done
 

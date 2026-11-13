@@ -17,6 +17,7 @@ review (through the day), gate 4 release (afternoon), gate 5 close-out (evening)
 | Afternoon | Add the app to `apps.yaml` for the day's cloud (PR Claude Code merges once green), smoke test after deploy | Claude Code (devops) |
 | Evening | README and demo script | Grok Build (or Antigravity) |
 | Evening | Launch post drafts (X, LinkedIn) and a two-minute demo script from the README and live URL | Grok Bot, from what Michael pastes in |
+| When Grok Build is out of usage | Paste a `grok`-labelled UI or fullstack issue into Grok Bot; it opens a PR from a `grok/<task>` branch that goes through the same gates (don't also run the runner on that issue) | Michael, Grok Bot |
 | Evening | Post the app (DNS records are created in Cloudflare by the deploy) | Michael |
 | Evening | Close-out: run log in `runs/NN-slug.md`, `catalog.yaml` status, `BRIEFING.md` "Where things stand"; `done` only when the definition of done holds | Claude Code (devops) |
 | Overnight | Queued issues → PRs | Codex and scheduled Claude Code tasks; Grok Build and Antigravity if the runner is left going |
@@ -29,7 +30,7 @@ Repos are created by the **Create app repos** workflow (`scripts/create-app-repo
 1. Open a PR in this repo that sets `create_repo: true` on the app in `catalog.yaml`. The PR's check prints what it
    would create; nothing happens yet.
 2. Merge it. On `main`, the workflow creates `BreakthruDevelopment/<repo>` from `30-apps-template` (public), adds the
-   topic `30-apps-30-days`, the harness labels (`claude`, `codex`, `grok`, `antigravity`) and a `protect-main` ruleset
+   topic `30-apps-30-days`, the harness labels (`claude`, `codex`, `grok`, `antigravity`), the `security-sensitive` label and a `protect-main` ruleset
    (pull request required, `Lint, test, build, smoke` from GitHub Actions must pass, no force pushes or deletion).
    At most 4 new repos per run; rerun the workflow for more.
 3. Leave `create_repo: true` in place: reruns only fill in what's missing. A repo that exists **without** the topic is
@@ -120,16 +121,24 @@ was **not** changed here. Requiring a check a repo doesn't run would block every
    permissions:
      contents: read
      pull-requests: read
+     actions: write # lets the gate re-run the pull_request run after a review
    jobs:
      review:
        uses: BreakthruDevelopment/ai-dev-os/.github/workflows/review-gate.yml@main
    ```
 
-2. Create the `security-sensitive` label in the repo.
+   `actions: write` is required. After a passing review, the gate re-runs the PR's earlier `pull_request` run for
+   the same commit, because that's the run the required check reads; without it someone would have to click
+   re-run. A called workflow can't hold more permissions than its caller grants, so a caller without
+   `actions: write` fails at startup (`startup_failure`, checked 2026-11-12). No `secrets: inherit` is needed: the
+   gate uses only the job's `GITHUB_TOKEN`.
+
+2. Create the `security-sensitive` label in the repo (`create-app-repos.py` does this for the repos it makes; for
+   apps 01–12, `python3 scripts/create-app-repos.py --labels-only` with `REPO_CREATOR_TOKEN` set).
 3. Once the check has reported on a PR, add `review / Reviewer sign-off` to that repo's `protect-main` required
    checks.
-4. For apps 13–30: after the template has the caller workflow, add `"review / Reviewer sign-off"` to
-   `REQUIRED_CHECKS` in `scripts/create-app-repos.py` (a PR here) so new repos get it from the start.
+4. For apps 13–30: `REQUIRED_CHECKS` in `scripts/create-app-repos.py` already includes `"review / Reviewer sign-off"`,
+   so new repos get it from the start (the template has the caller workflow).
 
 `30-apps-template` and apps 01–04 have **no** `protect-main` today (checked 2026-11-10); adding one there is
 Michael's call, in Settings or by rerunning the scripted pattern by hand.

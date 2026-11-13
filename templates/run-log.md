@@ -35,7 +35,7 @@ BreakthruSoftwareFactory run log ([`FACTORY.md`](../FACTORY.md)). Link evidence;
 | Reviewer | Claude Code (+ Codex on security-sensitive) | | Findings: |
 | DevOps | Claude Code | | |
 | Docs writer | | | |
-| Launch drafts | Grok Bot (no repo access; Michael posts) | — | |
+| Launch drafts | Grok Bot (no secrets; Michael posts) | — | |
 
 ## AI evals (live model)
 

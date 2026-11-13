@@ -62,7 +62,7 @@ calling the Claude API from the apps, paid DNS, and running many agents in paral
 | Codex | ChatGPT Plus (tightest limits) | Issues labeled `codex` | Fullstack on selected issues; second review on security-sensitive PRs |
 | Grok Build | X (SuperGrok) | Issues labeled `grok`, worked when Michael runs `scripts/run-harness.sh grok` on his Mac | UI pages, fullstack issues and READMEs; Michael wants it used more |
 | Antigravity | Google AI Pro | Issues labeled `antigravity`, worked when Michael runs `scripts/run-harness.sh antigravity` | Fullstack and docs, on trial |
-| Grok Bot | X (Grok) | Michael pastes in a live app's README and URL | Build-in-public drafts: an X post, a LinkedIn post and a two-minute demo script per app. No repo access, no secrets; Michael posts |
+| Grok Bot | X (Grok) | Michael pastes in an issue, or a live app's README and URL | Backup `ui-builder` / `fullstack-builder` when Grok Build is out of usage: works the pasted issue on a `grok/<task>` branch and opens a PR that goes through the same gates. Build-in-public drafts: an X post, a LinkedIn post and a two-minute demo script per app. No secrets, never merges; Michael posts |
 
 **Jules is gone.** Google turns it read-only after 2026-11-11 and shuts it down on 2026-12-31
 ([changelog](https://jules.google/docs/changelog/)); Google Antigravity replaces it. Its open issues were

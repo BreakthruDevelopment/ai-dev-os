@@ -83,13 +83,46 @@ jobs:
             const required = ["claude-code"];
             if (labels.includes("security-sensitive")) required.push("codex");
 
+            // Codex's GitHub app never writes the marker lines, so for "codex" also accept its own review state:
+            // the newest summary comment from a bot account whose login contains "codex", carrying
+            // `codex-review-state:v1 {...}` with a completed code review of the head commit and no unresolved
+            // findings. Only bot accounts count, so a comment typed by the shared agent account can't pass for it.
+            const codexState = async () => {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: pr.number, per_page: 100,
+              });
+              const states = comments
+                .filter((c) => c.user && c.user.type === "Bot" && /codex/i.test(c.user.login))
+                .map((c) => {
+                  const m = (c.body || "").match(/codex-review-state:v1\s+(\{.*?\})\s*-->/s);
+                  if (!m) return null;
+                  try { return { at: c.updated_at || c.created_at, url: c.html_url, state: JSON.parse(m[1]) }; }
+                  catch { return null; }
+                })
+                .filter(Boolean)
+                .sort((a, b) => new Date(a.at) - new Date(b.at));
+              return states[states.length - 1] || null;
+            };
+
             const problems = [];
             for (const who of required) {
               const mine = reviews
                 .filter((r) => r.state !== "DISMISSED" && marker(r.body, "Reviewer") === who)
                 .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
               const last = mine[mine.length - 1];
-              if (!last) {
+              if (!last && who === "codex") {
+                const cs = await codexState();
+                const cr = cs && cs.state && cs.state.code_review;
+                if (!cr) {
+                  problems.push(`no Codex review yet (comment "@codex review" on the PR)`);
+                } else if (cr.commit_sha !== head) {
+                  problems.push(`Codex's latest review is on ${String(cr.commit_sha || "?").slice(0, 7)}, not the head ${head.slice(0, 7)}: ask "@codex review" again`);
+                } else if (cr.status !== "completed" || cr.has_unresolved_findings !== false) {
+                  problems.push(`Codex's review of ${head.slice(0, 7)} has unresolved findings or isn't complete`);
+                } else {
+                  core.info(`codex: no unresolved findings on ${head.slice(0, 7)} (${cs.url})`);
+                }
+              } else if (!last) {
                 problems.push(`no review marked "Reviewer: ${who}" yet`);
               } else if (last.commit_id !== head) {
                 problems.push(`${who}'s latest review is on ${last.commit_id.slice(0, 7)}, not the head ${head.slice(0, 7)}: review again`);

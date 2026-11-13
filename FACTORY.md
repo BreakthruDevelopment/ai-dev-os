@@ -61,7 +61,7 @@ Codex uses `Reviewer: codex`. `Verdict: blocking` means changes are needed. The
 [`Review gate`](.github/workflows/review-gate.yml) workflow turns that into the `Reviewer sign-off` check:
 
 - it needs the newest `claude-code` review to be on the PR's **current head commit** with `Verdict: ready`;
-- if the PR is labelled `security-sensitive`, it needs the same from `codex`;
+- if the PR is labelled `security-sensitive`, it needs the same from `codex`: either a review marked `Reviewer: codex` / `Verdict: ready`, or Codex's own GitHub review (comment `@codex review`) reporting no unresolved findings on the head commit, since Codex's app doesn't write the marker lines;
 - a push after review fails the check until the reviewer reviews again.
 
 This is a status check, not a human-approval count: required approvals stay at **0**. On app repos, a green

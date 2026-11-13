@@ -11,7 +11,7 @@
 # by marker, not by author: like the rest of the playbook, this guards against mistakes, not against that account.
 #
 # This check only says whether the review happened; it does not merge. On app repos, a green result plus green
-# CI lets a harness squash-merge per AGENTS.md. Spec, ai-dev-os, and release/infra PRs stay with Michael.
+# CI lets a harness squash-merge per AGENTS.md. Claude Code also merges green ai-dev-os and infra PRs; spec PRs stay with Michael.
 # Reviews are posted as COMMENT reviews (GitHub doesn't let an account approve its own PR), so required
 # approvals stay at 0.
 #

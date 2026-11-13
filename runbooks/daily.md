@@ -14,11 +14,10 @@ review (through the day), gate 4 release (afternoon), gate 5 close-out (evening)
 | Midday | UI pages PR | Grok Build |
 | Afternoon | Review every PR as a marked PR review (`Reviewer: claude-code` / `Verdict: ready`); `Reviewer sign-off` and CI green before merge | Claude Code (reviewer); Codex second review on `security-sensitive` PRs |
 | Afternoon | Squash-merge app-repo PRs once CI and `Reviewer sign-off` are green on the current head (`AGENTS.md`) | Any harness |
-| Afternoon | Add the app to `apps.yaml` for the day's cloud (PR Michael merges), smoke test after deploy | Claude Code (devops) |
-| Afternoon | AWS days only: run `deploy/aws.sh` in AWS CloudShell | Michael |
+| Afternoon | Add the app to `apps.yaml` for the day's cloud (PR Claude Code merges once green), smoke test after deploy | Claude Code (devops) |
 | Evening | README and demo script | Grok Build (or Antigravity) |
 | Evening | Launch post drafts (X, LinkedIn) and a two-minute demo script from the README and live URL | Grok Bot, from what Michael pastes in |
-| Evening | Approve the release (merge the `apps.yaml` PR) and post the app (DNS records are created in Cloudflare by the deploy) | Michael |
+| Evening | Post the app (DNS records are created in Cloudflare by the deploy) | Michael |
 | Evening | Close-out: run log in `runs/NN-slug.md`, `catalog.yaml` status, `BRIEFING.md` "Where things stand"; `done` only when the definition of done holds | Claude Code (devops) |
 | Overnight | Queued issues → PRs | Codex and scheduled Claude Code tasks; Grok Build and Antigravity if the runner is left going |
 | 5:37 AM Central | CI status, stalled work, app health, free-tier usage → `Ops report (nightly)` issue in `ai-dev-os` | Scheduled Claude Code task (ops monitor) |

@@ -6,8 +6,8 @@ state of every decision; the rules themselves are in [`AGENTS.md`](AGENTS.md).
 The process that builds the apps is called the **BreakthruSoftwareFactory**: this playbook, its eight roles, the five
 daily gates (spec, build, review, release, close-out) and the definition of done, all in [`FACTORY.md`](FACTORY.md).
 
-_Last updated: 2026-11-12 (agents may squash-merge app-repo PRs once CI and review are green; spec, `ai-dev-os`,
-and release/infra PRs stay with Michael). "Where things stand" below is still as of 2026-11-10._
+_Last updated: 2026-11-12 (agents may squash-merge app-repo PRs once CI and review are green; Claude Code also merges
+green deploy and playbook PRs; spec PRs stay with Michael). "Where things stand" below is still as of 2026-11-10._
 
 ## What we're building and why
 
@@ -87,10 +87,10 @@ and close-out (7).
    also reviews PRs labelled `security-sensitive`, and each posts a marked PR review that the `Reviewer sign-off`
    check reads. No merge without it. Once those checks are green on the current head, any harness may squash-merge
    an **app-repo** PR (see [`AGENTS.md`](AGENTS.md)).
-4. **These stay with Michael:** spec PRs (gate 1, scope approval), changes to `ai-dev-os` itself, and anything that
-   takes an app live or changes deploy or infra secrets (including `30-apps-infra` PRs such as `apps.yaml`).
+4. **Claude Code also merges** green deploy PRs (`30-apps-infra`, such as `apps.yaml`) and playbook PRs
+   (`ai-dev-os`). **These stay with Michael:** spec PRs (gate 1, scope approval), secrets and branch protection.
 5. The day's app is deployed to its cloud, smoke-tested at its live URL; its DNS record is created by the deploy.
-   Michael approves that release by merging the `apps.yaml` PR.
+   Claude Code merges the `apps.yaml` PR once its checks are green and the plan holds no surprise.
 6. Overnight, Codex and scheduled Claude Code tasks work queued issues into PRs, and may squash-merge app-repo PRs
    that go green; Grok Build and Antigravity run whenever Michael starts the runner. The nightly ops report lands in
    the `Ops report (nightly)` issue.

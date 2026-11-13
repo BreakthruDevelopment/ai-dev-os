@@ -21,7 +21,7 @@ catalog.yaml ──► Planner (Claude) ──► spec + GitHub issues
                                          │
             Agents squash-merge app-repo PRs once CI and review are green
                                          │
-              Michael approves the release (merges the apps.yaml PR)
+         Claude Code merges the apps.yaml PR once checks and plan are clean
                                          │
                        DevOps (Claude): deploy to the day's cloud, smoke test live URL
                                          │
@@ -33,8 +33,8 @@ catalog.yaml ──► Planner (Claude) ──► spec + GitHub issues
 GitHub is the only shared state. Harnesses never call each other: one Project board is the queue, each issue
 names a role and gets a harness label once its dependencies are merged (Grok Build and Antigravity
 pick theirs up via `scripts/run-harness.sh` on Michael's Mac), and every change arrives as a PR. Any harness may
-squash-merge an app-repo PR once CI and the required review are green; spec, `ai-dev-os`, and release/infra PRs
-stay with Michael ([`AGENTS.md`](AGENTS.md)).
+squash-merge an app-repo PR once CI and the required review are green; Claude Code also
+merges green deploy and playbook PRs; spec PRs stay with Michael ([`AGENTS.md`](AGENTS.md)).
 
 **Model, harness, agent.** A model does the thinking; a harness (Claude Code, Codex, Grok Build, Antigravity, Grok Bot)
 wraps it so it can act; an agent is a role running inside a harness. Roles live in `roles/` once and run in

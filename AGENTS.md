@@ -24,10 +24,13 @@ The BreakthruDevelopment org holds other, unrelated applications that must never
   `security-sensitive`). Use `gh pr merge --squash --auto` to queue the merge when auto-merge is enabled on the
   repo, or `gh pr merge --squash` once the checks are already green. Never bypass branch protection, never use an
   admin merge, never merge your own red PR, and never merge with failing or pending checks.
-- **These stay with Michael** (he merges, unless he explicitly asks an agent to): **spec PRs** (gate 1, scope
-  approval), **changes to `ai-dev-os` itself** (the playbook and rules), and **anything that takes an app live or
-  changes deploy or infra secrets**, including PRs in `30-apps-infra` such as `apps.yaml`. Michael is the only
-  release approver. No agent approves a release or changes branch protection.
+- **Deploys and playbook changes: Claude Code merges** (Michael's standing instruction, 2026-11-12). Claude Code
+  may also squash-merge PRs in `30-apps-infra` (deploys, `apps.yaml`) and in `ai-dev-os` (this playbook) once their
+  required checks are green on the current head and, for `ai-dev-os`, a marked review is in; for an infra PR it
+  first reads the plan and stops for Michael if it would destroy anything other than a known, explained change.
+  Other harnesses never merge those two repos.
+- **These stay with Michael:** **spec PRs** (gate 1, scope approval), entering secrets, and changing branch
+  protection or rulesets. Michael can stop or reverse any merge or deploy; no agent changes branch protection.
 
 ## 2. Models, harnesses and agents
 
@@ -94,13 +97,13 @@ When a harness hits its usage limit, Michael (or the planner) relabels its open 
 1. **Gate 1, spec. Planner** writes `specs/NN-slug.md` from `templates/spec.md`, opens one issue per slice with a role and a planned harness, marks security-sensitive slices, and adds them to the board. Michael approves the scope by merging the spec.
 2. **Gate 2, build. Builders** open PRs against the app repo from `<harness>/<task>` branches. CI must be green: lint, typecheck, tests, build, smoke.
 3. **Gate 3, review (required). Reviewer** (Claude Code) reviews every PR; Codex adds a second review on PRs labelled `security-sensitive`. Each posts a PR review ending in `Reviewer: claude-code` (or `codex`) and `Verdict: ready` or `Verdict: blocking`; the `Reviewer sign-off` check reads it. No merge without the reviewer check. Once CI and `Reviewer sign-off` are green on the current head, any harness may squash-merge the **app-repo** PR (see section 1).
-4. **DevOps** adds the app to `apps.yaml` in `30-apps-infra` for the day's `live_cloud` (a PR Michael merges; AWS runs from CloudShell), then runs the smoke test against the live URL. Migrations run when the app starts.
+4. **DevOps** adds the app to `apps.yaml` in `30-apps-infra` for the day's `live_cloud` (a PR Claude Code merges once green; AWS deploys itself within about 10 minutes), then runs the smoke test against the live URL. Migrations run when the app starts.
 5. **Docs writer** fills in the README from `templates/app-readme.md`. Grok Bot drafts the launch posts and demo script from it.
-6. **Michael** approves the release (merges the `apps.yaml` PR if it is still open) and posts the app. DNS records are created in Cloudflare by Terraform on deploy
+6. **Claude Code** merges the `apps.yaml` PR once its checks are green and the plan holds no surprise; **Michael** posts the app. DNS records are created in Cloudflare by Terraform on deploy
    (`30-apps-infra` README, "Custom domains and DNS"); nobody adds them by hand.
-7. **Overnight:** Codex and scheduled Claude Code tasks work queued issues into PRs; Grok Build and Antigravity work theirs whenever Michael starts the runner on his Mac. The ops monitor (a scheduled Claude Code task) posts to the `Ops report (nightly)` issue. Agents may squash-merge app-repo PRs that go green; spec, `ai-dev-os`, and release/infra PRs wait for Michael.
+7. **Overnight:** Codex and scheduled Claude Code tasks work queued issues into PRs; Grok Build and Antigravity work theirs whenever Michael starts the runner on his Mac. The ops monitor (a scheduled Claude Code task) posts to the `Ops report (nightly)` issue. Agents may squash-merge app-repo PRs that go green; Claude Code also merges green deploy and playbook PRs; spec PRs wait for Michael.
 
-Steps 4 and 6 are **gate 4, release** (Michael approves going live, devops updates `apps.yaml`, live smoke). **Gate 5,
+Steps 4 and 6 are **gate 4, release** (devops updates `apps.yaml`, Claude Code merges it, live smoke). **Gate 5,
 close-out** is the run log in `runs/NN-slug.md`, the `catalog.yaml` status and `BRIEFING.md` "Where things stand",
 and Grok Bot's launch drafts (Michael posts).
 

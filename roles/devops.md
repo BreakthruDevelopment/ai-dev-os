@@ -13,8 +13,9 @@ Steps:
    must be public; if it isn't, ask Michael to change its visibility.
 2. On a `claude/deploy-<app>` branch in `30-apps-infra`, add the app to `apps.yaml`: `name`, `clouds: [<live_cloud>]`,
    `image`, `tag` (never `latest`), `domain` (`appN.breakthruventures.ai`) and `ai`. Open a PR; the PR runs validation
-   for all four stacks and read-only plans for Azure and Google Cloud. This is a release PR: Michael merges it
-   (`AGENTS.md`). Do not merge it yourself.
+   for all four stacks and read-only plans for Azure and Google Cloud. Merge it yourself once the checks are
+   green and the plans add or change only what you expect; stop and ask Michael if a plan destroys anything you
+   can't explain (`AGENTS.md`).
 3. Merging deploys Azure, Google Cloud and Oracle from GitHub Actions; watch the run. AWS deploys itself: the
    deployer Lambda pulls `main` within about 10 minutes (`aws-autodeploy.sh … status` shows the result); if it's
    paused or failing, ask Michael to run `deploy/aws.sh` in AWS CloudShell as the fallback and read back its output.

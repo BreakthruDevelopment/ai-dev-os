@@ -35,4 +35,4 @@ left. The `Reviewer sign-off` check reads these lines; a new push needs a new re
 or access, payments, tenancy, uploads, tokens or secrets, or AI tool calls that write data, make sure it carries the
 `security-sensitive` label so Codex's second review is required too. You do not merge as part of the review. Once
 `Reviewer sign-off` and the other required checks are green on the current head, any harness may squash-merge an
-app-repo PR per `AGENTS.md`. Leave spec, `ai-dev-os`, and release or infra PRs for Michael.
+app-repo PR per `AGENTS.md`. Claude Code also merges green `ai-dev-os` and `30-apps-infra` PRs; leave spec PRs for Michael.

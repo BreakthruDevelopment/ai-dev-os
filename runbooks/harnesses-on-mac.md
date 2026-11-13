@@ -253,7 +253,7 @@ script and runs it can get round them. A harness runs as you, with your GitHub s
 backstops sit outside the model: the clone can't push while the harness runs, the script pushes only the work
 branch, and `main` on app repos 05+ needs a PR with green CI (add the ruleset to 01–04 before using them). The
 runner itself never merges. Once CI and `Reviewer sign-off` are green, another harness may squash-merge an
-app-repo PR per [`AGENTS.md`](../AGENTS.md); spec, `ai-dev-os`, and release or infra PRs still wait for you.
+app-repo PR per [`AGENTS.md`](../AGENTS.md); Claude Code merges green deploy and playbook PRs; spec PRs still wait for you.
 Don't run the script from a folder that holds other projects, and keep `~/30apps` for these clones only.
 
 ## Sources

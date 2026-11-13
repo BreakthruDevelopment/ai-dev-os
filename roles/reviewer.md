@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews a pull request for correctness, security and the definition of done. Use on every PR before Michael merges, including PRs written by Grok or Codex.
+description: Reviews a pull request for correctness, security and the definition of done. Use on every PR before it can be merged, including PRs written by Grok or Codex.
 default_harness: claude-code
 claude_model: opus
 claude_tools: Read, Glob, Grep, Bash
@@ -33,4 +33,6 @@ Verdict: ready
 Use `Reviewer: codex` when you are Codex doing the second review, and `Verdict: blocking` when anything blocking is
 left. The `Reviewer sign-off` check reads these lines; a new push needs a new review. If the PR touches auth, roles
 or access, payments, tenancy, uploads, tokens or secrets, or AI tool calls that write data, make sure it carries the
-`security-sensitive` label so Codex's second review is required too. You never merge: Michael does.
+`security-sensitive` label so Codex's second review is required too. You do not merge as part of the review. Once
+`Reviewer sign-off` and the other required checks are green on the current head, any harness may squash-merge an
+app-repo PR per `AGENTS.md`. Claude Code also merges green `ai-dev-os` and `30-apps-infra` PRs; leave spec PRs for Michael.

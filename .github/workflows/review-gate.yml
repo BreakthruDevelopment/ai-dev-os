@@ -10,8 +10,10 @@
 # review. `Verdict: blocking` fails the check. Agents and Michael share one GitHub account, so reviews are matched
 # by marker, not by author: like the rest of the playbook, this guards against mistakes, not against that account.
 #
-# Michael still merges; this check only says whether the review happened. Reviews are posted as COMMENT reviews
-# (GitHub doesn't let an account approve its own PR), so required approvals stay at 0.
+# This check only says whether the review happened; it does not merge. On app repos, a green result plus green
+# CI lets a harness squash-merge per AGENTS.md. Claude Code also merges green ai-dev-os and infra PRs; spec PRs stay with Michael.
+# Reviews are posted as COMMENT reviews (GitHub doesn't let an account approve its own PR), so required
+# approvals stay at 0.
 #
 # ai-dev-os runs it directly. An app repo can call it (see runbooks/daily.md, "Review gate"):
 #     jobs:
@@ -82,5 +84,5 @@ jobs:
             if (problems.length) {
               core.setFailed(`Review gate: ${problems.join("; ")}.`);
             } else {
-              core.info(`Review gate passed for ${required.join(" + ")}. Michael merges.`);
+              core.info(`Review gate passed for ${required.join(" + ")}. Merge per AGENTS.md.`);
             }

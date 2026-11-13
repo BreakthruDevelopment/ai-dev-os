@@ -13,11 +13,11 @@ review (through the day), gate 4 release (afternoon), gate 5 close-out (evening)
 | Midday | AI feature PR; template changes | Claude Code |
 | Midday | UI pages PR | Grok Build |
 | Afternoon | Review every PR as a marked PR review (`Reviewer: claude-code` / `Verdict: ready`); `Reviewer sign-off` and CI green before merge | Claude Code (reviewer); Codex second review on `security-sensitive` PRs |
-| Afternoon | Add the app to `apps.yaml` for the day's cloud (PR), smoke test after deploy | Claude Code (devops) |
-| Afternoon | AWS days only: run `deploy/aws.sh` in AWS CloudShell | Michael |
+| Afternoon | Squash-merge app-repo PRs once CI and `Reviewer sign-off` are green on the current head (`AGENTS.md`) | Any harness |
+| Afternoon | Add the app to `apps.yaml` for the day's cloud (PR Claude Code merges once green), smoke test after deploy | Claude Code (devops) |
 | Evening | README and demo script | Grok Build (or Antigravity) |
 | Evening | Launch post drafts (X, LinkedIn) and a two-minute demo script from the README and live URL | Grok Bot, from what Michael pastes in |
-| Evening | Review and merge; post the app (DNS records are created in Cloudflare by the deploy) | Michael |
+| Evening | Post the app (DNS records are created in Cloudflare by the deploy) | Michael |
 | Evening | Close-out: run log in `runs/NN-slug.md`, `catalog.yaml` status, `BRIEFING.md` "Where things stand"; `done` only when the definition of done holds | Claude Code (devops) |
 | Overnight | Queued issues → PRs | Codex and scheduled Claude Code tasks; Grok Build and Antigravity if the runner is left going |
 | 5:37 AM Central | CI status, stalled work, app health, free-tier usage → `Ops report (nightly)` issue in `ai-dev-os` | Scheduled Claude Code task (ops monitor) |
@@ -94,8 +94,9 @@ published (its `publish` workflow tags `sha-<7>`), add it to `apps.yaml`:
 
 Gate 3 is enforced by the `Reviewer sign-off` check from [`.github/workflows/review-gate.yml`](../.github/workflows/review-gate.yml).
 The workflow reports on every PR in this repo as soon as it is on `main`; making it **required** is a ruleset change
-only Michael makes. Required approvals stay at 0 and nothing removes Michael's ability to merge. No ruleset was
-changed when this was added (2026-11-10).
+only Michael makes. Required approvals stay at 0, and nothing removes Michael's ability to merge. On app repos,
+a harness may also squash-merge once the required checks are green (`AGENTS.md`); the ruleset must still block a
+merge that would skip those checks. No ruleset was changed when this was added (2026-11-10).
 
 **1. `ai-dev-os` (do this first).** Settings → Rules → Rulesets → `protect-main` → **Require status checks to pass**
 → add `check` and `Reviewer sign-off` (source: GitHub Actions). Leave **Require a pull request** at 0 approvals.

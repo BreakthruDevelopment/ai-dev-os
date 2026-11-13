@@ -103,14 +103,18 @@ An app is **done** only when all four hold, each with a link in its run log:
 
 The `Check` workflow refuses an unknown status and refuses `done` without a run log.
 
-## Branch protection, as it stands (checked 2026-11-10)
+## Branch protection, as it stands (checked 2026-11-13)
 
-| Repos | `main` protection |
+From the live rulesets (`gh api repos/BreakthruDevelopment/<repo>/rulesets` and `/rulesets/<id>`). Every ruleset
+below is `protect-main`, active on the default branch: no deletion, no force push, PR required with 0 approvals,
+plus the required checks listed.
+
+| Repos | Required checks on `main` |
 | --- | --- |
-| `ai-dev-os` | Ruleset `protect-main`: no deletion, no force push, PR required (0 approvals), "require status checks" turned on but **with no checks listed**, so `check` isn't actually enforced |
-| `30-apps-infra` | `protect-main`: PR required (0 approvals), `Validate aws/azure/gcp/oci` required |
-| `05`–`12` app repos | `protect-main` from `create-app-repos.py`: PR required (0 approvals), `Lint, test, build, smoke` required |
-| `30-apps-template`, `01`–`04` app repos | **No ruleset and no classic branch protection** (they were created before the workflow) |
+| `ai-dev-os` | `check` and `Reviewer sign-off` |
+| `30-apps-infra` | `Validate aws`, `Validate azure`, `Validate gcp`, `Validate oci` |
+| `05`–`12` app repos | `Lint, test, build, smoke` and `review / Reviewer sign-off` |
+| `30-apps-template`, `01`–`04` app repos | **None yet**: no ruleset and no classic branch protection. Michael is importing a ruleset for them |
 
-No ruleset was changed by the hardening pass. The exact changes recommended for Michael, in order, are in
+For the remaining repos, the recommended ruleset is in
 [`runbooks/daily.md`](runbooks/daily.md#review-gate-turning-it-on).

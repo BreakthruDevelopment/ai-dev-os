@@ -6,8 +6,9 @@ state of every decision; the rules themselves are in [`AGENTS.md`](AGENTS.md).
 The process that builds the apps is called the **BreakthruSoftwareFactory**: this playbook, its eight roles, the five
 daily gates (spec, build, review, release, close-out) and the definition of done, all in [`FACTORY.md`](FACTORY.md).
 
-_Last updated: 2026-11-12 (agents may squash-merge app-repo PRs once CI and review are green; Claude Code also merges
-green deploy and playbook PRs; spec PRs stay with Michael). "Where things stand" below is still as of 2026-11-10._
+_Last updated: 2026-11-13 ("Where things stand" brought up to date: apps 1–12 live, apps 5, 7, 9 and 10 `done`,
+apps 31 and 32 in the catalog, branch protection re-checked). Since 2026-11-12, agents may squash-merge app-repo PRs
+once CI and review are green; Claude Code also merges green deploy and playbook PRs; spec PRs stay with Michael._
 
 ## What we're building and why
 
@@ -102,8 +103,9 @@ When a harness hits its usage limit, its issues are relabeled to another harness
 
 ## Where things stand
 
-_As of 2026-11-10, about 2:30 PM Central, from GitHub, `30-apps-infra` `apps.yaml` and live `/api/health` checks.
-Details and the honest gap list: [`runs/retro-01-12.md`](runs/retro-01-12.md)._
+_As of 2026-11-13, from GitHub: `30-apps-infra` `apps.yaml` (through #77), the rulesets, and the `Live smoke test`
+runs on each app repo's `claude/live-smoke` branch, whose `/api/health` output shows the version each app is serving.
+Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/retro-01-12.md`](runs/retro-01-12.md)._
 
 - **Day 0 done** (2026-11-04): the app template, this repo, the four cloud accounts, `30-apps-infra`, and the
   template app live on all four clouds (still in `apps.yaml`, tag `sha-99a8f86`):
@@ -111,27 +113,48 @@ Details and the honest gap list: [`runs/retro-01-12.md`](runs/retro-01-12.md)._
   - Azure: https://app-template.salmonpebble-b870873b.eastus.azurecontainerapps.io
   - Google Cloud: https://template-189497094271.us-central1.run.app
   - Oracle: https://template.141-148-159-122.sslip.io
-- **Deployed (4):** health check `ok` at the custom domain, reporting the tag `apps.yaml` pins. Not yet `done`: no
-  live smoke result is recorded, and their run logs were only reconstructed on 2026-11-10.
+- **Apps 1–12 are live** (12 of 30), each at `appN.breakthruventures.ai` with the tag `apps.yaml` pins. For apps
+  5–12 the latest live-smoke run's `/api/health` reported exactly that tag. App 4 also answered with its tag on
+  2026-11-12 (logged inside app 8's live-smoke run). Apps 1–3 have no health check recorded on GitHub since
+  2026-11-10.
 
-  | # | App | Cloud | Live | Tag |
-  | --- | --- | --- | --- | --- |
-  | 1 | Portfolio Build Tracker | AWS | https://app1.breakthruventures.ai | `sha-a4e6649` |
-  | 2 | Notes and Knowledge Base | Azure | https://app2.breakthruventures.ai | `sha-6675f0b` |
-  | 3 | Expense Tracker | Google Cloud | https://app3.breakthruventures.ai | `sha-811aac4` |
-  | 4 | Habit and Goal Tracker | Oracle | https://app4.breakthruventures.ai | `sha-c91ffc1` |
+  | # | App | Cloud | Tag | Deploy PR (`30-apps-infra`) | Live smoke after latest deploy | Status |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 1 | Portfolio Build Tracker | AWS | `sha-de78c18` | #71 | not recorded | deployed |
+  | 2 | Notes and Knowledge Base | Azure | `sha-6675f0b` | #42 | not recorded | deployed |
+  | 3 | Expense Tracker | Google Cloud | `sha-811aac4` | #42, domain #41 | not recorded | deployed |
+  | 4 | Habit and Goal Tracker | Oracle | `sha-c91ffc1` | #45, #47 | health only | deployed |
+  | 5 | Personal Budget Planner | AWS | `sha-50aa60b` | #65, #75 | pass, 2026-11-12 | **done** |
+  | 6 | Bookmark and Read-Later | Azure | `sha-51175dd` | #66 | pass, 2026-11-10 | deployed (README) |
+  | 7 | Appointment Booking | Google Cloud | `sha-0f8cdf3` | #69, domain #70, #75 | pass, 2026-11-12 | **done** |
+  | 8 | Loan Application Portal | Oracle | `sha-713b6c3` | #67, #75 | health and public pages only | deployed (smoke) |
+  | 9 | Invoicing | AWS | `sha-4171700` | #72 | pass, 2026-11-11 | **done** |
+  | 10 | Inventory Management | Azure | `sha-881d16a` | #73, #75 | pass, 2026-11-12 | **done** |
+  | 11 | Helpdesk Ticketing | Google Cloud | `sha-3fd1ca2` | #76, domain #77 | pass, 2026-11-13 (UTC) | deployed (README) |
+  | 12 | Restaurant Ordering | Oracle | `sha-6bd0d02` | #74, #75 | fail: no orderable dish | deployed (README, smoke) |
 
-- **Building (8):** apps 5–12 have repos (created 2026-11-09 Central, with the `protect-main` ruleset), green CI on
-  `main`, and open UI, fullstack, AI or README issues. None is in `apps.yaml` yet; their deploy issues are
-  `30-apps-infra` #55–#59 (apps 5–8, labelled `claude`) and #60–#64 (apps 9–12, not labelled yet).
-- **Planned (18):** apps 13–30 are catalog entries only. Not started.
-- **Close-out debt:** no app is `done`. The READMEs for app 06 and app 09 still have the template's "What this app
-  does" placeholder; apps 10–12 still carry template title or intro text; app 1's README header still says it is
-  going live. 01-build-tracker #9 (Jules README PR) and 04-habit-tracker #16 (unlabelled bug) are open.
-- **Protection gap:** `30-apps-template` and apps 01–04 have no branch protection, and `ai-dev-os`'s ruleset lists no
-  required check. See [`FACTORY.md`](FACTORY.md#branch-protection-as-it-stands-checked-2026-11-10).
-- **Next:** finish and deploy apps 5–12 through the five gates, clear the close-out debt, have Michael turn on the
-  `Reviewer sign-off` required check, then start apps 13–30.
+  Notes on what's live:
+  - **App 5:** Plaid bank sync is built (05-budget-planner #15) but off until Michael enters Plaid keys; health
+    reports `"bank":"demo"`.
+  - **App 9:** payments run on the demo provider (health reports `"payments":"demo"`); Stripe test mode is built.
+  - **App 11:** custom domain live since 2026-11-13 (UTC; `30-apps-infra` #77, 9:36 PM Central on 11-12).
+  - **App 12:** the live smoke passes every step up to ordering, then stops at "the menu has no orderable dish"
+    until the demo workspace is loaded (admin button) or staff smoke credentials are set.
+  - **App 8:** the live check is health plus public pages (`/`, `/sign-in`, and `/dashboard` and `/admin`
+    redirecting); `scripts/smoke.sh` hasn't been run against the live URL.
+- **Done (4): apps 5, 7, 9, 10.** Filled README, `scripts/smoke.sh` passed live after the latest deploy, run log in
+  [`runs/`](runs/). Apps 6, 11 and 12 still need their README (open `[docs-writer]` issues 06 #5, 11 #6, 12 #5: no
+  harness label); app 8 needs a full live smoke; app 12 also needs a passing smoke. Apps 1–4 need a recorded live
+  smoke (and app 1 a README fix; see the retro).
+- **Catalog:** apps 31 (Cloud Cost Scaler, Google Cloud) and 32 (Purchase Orders and Vendor Management, Oracle)
+  were added as `planned` (ai-dev-os #23). Apps 13–30 are `planned` too: no repos yet.
+- **Agreed order:** BreakthruSoftwareFactory complete → app 31 → apps 13–30 → app 32 last (ai-dev-os #23).
+- **Template:** hardening for apps 13+ is merged (`30-apps-template` #32, 2026-11-13), so new repos start from it.
+- **Branch protection:** `ai-dev-os` now requires `check` and `Reviewer sign-off`; apps 05–12 require
+  `Lint, test, build, smoke` and `review / Reviewer sign-off`. `30-apps-template` and apps 01–04 have none yet;
+  Michael is importing a ruleset. See [`FACTORY.md`](FACTORY.md#branch-protection-as-it-stands-checked-2026-11-13).
+- **Next:** finish the factory: READMEs for 06, 11 and 12, the app 12 demo workspace and a passing smoke, a full
+  live smoke for app 8, live smokes for 1–4, and the ruleset on the template and 01–04. Then app 31, then 13–30.
 
 ## Where to read more
 

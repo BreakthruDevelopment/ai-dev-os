@@ -24,3 +24,4 @@ and how the AI feature scored.
 | --- | --- |
 | [`retro-01-12.md`](retro-01-12.md) | Retrospective for apps 1–12, written when the factory was named (2026-11-10) |
 | `01-build-tracker.md` … `04-habit-tracker.md` | Run logs reconstructed after the fact from GitHub for the four deployed apps |
+| `05-budget-planner.md` … `12-restaurant-ordering.md` | Run logs written at close-out on 2026-11-13 from GitHub (PRs, reviews, deploys, live-smoke runs); apps 5, 7, 9 and 10 are `done` |

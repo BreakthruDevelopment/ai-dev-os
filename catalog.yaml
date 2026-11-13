@@ -69,7 +69,7 @@ apps:
     client_need: "Content apps"
     ai_feature: "Summarize and auto-tag saved links"
     notable: "Background jobs, rate limiting"
-    status: deployed
+    status: done
   - n: 7
     repo: 07-appointment-booking
     create_repo: true
@@ -119,7 +119,7 @@ apps:
     client_need: "Customer support"
     ai_feature: "Auto-triage, suggested replies from KB"
     notable: "Agent vs customer portals, SLA timers"
-    status: deployed
+    status: done
   - n: 12
     repo: 12-restaurant-ordering
     create_repo: true

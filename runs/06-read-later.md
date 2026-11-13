@@ -54,3 +54,7 @@ Live smoke step "summarize job ran and the link is ready with a summary" passed 
 - The first live smoke (run 42912307608, 4:12 PM) failed because the script expected a demo summary and got a live one; #15 fixed the script and the re-run passed.
 - README never written: Jules's #6 was closed and issue #5 has no harness label, so no harness will pick it up.
 - Launch drafts: unknown.
+
+## Update 2026-11-13
+
+README filled (06-read-later#17, merged). With the passing live smoke on the deployed version and this run log, the definition of done is met; status set to `done`.

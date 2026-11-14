@@ -55,9 +55,9 @@ Added 2026-11-14 after the app 13 incident below.
 - **Waves.** A spec's Issues section groups slices into waves. **Wave 1 is the foundation**: schema, migrations,
   roles, access rules and auth config, always `claude` and `security-sensitive`. The **foundation paths** are
   `src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/` (where role and permission code lives),
-  `src/lib/access.ts`, `src/proxy.ts` and `src/middleware.ts`. No slice outside wave 1 creates or edits them; the
-  one exception is a later slice the spec marks security-sensitive, `claude`, and the owner of a named file (e.g.
-  a CSP in `src/proxy.ts`). If a later slice needs a schema change, the spec gives that change its own foundation
+  `src/lib/access.ts`, `src/proxy.ts` and `src/middleware.ts`. No slice outside wave 1 creates or edits them
+  unless a security-sensitive `claude` slice is named as the owner (e.g. of a CSP in `src/proxy.ts`). Grok and
+  Antigravity never touch them. If a later slice needs a schema change, the spec gives that change its own foundation
   slice, or the builder stops and comments on the issue. Later waves list their
   dependencies as before, and every slice not planned for `claude` depends, directly or not, on wave 1.
 - **Planned harness vs start signal.** Every issue body has a `Planned harness: <name>` line (the owner) and a
@@ -71,12 +71,18 @@ Added 2026-11-14 after the app 13 incident below.
   creation), so a removal sticks until a person adds the label back.
 - **The Mac runner fails closed.** `scripts/run-harness.sh` won't claim an issue without a `## Dependencies`
   section, with a bare `#N` or `repo#N` there, or without a `Planned harness:` line naming its harness. Before
-  pushing, it refuses a branch that changes the foundation paths unless the issue is labelled
-  `security-sensitive`: the branch stays on the Mac and the issue gets a comment naming the files. That check
+  pushing, it refuses every branch that changes the foundation paths, whatever the issue's labels (their owners are
+  all `claude` slices): the branch stays on the Mac and the issue gets a comment naming the files. That check
   compares with the `main` commit recorded before the harness ran (not the clone's `origin/main`, which the harness
   could move), and holds the push if the branch doesn't build on that commit or git can't list its changes. A
   harness that finds its data layer missing writes `.harness/blocked.md` instead of committing; the runner posts it
-  quoted (no HTML comments or @mentions), removes the harness label and adds `hold`.
+  quoted (no HTML comments or @mentions), removes the harness label and adds `hold`. Between runs it trusts a clone
+  only if origin is the repo's https URL and `.git/config` holds nothing outside a short allow list (checked again
+  straight after every harness run); its own git calls ignore the clone's hooks and fsmonitor. It skips issues
+  labelled `hold`.
+- **Prerequisites that aren't issues** (a Day 0 step such as `D4`) go in `## Dependencies` as plain text.
+  `open-issues.py` opens such an issue with `hold` and no harness label; **Claude removes `hold` when the step is
+  done**, and `release-labels.py` then adds the label once the issue dependencies are done too.
 - **Follow-up, not built yet:** an app-repo CI check that fails when a PR not labelled `security-sensitive` changes
   the foundation paths. The runner only guards Grok Build and Antigravity on the Mac; that check would also cover
   Codex, Grok Bot and people.

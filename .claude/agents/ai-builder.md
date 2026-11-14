@@ -18,8 +18,8 @@ Requirements:
   plumbing; run them against the live model locally with `AI_PROVIDER=gemini` and record results in the run log.
 - If the feature uses tools (actions the model can request), every tool call is authorized server-side with the
   same `assertCan()` rules as a normal request, and anything that changes money or data needs human approval.
-- Build on the foundation (wave 1): don't create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) unless your issue is the
-  foundation slice or names you as a file's owner. If the feature needs a
+- Build on the foundation (wave 1): don't create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) unless a security-sensitive `claude` slice is named as the owner
+  (the foundation slice, or the slice the spec names). If the feature needs a
   table or column that isn't on `main`, stop and comment on the issue (under `scripts/run-harness.sh`, write it to
   `.harness/blocked.md` and make no commits); never invent schema or auth. If your issue does own a migration, rebase
   on `main` and regenerate it if another merged first; never two `drizzle/NNNN_*` files with the same number.

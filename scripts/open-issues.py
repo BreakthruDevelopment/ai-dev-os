@@ -27,7 +27,12 @@ Spec format (templates/spec.md, "Issues"): `### Wave N` headings; under them one
 `2nd: Codex` (or `security-sensitive`) marks a security-sensitive slice; `repo` is optional (default: the app repo).
 `Dependencies:` lists slice ids separated by commas: `NN.1, NN.3`, ranges `NN.1–NN.3` or `NN.1-3` (expanded), and
 anything that isn't a slice id (`D4`, `Day 0 D4 (Michael)`) goes into the body as a plain dependency line. A token
-that mixes an id with other text (`NN.1 (schema)`) is refused, so an id can't be lost.
+that mixes an id with other text (`NN.1 (schema)`), or holds only digits and punctuation (`143`, or `14,3`, which
+splits into `14` and `3`), is refused, so an id can't be lost.
+
+A slice with such a non-issue prerequisite is opened with `hold` and without its harness label, whatever its issue
+dependencies: no script can tell when `D4` is done. Claude removes `hold` once the step is done, and
+release-labels.py then adds the label when the issue dependencies are done too.
 
 JSON plan: {"repo": "NN-slug", "spec": "specs/NN-slug.md", "issues": [{"id": "NN.1", "title": "[role] Title",
 "harness": "claude", "wave": 1, "security_sensitive": true, "deps": [], "repo": null, "body": "markdown",
@@ -55,7 +60,7 @@ WAVE = re.compile(r"^###\s+Wave\s+(\d+)\b", re.I)
 WAVE1_NOTE = ("Wave 1 (foundation): this slice owns the schema, migrations, roles, access rules and auth config. "
               "Later slices don't change the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`).")
 LATER_NOTE = ("Don't create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) "
-              "unless this issue names you as a file's owner: the foundation slice owns them. If the data layer this needs isn't on `main`, or it "
+              "unless a security-sensitive `claude` slice is named as the owner: the foundation slice owns them. If the data layer this needs isn't on `main`, or it "
               "needs a schema change, stop and comment here. Never invent schema, migrations, roles or session code.")
 
 
@@ -151,6 +156,8 @@ def parse_deps(sid: str, tail: str) -> tuple[list[str], list[str]]:
             ids += [f"{major}.{k}" for k in range(lo, hi + 1)]
         elif re.search(ID, tok):
             raise PlanError(f"{sid}: '{tok}' mixes a slice id with other text; list ids plainly (e.g. '14.1, 14.2')")
+        elif re.fullmatch(r"[\d\s.,;:–-]+", tok):
+            raise PlanError(f"{sid}: '{tok}' looks like a mistyped slice id; write ids as NN.M (e.g. '14.3')")
         else:
             extra.append(tok)
     if not ids and not extra:
@@ -214,6 +221,14 @@ def validate(plan: dict) -> list[dict]:
         if it["wave"] > 1 and it["harness"] != "claude" and not reaches_wave1(it["id"]):
             raise PlanError(f"{it['id']}: a {it['harness']} slice outside wave 1 must depend on the foundation (wave 1)")
     return order
+
+
+def labels_for(it: dict, deps_open: bool) -> list[str]:
+    """Labels at creation. The harness label (start signal) only with no open dependency and no non-issue
+    prerequisite; a non-issue prerequisite (`D4`) means `hold`, which Claude removes once the step is done."""
+    held = bool(it.get("extra_deps"))
+    return (([] if deps_open or held else [it["harness"]]) + (["security-sensitive"] if it["security_sensitive"] else [])
+            + ([issuelib.HOLD_LABEL] if held else []))
 
 
 def issue_body(it: dict, plan: dict, numbers: dict, spec_ref: str) -> str:
@@ -285,7 +300,7 @@ def run(plan: dict, dry: bool, spec_ref: str) -> None:
             raise PlanError(f"{it['id']}: generated body fails the intake check: {problem}")
         # The start signal only when every dependency is done: on a first run, only dependency-free issues.
         open_deps = [d for d in it["deps"] if d in fresh or states.state(*numbers[d]) != "done"]
-        labels = ([] if open_deps else [it["harness"]]) + (["security-sensitive"] if it["security_sensitive"] else [])
+        labels = labels_for(it, bool(open_deps))
         fresh.add(it["id"])
         if dry:
             fake += 1
@@ -295,7 +310,7 @@ def run(plan: dict, dry: bool, spec_ref: str) -> None:
         res = issuelib.gh(f"repos/{OWNER}/{repo}/issues", "POST", {"title": it["title"], "body": body, "labels": labels})
         numbers[it["id"]] = (repo, res["number"])
         by_mark[it["id"]] = res["number"]
-        if not open_deps:  # labelled now: record the release, so a label taken away later stays away
+        if it["harness"] in labels:  # labelled now: record the release, so a label taken away later stays away
             issuelib.gh(f"repos/{OWNER}/{repo}/issues/{res['number']}/comments", "POST", {"body": (
                 f"Labelled `{it['harness']}` at creation: no open dependencies, so this is the start signal. "
                 f"(`scripts/open-issues.py`)\n\n{issuelib.RELEASE_MARK.format(it['harness'])}")})
@@ -410,12 +425,16 @@ def self_test() -> None:
                 fails.append(f"parse_deps({tail!r}) = {parse_deps('t', tail)}")
         except PlanError as e:
             fails.append(f"parse_deps({tail!r}): {e}")
-    for tail in ["14.1 (schema)", "77.3–77.1", "77.1–78.2", ""]:
+    for tail in ["14.1 (schema)", "77.3–77.1", "77.1–78.2", "", "143", "14,3", "14.1, 7", "14.3.1"]:
         try:
             parse_deps("t", tail)
             fails.append(f"parse_deps accepted {tail!r}")
         except PlanError:
             pass
+    lab = [labels_for(plan["issues"][0], False), labels_for(plan["issues"][1], False), labels_for(plan["issues"][3], True),
+           labels_for(plan["issues"][3], False)]
+    if lab != [["claude", "security-sensitive"], ["hold"], [], ["grok"]]:
+        fails.append(f"labels_for: {lab}")
     b2 = issue_body(plan["issues"][1], plan, numbers, "main")
     if "- Day 0 D3 (Michael, not an issue)" not in b2 or issuelib.intake_problem(b2, "antigravity"):
         fails.append("body 99.2: extra dependency text")
@@ -430,7 +449,7 @@ def self_test() -> None:
         fails.append(f"templates/spec.md doesn't parse: {e}")
     if fails:
         sys.exit("open-issues self-test FAILED:\n  " + "\n  ".join(fails))
-    print(f"open-issues self-test ok (sample spec, {len(tplan['issues'])} slices in templates/spec.md, 14 refusals, 5 dependency lists)")
+    print(f"open-issues self-test ok (sample spec, {len(tplan['issues'])} slices in templates/spec.md, 18 refusals, 5 dependency lists)")
 
 
 def main(argv: list[str]) -> None:

@@ -20,7 +20,9 @@
 #      (logged, no claim) an issue with no "## Dependencies" section, one whose Dependencies hold a bare `#N` or
 #      `repo#N` instead of a full issue URL, and one without a "Planned harness: <this harness>" line;
 #   2. takes a per-repo lock (~/30apps/.locks/<repo>.lock), then clones the repo into ~/30apps/<repo>, or fetches
-#      and fast-forwards main; refuses a dirty working tree;
+#      and fast-forwards main; refuses a dirty working tree, an origin that isn't the repo's https URL, and any
+#      .git/config setting outside a short allow list (checked again straight after every harness run). Its own
+#      git calls ignore the clone's hooks and fsmonitor. Issues labelled `hold` are skipped;
 #   3. claims the issue: labels it `in-progress`, comments "Started by <harness> on Michael's Mac" with a claim
 #      marker (host:pid:time), re-reads the comments and backs off if another runner's claim came first;
 #   4. creates branch <harness>/<N>-<slug> and runs the harness CLI headless with a standard prompt (AGENTS.md, the
@@ -28,8 +30,8 @@
 #      while it runs. A run that fails with no commits on a transient network error is retried twice (30 s, 120 s);
 #   5. checks the result (still on the branch, commits exist, tree clean, local main untouched, and no foundation
 #      path — src/lib/db/, drizzle/, drizzle.config.ts, src/lib/auth/, src/lib/access.ts, src/proxy.ts,
-#      src/middleware.ts — changed against the main commit recorded before the run, unless the issue is labelled
-#      security-sensitive), pushes the branch (never --force, never main), opens a PR whose body starts
+#      src/middleware.ts — changed against the main commit recorded before the run; the runner never pushes
+#      those, whatever the labels), pushes the branch (never --force, never main), opens a PR whose body starts
 #      with "Closes #N", waits up to 20 min for its CI checks and reports the result on the issue.
 #   On a failure with no commits it deletes the local branch, removes `in-progress` and comments once with the
 #   reason (the issue is then skipped for 6 hours); if the harness wrote .harness/blocked.md it posts that, quoted,
@@ -84,6 +86,14 @@ DEP_STATE_JQ='if .state != "closed" then (.state // "unknown")
   else "done" end'
 HARNESS=""
 
+# Every git call this script makes ignores the clone's hooks and fsmonitor: a harness can write .git/hooks and
+# .git/config, and nothing it writes there may run in a later step or a later run.
+git() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
+# The only .git/config settings a clone may have (git lowercases names; branch names keep their case). Anything else
+# (include.path, url.*.insteadOf, filter.*, diff.*, core.sshCommand, credential.*, ...) could run code or redirect
+# pushes, so the runner refuses the clone until a person removes it.
+CLONE_KEYS_RE='^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks)|remote\.origin\.(url|fetch|gh-resolved)|branch\..+\.(remote|merge|vscode-merge-base)|extensions\.objectformat)$'
+
 # ---------------------------------------------------------------------------------------------------------------
 # Issue intake rules (fail closed). scripts/issuelib.py has the same rules in Python; its --self-test runs these
 # functions on the same cases through --check-body and --wave1-files below.
@@ -125,11 +135,40 @@ foundation_changes() { # $1 dir, $2 branch, $3 base commit
 }
 # Text a harness wrote, made safe to post: no HTML comments (they could fake the runner's markers), no @mentions,
 # no fence breaks; the caller posts it inside a ~~~~ fence.
+# Why the pre-push guard holds a branch, or nothing. The Mac runner refuses every foundation-path change, whatever
+# the issue's labels: foundation work belongs to security-sensitive `claude` slices, never to grok or antigravity.
+guard_reason() { # $1 dir, $2 branch, $3 base commit
+  local touched frc
+  touched=$(foundation_changes "$1" "$2" "$3"); frc=$?
+  case "$frc" in
+    0) [ -z "$touched" ] && return 0
+       # shellcheck disable=SC2016  # Markdown backticks
+       printf '%s\n\n%s\n' "\`$2\` changes foundation files, which the Mac runner never pushes (they belong to the app's security-sensitive \`claude\` slices):" \
+         "$(printf '%s\n' "$touched" | quote_untrusted 4000 | sed 's/^/- `/; s/$/`/')" ;;
+    3) echo "\`$2\` doesn't build on \`main\` as it was when the run started (\`${3:0:7}\`), so its changes can't be checked." ;;
+    *) echo "git couldn't list the files \`$2\` changes (status $frc), so its changes can't be checked." ;;
+  esac
+}
+# Why the clone can't be trusted, or nothing: origin must be the repo's https URL and .git/config may hold only the
+# settings in CLONE_KEYS_RE. Uses only `git config` reads, which run nothing from the clone.
+clone_config_problem() { # $1 dir, $2 repo
+  local url bad
+  url=$(git -C "$1" config --local --get remote.origin.url 2>/dev/null || true)
+  case "$url" in
+    "https://github.com/$OWNER/$2"|"https://github.com/$OWNER/$2.git") ;;
+    *) echo "origin is '$(printf '%s' "$url" | quote_untrusted 200)', not https://github.com/$OWNER/$2.git"; return 0 ;;
+  esac
+  bad=$(git -C "$1" config --local --name-only --list 2>/dev/null | grep -Eiv "$CLONE_KEYS_RE" | sort -u | tr '\n' ' ' \
+        | quote_untrusted 600)
+  [ -z "${bad// /}" ] || echo ".git/config has settings the runner doesn't allow: ${bad% } (remove them with \`git -C <clone> config --unset-all <name>\`, or delete the clone so the runner re-clones it)"
+  return 0
+}
 quote_untrusted() { # stdin: text. $1 max bytes (default 1500)
   local at
   at=$(printf '\357\274\240')  # U+FF20 FULLWIDTH COMMERCIAL AT
+  # Byte-wise (LC_ALL=C): BSD sed refuses or mangles invalid multibyte text, and head -c can cut a character.
   # shellcheck disable=SC2016  # literal backticks, not command substitution
-  head -c "${1:-1500}" | sed -e 's/<!--/< !--/g' -e 's/-->/-- >/g' -e "s/@/$at/g" -e 's/~~~/~ ~ ~/g' -e 's/```/` ` `/g'
+  LC_ALL=C head -c "${1:-1500}" | LC_ALL=C sed -e 's/<!--/< !--/g' -e 's/-->/-- >/g' -e "s/@/$at/g" -e 's/~~~/~ ~ ~/g' -e 's/```/` ` `/g'
 }
 intake_problem() { # $1 issue body. Prints why $HARNESS mustn't start it and returns 0; returns 1 if it may
   local section refs planned
@@ -158,6 +197,9 @@ case "${1:-}" in
   --wave1-files) wave1_files; exit 0 ;;
   --foundation-changes) foundation_changes "$2" "$3" "$4"; exit $? ;;  # $2 dir, $3 branch, $4 base
   --quote) quote_untrusted; exit 0 ;;
+  --guard) guard_reason "$2" "$3" "$4"; exit 0 ;;          # $2 dir, $3 branch, $4 base: prints why it holds, or nothing
+  --check-clone) clone_config_problem "$2" "$3"; exit 0 ;; # $2 dir, $3 repo: prints why the clone isn't trusted
+  --git) shift; git "$@"; exit $? ;;                        # git as this script runs it (hooks and fsmonitor off)
   --dep-state) jq -r "$DEP_STATE_JQ"; exit $? ;;  # stdin: one issue's JSON (needs jq; gh --jq in real runs)
 esac
 
@@ -520,6 +562,7 @@ list_candidates() { # $1 repo
   gh api --paginate "repos/$OWNER/$1/issues?state=open&labels=$HARNESS&per_page=100&sort=created&direction=asc" \
     --jq ".[] | select(.pull_request | not)
               | select([.labels[].name] | index(\"$IN_PROGRESS\") | not)
+              | select([.labels[].name] | index(\"$HOLD_LABEL\") | not)
               | \"\(.number)\t\(.title | gsub(\"[\\t\\n\\r]\"; \" \"))\""
 }
 
@@ -655,18 +698,15 @@ slug_of() {
 # Local clone
 # ---------------------------------------------------------------------------------------------------------------
 prepare_clone() { # $1 repo; prints nothing, returns non-zero (with a log line) if the repo can't be used
-  local repo=$1 dir="$WORK_ROOT/$1" url
+  local repo=$1 dir="$WORK_ROOT/$1" problem
   if [ ! -d "$dir/.git" ]; then
     [ -e "$dir" ] && { log "skip $repo: $dir exists but isn't a git clone"; return 1; }
     log "cloning $OWNER/$repo into $dir"
     gh repo clone "$OWNER/$repo" "$dir" -- --quiet || { log "skip $repo: clone failed"; return 1; }
   fi
-  url=$(git -C "$dir" config --get remote.origin.url 2>/dev/null || true)  # raw, before insteadOf rewriting
-  case "$url" in
-    *"$OWNER/$repo"|*"$OWNER/$repo.git") ;;
-    *) log "skip $repo: origin is '$url', not $OWNER/$repo"; return 1 ;;
-  esac
   git -C "$dir" config --unset-all remote.origin.pushurl >/dev/null 2>&1 || true  # left over from a killed run
+  problem=$(clone_config_problem "$dir" "$repo")
+  [ -z "$problem" ] || { log "REFUSE $repo: $problem"; return 1; }
   if [ -n "$(git -C "$dir" status --porcelain)" ]; then
     log "REFUSE $repo: working tree in $dir is dirty; commit, stash or discard it first"
     git -C "$dir" status --short | head -20
@@ -733,7 +773,7 @@ is_transient() { # $1 output file: a network error near the end of the output
 
 work_issue() { # $1 repo, $2 number, $3 title, $4 role, $5 branch
   local repo=$1 n=$2 title=$3 role=$4 branch=$5 dir="$WORK_ROOT/$1" prompt rc ahead body_file pr_url sha ci
-  local attempt=1 max_attempts out waits wait_s denied="" blocked="" touched touched_md frc hold_why base
+  local attempt=1 max_attempts out waits wait_s denied="" blocked="" hold_why base tamper
 
   if git -C "$dir" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
     log "skip $repo#$n: branch $branch already exists on GitHub; open its PR or delete it by hand"
@@ -815,6 +855,19 @@ $FAIL_MARK" >/dev/null 2>&1 || log "warning: couldn't comment on $repo#$n"
     run_harness_once "$prompt" "$dir" "$out"
     rc=$?
     log "$HARNESS exited with status $rc"
+    # Before any other git command touches the clone: settings the harness added could run code (filters, diff
+    # drivers) or redirect a push. On any, stop here and leave the clone untouched for a person.
+    tamper=$(clone_config_problem "$dir" "$repo")
+    if [ -n "$tamper" ]; then
+      CLONE_TAINTED=1
+      log "STOP $repo#$n: $tamper; nothing pushed, and the clone is left as it is"
+      comment "$repo" "$n" "$HARNESS stopped before pushing: the clone's git settings were changed during the run. $(public "$tamper").
+
+Nothing was pushed, and the runner won't use this clone again until it's fixed: inspect or delete \`~/30apps/$repo\` on Michael's Mac, then remove \`$IN_PROGRESS\` here. Log: \`$(public "$LOG")\`.
+
+$FAIL_MARK" >/dev/null 2>&1 || log "warning: couldn't comment on $repo#$n"
+      return 1
+    fi
     ahead=$(commits_on "$dir" "$branch" "$base")
     if [ "$ahead" -eq 0 ] && [ "$attempt" -lt "$max_attempts" ] && [ "$rc" -ne 124 ] && [ "$rc" -ne 130 ] \
        && [ "$(git -C "$dir" rev-parse --abbrev-ref HEAD)" = "$branch" ] && is_transient "$out"; then
@@ -855,29 +908,16 @@ $blocked
   fi
   [ -z "$(git -C "$dir" status --porcelain)" ] || { fail "uncommitted changes left in $dir"; return 1; }
 
-  # Foundation (wave 1) files leave this Mac only on a security-sensitive issue (the foundation slice). Checked
-  # before pushing against the recorded base; a diff that fails, a branch that doesn't build on the base, or a
-  # label that can't be read all hold the push.
-  touched=$(foundation_changes "$dir" "$branch" "$base"); frc=$?
-  hold_why=""
-  case "$frc" in
-    0) if [ -n "$touched" ] && ! issue_has_label "$repo" "$n" security-sensitive; then
-         # shellcheck disable=SC2016  # Markdown backticks
-         touched_md=$(printf '%s\n' "$touched" | quote_untrusted 4000 | sed 's/^/- `/; s/$/`/')
-         hold_why="\`$branch\` changes foundation (wave 1) files, which only the app's foundation slice may change:
-
-$touched_md"
-       fi ;;
-    3) hold_why="\`$branch\` doesn't build on \`main\` as it was when the run started (\`${base:0:7}\`), so its changes can't be checked." ;;
-    *) hold_why="git couldn't list the files \`$branch\` changes (status $frc), so its changes can't be checked." ;;
-  esac
+  # Foundation files never leave this Mac (their owners are `claude` slices). Checked before pushing against the
+  # recorded base; a diff that fails or a branch that doesn't build on the base also holds the push.
+  hold_why=$(guard_reason "$dir" "$branch" "$base")
   if [ -n "$hold_why" ]; then
     log "HOLD $repo#$n: not pushing $branch: $(printf '%s' "$hold_why" | tr '\n' ' ')"
     git -C "$dir" checkout --quiet main 2>/dev/null || true
     remove_label "$repo" "$n"
     comment "$repo" "$n" "$HARNESS stopped before pushing: $hold_why
 
-Nothing was pushed. The schema, migrations, roles, access rules and auth config come from the foundation issue; if this issue really needs a change there, it belongs in a foundation slice (see the spec). The branch has $ahead commit(s) and stays on Michael's Mac; the runner skips this issue while it exists. Delete it there once this is sorted: \`git -C ~/30apps/$repo branch -D $branch\`. Log: \`$(public "$LOG")\`.
+Nothing was pushed. The schema, migrations, roles, access rules and auth config come from the app's security-sensitive \`claude\` slices; if this issue really needs a change there, it belongs in one of them (see the spec). The branch has $ahead commit(s) and stays on Michael's Mac; the runner skips this issue while it exists. Delete it there once this is sorted: \`git -C ~/30apps/$repo branch -D $branch\`. Log: \`$(public "$LOG")\`.
 
 $FAIL_MARK" >/dev/null 2>&1 || log "warning: couldn't comment on $repo#$n"
     return 1
@@ -966,6 +1006,7 @@ repos=$(list_repos) || die "couldn't list $OWNER repos"
 [ -n "$repos" ] || die "no repos with the topic $TOPIC"
 
 done_count=0
+CLONE_TAINTED=0
 for repo in $repos; do
   candidates=$(list_candidates "$repo") || { log "skip $repo: couldn't list issues"; continue; }
   [ -n "$candidates" ] || continue
@@ -1028,6 +1069,9 @@ for repo in $repos; do
 
     if work_issue "$repo" "$n" "$title" "$role" "$branch"; then
       done_count=$((done_count + 1))
+    elif [ "$CLONE_TAINTED" -eq 1 ]; then
+      log "skip rest of $repo: its clone's git settings changed during the run; a person has to look"
+      CLONE_TAINTED=0; release_lock; continue 2
     else
       git -C "$WORK_ROOT/$repo" checkout --quiet main 2>/dev/null || true
     fi

@@ -255,7 +255,7 @@ def self_test() -> None:
     if failures:
         sys.exit("issuelib self-test FAILED:\n  " + "\n  ".join(failures))
     print(f"issuelib self-test ok ({len(CASES)} bodies, {len(DEP_CASES)} dependency states, the wave 1 paths, "
-          "the pre-push guard and quoting, in Python and in run-harness.sh)")
+          "the pre-push guard, clone checks and quoting, in Python and in run-harness.sh)")
 
 
 def _guard_tests() -> list[str]:
@@ -310,6 +310,53 @@ def _guard_tests() -> list[str]:
         rc, got = guard("0" * 40)
         if rc == 0:
             out.append(f"guard with an unusable base returned 0 ({got})")
+
+        def reason(branch, b=base):
+            return subprocess.run(["bash", str(SCRIPT), "--guard", d, branch, b],
+                                  capture_output=True, text=True).stdout.strip()
+
+        # The runner refuses any foundation change outright (no label check), and passes a page-only branch.
+        git("switch", "-q", "main")
+        git("switch", "-qc", "grok/3-page")
+        pathlib.Path(d, "src/app/page.tsx").write_text("c\n")
+        git("commit", "-qam", "page")
+        if reason("grok/3-page"):
+            out.append(f"guard held a page-only branch: {reason('grok/3-page')!r}")
+        r1 = reason("grok/1-x")
+        if "foundation files" not in r1 or "src/lib/db/schema.ts" not in r1 or "café" not in r1:
+            out.append(f"guard reason for foundation changes: {r1!r}")
+        if "doesn't build on" not in reason("grok/2-y") or not reason("grok/1-x", "0" * 40):
+            out.append("guard reasons for a foreign history or an unusable base")
+
+        # The clone checks: origin must be the https URL, .git/config only allowed settings.
+        def clone_problem():
+            return subprocess.run(["bash", str(SCRIPT), "--check-clone", d, "99-x"],
+                                  capture_output=True, text=True).stdout.strip()
+
+        git("remote", "add", "origin", f"https://github.com/{OWNER}/99-x.git")
+        git("config", "branch.main.remote", "origin")
+        git("config", "branch.main.merge", "refs/heads/main")
+        if clone_problem():
+            out.append(f"clean clone refused: {clone_problem()!r}")
+        for key, val in [("core.fsmonitor", "touch pwned"), ("include.path", "../evil"),
+                         ("url.https://evil.example/.insteadOf", "https://github.com/"), ("filter.x.smudge", "sh")]:
+            git("config", key, val)
+            if "settings the runner doesn't allow" not in clone_problem():
+                out.append(f"clone check missed {key}")
+            git("config", "--unset-all", key)
+        for url in [f"git@github.com:{OWNER}/99-x.git", f"https://evil.example/{OWNER}/99-x.git",
+                    f"https://github.com/{OWNER}/99-x-other.git"]:
+            git("remote", "set-url", "origin", url)
+            if "not https://github.com/" not in clone_problem():
+                out.append(f"clone check accepted origin {url}")
+
+        # The script's own git ignores hooks a harness wrote.
+        hook = pathlib.Path(d, ".git/hooks/post-checkout")
+        hook.write_text(f"#!/bin/sh\ntouch '{d}/HOOK-RAN'\n")
+        hook.chmod(0o755)
+        subprocess.run(["bash", str(SCRIPT), "--git", "-C", d, "switch", "-q", "main"], capture_output=True)
+        if pathlib.Path(d, "HOOK-RAN").exists():
+            out.append("run-harness.sh's git ran a hook from .git/hooks")
     return out
 
 

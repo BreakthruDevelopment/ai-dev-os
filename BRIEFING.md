@@ -75,8 +75,8 @@ reassigned on 2026-11-09 ([`specs/day-0-apps-5-8.md`](specs/day-0-apps-5-8.md#20
 doesn't trigger them. An issue gets its harness label only once its dependencies are done (completed or merged)
 (`scripts/release-labels.py`); the runner script then picks it up, works it in `~/30apps/<repo>` and opens a PR. It
 fails closed: it skips anything whose dependencies are still open, any issue without a `## Dependencies` section of
-full URLs or a matching `Planned harness:` line, and it won't push a branch that changes foundation files unless the
-issue is `security-sensitive`. Setup and safety trade-offs: [`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md).
+full URLs or a matching `Planned harness:` line, and anything labelled `hold`, and it never pushes a branch that
+changes foundation files. Setup and safety trade-offs: [`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md).
 
 ## How work moves
 

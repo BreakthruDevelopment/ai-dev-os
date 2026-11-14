@@ -97,7 +97,7 @@ Harnesses never talk to each other directly. Work moves through:
 **Waves.** Every spec groups its issues into waves ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)).
 Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and
 `security-sensitive`. No issue outside wave 1 creates or edits the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`; role and permission code
-lives in `src/lib/auth/`), except a security-sensitive `claude` slice the spec names as a file's owner. A later
+lives in `src/lib/auth/`), unless a security-sensitive `claude` slice is named as the owner. A later
 slice that needs a schema change gets a foundation slice, or its builder stops and comments on the issue.
 
 **The harness label is the start signal.** Every issue body carries a `Planned harness: <name>` line and a

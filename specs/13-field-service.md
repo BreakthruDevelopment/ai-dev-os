@@ -282,6 +282,16 @@ the live run fails loudly instead of passing a partial check (the app 8 and 12 l
 list grouped by technician; the tech job page keeps status buttons and Check in reachable with one thumb; a 60-char
 unbroken note, part name and address wrap.
 
+## Decisions (Michael, 2026-11-14)
+
+1. **Live smoke accounts:** after deploy Michael signs up a dispatcher and a technician, grants their roles in `/admin`, and stores the logins as repo secrets `SMOKE_DISPATCHER_*` and `SMOKE_TECH_*`; the smoke cancels the job it creates and fails loudly if the secrets are missing.
+2. **Visitors:** new sign-ups get no role in v1; the flow is shown through the README demo script and a recording. A per-visitor sandbox is a follow-up issue.
+3. **Technician role:** granted by admins only in v1.
+4. **Work orders:** the technician submits, a dispatcher approves.
+5. **Notes on reassigned jobs:** rejected as `not_assigned`; the text stays in "Needs attention" with a copy button.
+6. **Check-in location:** stored to 4 decimal places (about 11 m) and deleted 90 days after the job is completed.
+7. **Template:** the offline pattern goes into `30-apps-template` only after app 13 is live and reviewed.
+
 ## Day 0 checklist
 
 | # | Step | Who |

@@ -28,7 +28,11 @@ bot that answers only from what the organiser wrote**.
 ([14 "Roles"](14-real-estate.md#problem-and-users)): `ac.newRole({ user: [], session: [] })`, `adminRoles:
 ["admin"]`, `ROLES = ["user", "organizer", "admin"]`, `toRole()` returns one role (`admin` > `organizer` > `user`);
 admin is not a superset of `organizer`; sign-up can't set a role (tested by posting `role`); only an admin grants,
-logged `role.changed`. Revoking `organizer` hides that organiser's published events that aren't already hidden
+logged `role.changed`. **Roles change only through `POST /api/admin/roles`**, which writes `user.role` with Drizzle
+in the same transaction as the hide/unhide below. Better Auth's admin user-write endpoints would skip that, so 15.1
+adds **`/admin/set-role`, `/admin/create-user`, `/admin/update-user` and `/admin/remove-user`** to `DISABLED_AUTH_PATHS`
+in `src/lib/auth/permissions.ts` (list and ban stay). **Account deletion is out of scope**: with `/admin/remove-user`
+disabled nothing deletes users, and user FKs stay `restrict`. Revoking `organizer` hides that organiser's published events that aren't already hidden
 (`hidden_reason = 'organizer_revoked'`, same transaction); granting again unhides only those. **Door staff** is a row in
 `event_staff`, created when a signed-in user accepts the organiser's invite link; it is checked on every door request,
 so removal takes effect on the next scan.
@@ -47,7 +51,7 @@ so removal takes effect on the next scan.
   recurring events, promo codes, attendee questions at registration, **offline check-in** (Decisions Q3), native
   apps, hardware scanners (a USB/Bluetooth wedge scanner typing into the manual field works, untested), notifications
   of any kind (an organiser's cancellation shows on the event page and `/tickets`), multiple organisers per event,
-  self-serve organiser role.
+  self-serve organiser role, account deletion (Better Auth's `/admin/remove-user` is disabled).
 
 **Platform (Google Cloud, from `30-apps-infra` `stacks/gcp/main.tf` and README at `5e5ad6a`).** Cloud Run, us-central1,
 **1 vCPU / 512 Mi, 0–1 instance, concurrency 40, request timeout 30 s** (`timeout = "30s"`; the per-app override
@@ -224,8 +228,10 @@ checked_in_at is not null returning id`. One row → logged `undone` in `checkin
 - **Content Security Policy on `/door/*` and `/tickets/*`** (`src/proxy.ts`, the Next 16 name for middleware; read the
   CSP guide in `node_modules/next/dist/docs/` first): a per-request nonce and `default-src 'self'; script-src 'self'
   'nonce-<n>' 'strict-dynamic'; worker-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self'
-  'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`. Owned by 15.2; the
-  scanner worker and the PNG export (15.4, 15.8) must work under it.
+  'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`. Production only:
+  `next dev` needs `'unsafe-eval'`, so when `NODE_ENV !== "production"` the proxy adds it to `script-src` (a test
+  checks the production header has no `'unsafe-eval'`). Owned by 15.2; the scanner worker and the PNG export (15.4,
+  15.8) must work under it.
 
 ## FAQ bot retrieval (decision: put the whole FAQ in the prompt)
 
@@ -275,7 +281,7 @@ it; removing it would break that test. `DAILY_USAGE_KINDS` stays `["ai", "demo_l
 | `ticket` | `id` uuid (`gen_random_uuid()`), `event_id`, `ticket_type_id`, `registration_id` null, `holder_user_id` null, `holder_name` ≤80, `guest_label` ≤40 null, `source` (`registration`, `guest_list`), `status` (`valid`, `cancelled`), `qr_epoch` smallint 1–20, `reissues_today` / `reissue_day`, `door_code_digest` bytea, `checked_in_at`, `checked_in_by` FK user, `checkin_op_id`, `created_at` | **`holder_user_id`** (attendee); event's `organizer_id` (organiser) | Unique (`event_id`, `door_code_digest`); index (`event_id`, `status`); index (`event_id`, `lower(holder_name) text_pattern_ops`) for prefix search; guest-list tickets have `holder_user_id` null and are shown to the organiser |
 | `event_staff` | PK (`event_id`, `user_id`), `invited_by`, `created_at` | `event_id` → organiser manages | Deleted on removal |
 | `staff_invite` | `id`, `event_id`, `token_digest` bytea unique (sha256 of a random 128-bit token), `expires_at`, `used_by`, `used_at`, `created_by` | via `event` | Token shown once to the organiser as a link; only its digest is stored |
-| `checkin_event` | `id`, `event_id`, `ticket_id` null, `actor_id`, `op_id` uuid, `method` (`qr`, `code`, `list`, `undo`), `outcome` (`checked_in`, `already`, `invalid`, `cancelled`, `undone`), `at` | `actor_id` | Unique (`actor_id`, `op_id`); the audit log and replay ledger |
+| `checkin_event` | `id`, `event_id`, `ticket_id` null, `actor_id`, `op_id` uuid, `payload_hash` (sha256 of method and the qr/code/ticketId value), `method` (`qr`, `code`, `list`, `undo`), `outcome` (`checked_in`, `already`, `invalid`, `cancelled`, `undone`), `at` | `actor_id` | Unique (`actor_id`, `op_id`); the audit log and replay ledger |
 | `faq_entry` | `id`, `event_id` FK cascade, `ref_no` int 1–9,999 (per event, never reused), `question` ≤200, `answer` ≤800, `position`, timestamps | via `event` | Unique (`event_id`, `ref_no`); cited as `F<ref_no>`; every write bumps `event.faq_version` (so does every edit to a field in E1–E5: title, times, venue, address, description, ticket type names, registration close, contact) |
 | `faq_ask` | `id`, `event_id`, `question` ≤300, `q_hash` (sha256 of normalised question), `faq_version`, `status`, `answer` ≤600 null (the model's text in `model` mode; null in `quoted`, `lookup` and `not_in_faq`, which are rendered from `citations` against the entries of the same `faq_version`), `citations` text[], `mode` (`model`, `quoted`, `lookup`, `cached`), `flags` text[], `created_at` **stored to the hour** (`date_trunc('hour', now())`) | — (**no user id**: anonymous by design) | Index (`event_id`, `q_hash`, `faq_version`); pruned at 30 days; shown to the event's organiser only, grouped by day |
 | `rate_event`, `daily_usage` | template | | Kinds above |
@@ -285,7 +291,7 @@ it; removing it would break that test. `DAILY_USAGE_KINDS` stays `["ai", "demo_l
 `registration.ticket_type_id`, so deleting a draft or cancelled event (organiser, typed confirm; the smoke does it every
 run) removes everything about it in one statement. User FKs that own rows (`event.organizer_id`,
 `registration.user_id`, `ticket.holder_user_id`, `checkin_event.actor_id`, `event_staff.user_id`) are `restrict`
-(account deletion is out of scope); `checked_in_by`, `invited_by`, `used_by` and `created_by` are `on delete set null`.
+(account deletion is out of scope: `/admin/remove-user` is disabled and nothing else deletes users); `checked_in_by`, `invited_by`, `used_by` and `created_by` are `on delete set null`.
 
 **Access rules** (`src/lib/access.ts`, integration-tested per row): public → `published`, not hidden events, their
 ticket types (name, seats left) and FAQ entries; never attendee data. Attendee → own registrations and tickets (QR text
@@ -410,7 +416,7 @@ use them).
 | CSV formula injection | Every field quoted; leading `'` on cells starting `=`, `+`, `-`, `@`, tab or CR; served as an attachment; no emails or codes in the door list |
 | Camera misuse | `camera=(self)` only on `/door/*`, `camera=()` elsewhere; started by a tap, stopped on hide |
 | Sensitive values in logs | Never log QR text, door codes, invite tokens, names, emails or questions; check-in logs carry event id, outcome and method |
-| Role escalation / fake events | Roles not client-writable; `organizer` admin-granted and audited; admin hide; revoking hides events |
+| Role escalation / fake events | Roles not client-writable; `organizer` admin-granted only through `POST /api/admin/roles` and audited; Better Auth's set-role, create-user, update-user and remove-user disabled (tested); admin hide; revoking hides events |
 | Stored XSS | Plain-text rendering everywhere |
 | Demo seed against production | `demoSeedConfig()` for the CLI; admin button only; marker `urn:breakthru:event-ticketing-demo:v1` |
 
@@ -476,15 +482,22 @@ fixture (`test/fixtures/faq-event.ts`), so 15.5 doesn't wait for the demo seed; 
 everything it seeds; no backend issue depends on a UI issue.
 
 1. **15.1 `[fullstack-builder] Roles, schema, access rules, events, staff and admin`** · `claude` · **2nd: Codex**
-   Files: `src/lib/auth/*` (`organizer`, app 11 pattern, revoke hides events), `src/lib/db/schema.ts` (all tables
+   Files: `src/lib/auth/*` (`organizer`, app 11 pattern, revoke hides events, four admin
+   user-write paths disabled), `src/lib/db/schema.ts` (all tables
    above and the kinds, `upload` kept), `drizzle/0001_*`, `src/lib/access.ts`, `src/lib/events.ts`,
    `src/lib/ticket-types.ts`, `src/lib/staff.ts` (invites, accept, remove), the routes owned by 15.1 in "Pages and
    API", `test/access.integration.test.ts`, `test/events.integration.test.ts`, `test/staff.integration.test.ts`.
    Done when every access rule has a test, a duplicate `client_op_id` makes one event, stale `version` → 409, NUL → 400,
    sign-up with `role` stays `user`, publishing without a ticket type is refused, an invalid time zone is refused, an
    invite works once and answers the same for unknown, used and expired tokens, a removed staffer loses door access,
-   revoking `organizer` hides their published events and re-granting unhides only those, and the template's
-   `test/usage.integration.test.ts` passes unchanged. Dependencies: none.
+   revoking `organizer` hides their published events and re-granting unhides only those, **E1–E5 edits (event PATCH
+   and the ticket-type routes) bump `faq_version`** (test here; 15.5 keeps its cache-miss test), **`/admin/set-role`,
+   `/admin/create-user`, `/admin/update-user` and `/admin/remove-user` each answer 403 or 404 for an admin and change
+   nothing** (test), and the template's `test/usage.integration.test.ts` passes unchanged. The template's
+   `test/admin-permissions.integration.test.ts` has two cases this change breaks on purpose: "still lets an admin
+   promote and demote a user" (about line 166) and "still lets an admin remove a user" (about line 189); 15.1 rewrites
+   them to expect 403/404 and moves promote/demote to `POST /api/admin/roles`; the impersonation, password, session,
+   list and ban cases stay unchanged. Dependencies: none.
 2. **15.2 `[fullstack-builder] Registration, capacity, ticket issuing and QR signing`** · `claude` · **2nd: Codex**
    Files: `src/lib/tickets/keys.ts`, `token.ts` (+ test), `src/proxy.ts` (CSP), `qr.ts` (pinned encoder, `qrSvg`) (+ test),
    `src/lib/registrations.ts`, `src/lib/tickets.ts`, the routes owned by 15.2, `test/registration.integration.test.ts`,
@@ -527,8 +540,12 @@ everything it seeds; no backend issue depends on a UI issue.
    `POST /api/admin/demo` (sole owner; admin, `demo_load` cap), `scripts/smoke.sh` per "Smoke and 375px". Inserts in
    batches of 500. Done when one demo load finishes in **≤20 s inside a `--cpus=1 --memory=512m` container** against a
    Postgres with `shared_buffers=96MB` (the PR states the time), a second load replaces the demo rows without
-   duplicates or touching non-demo data (a test inserts non-demo users, events and tickets and asserts they're
-   unchanged after two loads), and `pnpm smoke` passes twice back-to-back with the organiser's event count
+   duplicates or touching non-demo data. **Intended:** reloading deletes and recreates the demo event (fixed id), so
+   tickets visitors registered for it, their check-ins and FAQ questions go with it by cascade; everything attached to
+   the demo event is demo data, and the event page says "Demo event: reset when the demo reloads". The test inserts a
+   non-demo organiser's event with tickets, plus a visitor holding a ticket for that event **and** one for the demo
+   event, then asserts after two loads that the non-demo event, its tickets and the visitor account are unchanged and
+   only the demo-event ticket is gone; and `pnpm smoke` passes twice back-to-back with the organiser's event count
    unchanged after the second run. **Reviewer focus** (an Antigravity slice with no Codex review): `POST
    /api/admin/demo` deletes and rewrites only rows owned by users carrying the demo marker and the fixed ids in
    `src/lib/demo/ids.ts`; every delete is scoped by them. Dependencies: 15.1, 15.2, 15.3, 15.5.

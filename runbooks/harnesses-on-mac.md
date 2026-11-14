@@ -8,9 +8,13 @@ don't start them; [`scripts/run-harness.sh`](../scripts/run-harness.sh) does. It
 harness, works them one at a time in a local clone and opens a PR for each. The runner does not merge. Once CI
 and `Reviewer sign-off` are green, another harness may squash-merge an app-repo PR per [`AGENTS.md`](../AGENTS.md).
 
-A harness label is the **start signal**: Claude adds `grok` or `antigravity` to an issue only once the issues it
-depends on are merged. The script double-checks: it skips an issue whose `## Dependencies` section still lists an
-open issue.
+A harness label is the **start signal**: `scripts/release-labels.py` adds `grok` or `antigravity` to an issue only
+once every issue it depends on is closed. The script double-checks and **fails closed**: it skips an issue whose
+`## Dependencies` section still lists an open issue, and also one with no `## Dependencies` section, one whose
+dependencies are written as a bare `#12` or `repo#12` instead of a full issue URL, and one without a
+`Planned harness:` line naming this harness, and anything labelled `hold`. It never pushes a branch that changes
+the foundation files (schema, migrations, auth, access rules; their owners are all `claude` slices)
+([`FACTORY.md`](../FACTORY.md#waves-and-the-start-signal); added after the 2026-11-14 app 13 incident).
 
 ## One-time setup
 
@@ -185,12 +189,20 @@ Before anything else it checks: not nested inside `grok`/`agy`, `gh` signed in, 
 Antigravity the file rules in `settings.json`, and `TEST_DATABASE_URL` set and answering (unless `--no-db-ok`).
 Then, for each repo tagged `30-apps-30-days` whose name is `NN-slug`:
 
-1. Lists open issues labelled with the harness. Skips any labelled `in-progress`, any with an open PR that closes it
+1. Lists open issues labelled with the harness. Skips any labelled `in-progress` or `hold`, any with an open PR that closes it
    (`Closes #N` in the body or a `<harness>/N-…` branch), any whose title doesn't start with a known `[role]`, any
    this harness failed on in the last 6 hours (unless `--retry-failed`), and any whose `## Dependencies` list still
-   has an open issue.
+   has an open issue. It also skips, with the reason in the log and without claiming it, any issue with no
+   `## Dependencies` section, a bare `#N` or `repo#N` in that section (only full
+   `https://github.com/BreakthruDevelopment/<repo>/issues/<n>` links count; `[#3](that URL)` is fine), or no
+   `Planned harness: <this harness>` line.
 2. Takes the repo's local lock, then clones it into `~/30apps/<repo>`, or fetches, checks out `main` and
-   fast-forwards. **Refuses a repo whose working tree is dirty.**
+   fast-forwards. **Refuses a repo whose working tree is dirty**, whose origin isn't
+   `https://github.com/BreakthruDevelopment/<repo>(.git)`, or whose `.git/config` has a setting outside a short
+   allow list (core basics, origin's url/fetch, branch tracking). The same check runs straight after every harness
+   run, before any other git command; if it fails, nothing is pushed and the clone is left for you. The script's own
+   git calls run with hooks and fsmonitor switched off, so a harness-written `.git/hooks` never runs. If you've set
+   other git options in a clone (`pull.rebase`, a VS Code setting), unset them there or delete the clone.
 3. Claims the issue: re-reads its labels, adds `in-progress`, comments "Started by <harness> on Michael's Mac" with a
    hidden claim marker (host, process id, time), then re-reads the comments. If another runner's claim came first,
    it deletes its own comment and moves on.
@@ -198,11 +210,13 @@ Then, for each repo tagged `30-apps-30-days` whose name is `NN-slug`:
    harness headless with a standard prompt: read `AGENTS.md` and the role, do the issue, run `pnpm install`, `lint`,
    `typecheck`, `test` (integration tests included, which must pass) and `build`, then smoke, commit, and write the
    PR description to `.harness/pr-body.md`. **Pushing is switched off in the clone while the harness runs**, and
-   it's told not to push or touch PRs. If it fails with no commits and its output ends with a network error (TLS,
+   it's told not to push or touch PRs, and not to change the foundation files; if the data layer it needs isn't
+   on `main`, it writes the reason to `.harness/blocked.md` and makes no commits. If it fails with no commits and its output ends with a network error (TLS,
    connection reset, timeout, 502/503/429, `UNAVAILABLE`), the branch is reset to `main` and it's retried twice,
    after 30 s and 120 s.
-5. Checks the result: still on the work branch, at least one commit, nothing uncommitted, local `main` unchanged.
-   Then it pushes only that branch (never `--force`) and opens a PR whose body starts with `Closes #N`, followed by
+5. Checks the result: still on the work branch, at least one commit, nothing uncommitted, local `main` unchanged,
+   and no change to the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) whatever the issue's labels (foundation work is `claude`'s). It compares with the `main` commit it recorded before the harness ran, not the clone's
+   `origin/main`; if the branch doesn't build on that commit, or git can't list the changes, it holds the push too. Then it pushes only that branch (never `--force`) and opens a PR whose body starts with `Closes #N`, followed by
    the harness's summary and checks list. It removes `in-progress`, since the open PR now marks the issue as taken.
 6. Waits up to 20 minutes for the PR's CI checks and comments the result on the issue (passed, failed with the
    failing check names, or still running), so a red PR shows up straight away.
@@ -216,6 +230,14 @@ refused tool call) and:
 - **Commits but no PR** (push or PR creation failed, or uncommitted changes on top of commits): keeps the branch
   and the label and says so. Push it and open the PR by hand, or delete the branch and remove the label to retry.
 - **Local `main` changed:** keeps everything for you to inspect; nothing was pushed.
+- **The harness asked for help** (`.harness/blocked.md`, e.g. the data layer isn't on `main`): posts what it wrote
+  inside a quote block (HTML comments and @mentions defused), deletes the empty branch, removes `in-progress` and
+  the harness label and adds `hold`, so neither the runner nor `release-labels.py` takes it again. Once it's sorted,
+  remove `hold` and add the label back.
+- **Foundation files changed** (or the change can't be checked):
+  nothing is pushed. The comment names the
+  files; `in-progress` comes off and the branch stays in `~/30apps/<repo>`, so the issue is skipped while it exists.
+  Delete it (`git -C ~/30apps/<repo> branch -D <branch>`) once the issue is sorted.
 
 An empty local branch left over from an older run is deleted automatically the next time the issue comes up.
 

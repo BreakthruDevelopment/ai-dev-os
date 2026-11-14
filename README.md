@@ -31,7 +31,7 @@ catalog.yaml ──► Planner (Claude) ──► spec + GitHub issues
 ```
 
 GitHub is the only shared state. Harnesses never call each other: one Project board is the queue, each issue
-names a role and gets a harness label once its dependencies are merged (Grok Build and Antigravity
+names a role and a planned harness, and gets its harness label once its dependencies are done (Grok Build and Antigravity
 pick theirs up via `scripts/run-harness.sh` on Michael's Mac), and every change arrives as a PR. Any harness may
 squash-merge an app-repo PR once CI and the required review are green; Claude Code also
 merges green deploy and playbook PRs; spec PRs stay with Michael ([`AGENTS.md`](AGENTS.md)).

@@ -47,13 +47,38 @@ Who would hire this out, what they need, and the roles in the app (for example c
 
 ## Issues
 
-Each issue names a role, its planned harness and a `## Dependencies` list; it gets the harness label (the start
-signal) once those are merged. Add each to the project board.
+Slices are grouped into waves. **Wave 1 is the foundation**: schema, migrations, roles, access rules and auth
+config, always `claude` and security-sensitive (**2nd: Codex**). No slice outside wave 1 creates or edits the
+foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`), unless a security-sensitive `claude` slice is named as the owner; if a later
+slice needs a schema change, add a foundation slice for it here. Every slice not planned for `claude` depends,
+directly or not, on wave 1. Each slice names its role, its planned harness and ends with `Dependencies:` (slice ids
+and ranges such as `NN.1–NN.3`, other prerequisites as plain text, or `none`).
 
-- [ ] `[fullstack-builder]` `grok` — schema and migration
-- [ ] `[fullstack-builder]` `grok` — data functions, route handlers, server actions, integration tests
-- [ ] `[ai-builder]` `claude` — AI feature, fixture, evals
-- [ ] `[ui-builder]` `grok` — pages and components (375px and desktop)
-- [ ] `[ui-builder]` `grok` — smoke test for the main flow
-- [ ] `[devops]` `grok` — Terraform for AWS and Azure
-- [ ] `[devops]` `antigravity` — Terraform for Google Cloud and Oracle Cloud
+Once the spec is merged, `python3 scripts/open-issues.py specs/NN-slug.md --dry-run`, then without `--dry-run`. Each
+issue gets a `Planned harness:` line and full-URL dependency links; only issues with no open dependencies get their
+harness label (the start signal), and `scripts/release-labels.py` adds the rest as dependencies close. Add the
+issues to the project board.
+
+### Wave 1: foundation
+
+1. **NN.1 `[fullstack-builder] Roles, schema, migrations and access rules`** · `claude` · **2nd: Codex**
+   All tables and the migration, roles, `src/lib/access.ts`, auth config, the core data functions, and an
+   integration test for every access rule. Dependencies: none.
+
+### Wave 2
+
+2. **NN.2 `[fullstack-builder] Data functions, route handlers and server actions`** · `grok`
+   On NN.1's schema; no schema or auth changes. Integration tests. Dependencies: NN.1.
+3. **NN.3 `[ai-builder] AI feature, fixture and evals`** · `claude` · **2nd: Codex**
+   Dependencies: NN.1.
+
+### Wave 3
+
+4. **NN.4 `[ui-builder] Pages and components (375px and desktop)`** · `grok` — Dependencies: NN.2, NN.3.
+5. **NN.5 `[ui-builder] Smoke test for the main flow`** · `grok` — Dependencies: NN.4.
+
+### Wave 4
+
+6. **NN.6 `[devops] Deploy app NN`** · `claude` · repo **`30-apps-infra`** — `apps.yaml` entry for the live cloud.
+   Dependencies: NN.2, NN.3, NN.4, NN.5.
+7. **NN.7 `[docs-writer] README`** · `antigravity` — Dependencies: NN.6.

@@ -1,6 +1,6 @@
 ---
 name: ui-builder
-description: Builds an app's pages and components against the API and data functions from its spec. Use for issues labeled for UI work, once the data layer PR exists.
+description: Builds an app's pages and components against the API and data functions from its spec. Use for issues labeled for UI work, once the data layer is merged.
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
 ---
@@ -21,3 +21,10 @@ Requirements:
 - Extend `scripts/smoke.sh` with the main flow if the spec's issue asks for it.
 - Work on a `<harness>/<task>` branch (for example `grok/dashboard-ui`) and open a PR.
 - Before opening the PR, run: `pnpm lint && pnpm typecheck && pnpm build`.
+
+Foundation guardrails (wave 1 owns the data layer):
+- Never create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`). The app's foundation (wave 1) slice
+  owns them.
+- If the tables, data functions, roles or access rules your pages need aren't on `main`, stop and comment on the
+  issue with what's missing (under `scripts/run-harness.sh`, write it to `.harness/blocked.md` and make no commits;
+  the runner posts it). Never invent schema, migrations, roles or session code to get unblocked.

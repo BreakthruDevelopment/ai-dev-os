@@ -294,6 +294,7 @@ apps:
     status: planned
   - n: 31
     repo: 31-cost-scaler
+    create_repo: true
     name: "Cloud Cost Scaler"
     subdomain: app31.breakthruventures.ai
     live_cloud: gcp

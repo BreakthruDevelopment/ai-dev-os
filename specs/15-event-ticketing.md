@@ -368,7 +368,8 @@ use them).
   `off_topic`; never guess, never give legal, medical or safety advice beyond what an entry says, never mention other
   attendees. US English. `maxOutputTokens` 400.
 - **Guardrails:** signed-in only; read-only (the bot can't register, cancel or change anything); answers cached per
-  (`event_id`, `faq_version`, `q_hash`) for 24 h; logs carry task, status, mode, flag codes, citation count and latency,
+  (`event_id`, `faq_version`, `q_hash`) for 24 h (`faq_version` bumps on any FAQ or E1–E5 edit, so a changed doors
+  time is never answered from cache); logs carry task, status, mode, flag codes, citation count and latency,
   never the question or answer. Questions are stored without a user id for 30 days and shown to the organiser as
   "Questions people asked" (the ask box says "Your question is shared anonymously with the organiser").
 - **Demo fixture** (`src/lib/ai/demo.ts`): `{ status: "answered", answer: "Recorded demo answer: parking is in the
@@ -451,7 +452,8 @@ Each question has a recommended answer; Michael's merge of this PR accepts them 
 9. **Visitors:** new sign-ups can register for the demo event and see their QR; the organiser and door flows are shown
    in the README demo script and a recording, as in apps 13 and 14 (recommended). Self-serve staff access is out.
 10. **Codex load:** five `security-sensitive` slices (15.1, 15.2, 15.3, 15.5, 15.12). Recommended: keep all five; if
-    Codex runs short, drop 15.12 (an `apps.yaml` entry with no secrets) first.
+    Codex runs short, drop 15.12 (an `apps.yaml` entry with no secrets) first. The admin demo route (15.6,
+    Antigravity) gets no Codex review, so the Claude reviewer checks that it touches only demo data.
 
 ## Day 0 checklist
 
@@ -537,7 +539,7 @@ everything it seeds; no backend issue depends on a UI issue.
    375px and desktop. Dependencies: 15.1, 15.2, 15.5.
 8. **15.8 `[ui-builder] My tickets, ticket page and staff invite`** · `grok` — `/tickets`, `/tickets/[id]` (inline
    QR, door code, PNG download, print stylesheet, reissue with confirm, cancel registration), `/staff-invite`.
-   Done when a ticket downloads as a PNG on iOS Safari and Android Chrome, prints one per page, and the invite page
+   Done when a ticket downloads as a PNG on iOS Safari and Android Chrome under 15.2's CSP, prints one per page, and the invite page
    reads the token from the fragment (never a path or query) and drops it from the address bar after accepting. Dependencies: 15.1, 15.2.
 9. **15.9 `[ui-builder] Organiser dashboard, event editor and FAQ editor`** · `grok` — `/organizer`,
    `/organizer/events/[id]` (and new: details with time-zone picker, ticket types, publish / cancel / delete with typed

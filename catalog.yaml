@@ -132,6 +132,7 @@ apps:
     status: deployed
   - n: 13
     repo: 13-field-service
+    create_repo: true
     name: "Field Service Dispatch"
     subdomain: app13.breakthruventures.ai
     live_cloud: aws

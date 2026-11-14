@@ -436,9 +436,10 @@ removed and the next scan is 404; A asks the bot "Where can I park?" → an answ
 banner, manual field and buttons ≥44 px reachable with one thumb; the ticket QR is ≥240 px wide with its quiet zone;
 cards stack; a 60-character unbroken event title, holder name and FAQ answer wrap.
 
-## Decisions (questions for Michael)
+## Decisions (Michael, 2026-11-14)
 
-Each question has a recommended answer; Michael's merge of this PR accepts them unless he changes one.
+Michael accepted every recommended answer below on 2026-11-14 ("go with your picks"), and confirmed the D1 name
+check (no existing `15-event-ticketing` repo).
 
 1. **Paid tickets:** free tickets only in v1 (recommended). A paid flow (Stripe **test mode**, as app 9 built, still no
    charges) would be a follow-up issue with its own security review; say so if you want it in v1.

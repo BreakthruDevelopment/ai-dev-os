@@ -337,9 +337,9 @@ agent's 50-listing cap and the photo store never grow across runs. Without the s
 loudly. 375px: result cards stack, filter chips wrap, the editor's photo grid is two columns with reorder buttons (no
 drag), and a 60-character unbroken title, alt text and inquiry wrap.
 
-## Decisions
+## Decisions (Michael, 2026-11-14)
 
-Recommended answers below; Michael's merge of this PR accepts them unless he changes one.
+Michael accepted every recommended answer below on 2026-11-14 ("go with your picks").
 
 1. **Image storage:** Postgres `bytea` with the caps above (recommended), not Azure Blob (new infra, free only 12
    months) and not cross-cloud to the Google Cloud bucket.

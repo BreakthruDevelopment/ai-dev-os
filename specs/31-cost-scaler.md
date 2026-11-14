@@ -246,6 +246,15 @@ prices it (four totals, cheapest set); B gets 404 on A's scenario and on `/api/a
 the advisor (demo) and every figure is marked verified; unauthenticated `POST /api/prices/refresh` → 401. Every page at
 375px: the four-cloud table becomes stacked cards per cloud, with the cheapest first and a long unbroken scenario name.
 
+## Decisions (Michael, 2026-11-14)
+
+1. **Price refresh:** a per-app Cloud Run request timeout of 300 s for app 31 (set in `30-apps-infra` `apps.yaml`, issue 31.8); one source per call, five scheduler fires a night. Not the GitHub Actions alternative.
+2. **Visibility:** the price table, the portfolio footprint and app pages are public; saved scenarios need sign-in and are owner-only.
+3. **Verdict thresholds:** migration effort at $100/hour; **move** when break-even is 6 months or less and the saving is at least $10/month; **consider** at 18 months or less; otherwise **stay**.
+4. **Agent rule:** `runAgent()` beside `generate()` is allowed in app 31's AGENTS.md only; template and BRIEFING change later if it proves itself.
+5. **Node 24:** app 31 uses Node 24.13+; whether it becomes the template default is decided after app 31 ships.
+6. **Google pricing key:** in Michael's existing Google Cloud project, restricted to the Cloud Billing API, entered by Michael. App 31 launches without it if needed, pricing AWS, Azure and Oracle and showing Google Cloud as "prices unavailable" until the key is set.
+
 ## Day 0 checklist
 
 | # | Step | Who |

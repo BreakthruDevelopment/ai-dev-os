@@ -151,10 +151,12 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
 - **Agreed order:** BreakthruSoftwareFactory complete → app 31 → apps 13–30 → app 32 last (ai-dev-os #23).
 - **Template:** hardening for apps 13+ is merged (`30-apps-template` #32, 2026-11-13), so new repos start from it.
 - **Branch protection:** `ai-dev-os` now requires `check` and `Reviewer sign-off`; apps 05–12 require
-  `Lint, test, build, smoke` and `review / Reviewer sign-off`. `30-apps-template` and apps 01–04 have none yet;
-  Michael is importing a ruleset. See [`FACTORY.md`](FACTORY.md#branch-protection-as-it-stands-checked-2026-11-13).
-- **Next:** finish the factory: READMEs for 06, 11 and 12, the app 12 demo workspace and a passing smoke, a full
-  live smoke for app 8, live smokes for 1–4, and the ruleset on the template and 01–04. Then app 31, then 13–30.
+  `Lint, test, build, smoke` and `review / Reviewer sign-off`, and since 2026-11-14 so do `30-apps-template` and
+  apps 01–04 (same `protect-main` ruleset). See [`FACTORY.md`](FACTORY.md#branch-protection-as-it-stands-checked-2026-11-13).
+- **Factory complete (2026-11-14).** READMEs for 06, 11 and 12 are merged (06 and 11 now `done`). Open app
+  close-out, not blocking: the app 12 demo workspace and a passing full live smoke, app 8's full live smoke (needs
+  an admin-based smoke or an accepted exception), live smokes for 1–4. **Next: app 31 (Cloud Cost Scaler, Google
+  Cloud, likely built on Google ADK for TypeScript), then 13–30, then 32.**
 
 ## Where to read more
 

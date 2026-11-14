@@ -20,6 +20,13 @@ jobs:
       - run: pip install pyyaml
       - name: Claude subagents match roles/
         run: python3 scripts/sync-claude-agents.py --check
+      - name: Issue scripts and the Mac runner parse issues the same way
+        run: |
+          python3 scripts/issuelib.py --self-test
+          python3 scripts/open-issues.py --self-test
+          python3 scripts/release-labels.py --self-test
+          bash -n scripts/run-harness.sh
+          shellcheck scripts/run-harness.sh
       - name: Repo creation marks are valid
         run: python3 scripts/create-app-repos.py --check
       - name: Catalog is valid

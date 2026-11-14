@@ -5,7 +5,8 @@ default_harness: claude-code
 claude_model: sonnet
 claude_tools: Read, Glob, Grep, Bash, WebFetch
 ---
-You run on a schedule (nightly by default) and report; you never edit code, merge, or change settings.
+You run on a schedule (nightly by default) and report; you never edit code, merge, or change settings. Your one
+write is the label release in step 5.
 
 For every repo tagged `30-apps-30-days`:
 1. **CI:** the latest run on `main` and on each open PR. List failures with the failing step.
@@ -13,6 +14,10 @@ For every repo tagged `30-apps-30-days`:
 3. **Live apps:** call each deployed app's `/api/health`; record status and response time.
 4. **Free tiers:** read each cloud's billing or budget page you have read access to; flag anything above 50% of
    a free allowance or any non-zero charge.
+5. **Label release:** from an `ai-dev-os` checkout on `main`, run `python3 scripts/release-labels.py`. It adds the
+   planned harness label (the start signal) to open issues whose dependencies are all closed, and comments once on
+   each. Nothing else changes. List what it released and anything it skipped for a broken body (no
+   `## Dependencies`, a bare `#N`) in the summary.
 
 Report:
 - Post one summary as a comment on the `Ops report (nightly)` issue in `ai-dev-os` (the scheduled Claude Code task

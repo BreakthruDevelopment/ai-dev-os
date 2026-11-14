@@ -31,8 +31,9 @@ Michael's standing instruction. The full rule is in [`AGENTS.md`](AGENTS.md).
   everyone else's. It also drafts launch posts (X, LinkedIn) and a two-minute demo script from what Michael pastes
   in; Michael posts.
 - **Antigravity replaced Jules** as of 2026-11-09.
-- **Labels are the start signal:** `claude`, `codex`, `grok`, `antigravity`. Grok Build and Antigravity are CLIs on
-  Michael's Mac, run by `scripts/run-harness.sh` ([runbook](runbooks/harnesses-on-mac.md)).
+- **Labels are the start signal:** `claude`, `codex`, `grok`, `antigravity`, added only once an issue's dependencies
+  are closed ([below](#waves-and-the-start-signal)). Grok Build and Antigravity are CLIs on Michael's Mac, run by
+  `scripts/run-harness.sh` ([runbook](runbooks/harnesses-on-mac.md)).
 - **Usage limits:** relabel the issues to another harness that can take the role. Never buy credits.
 
 ## The five gates
@@ -41,11 +42,44 @@ Every app passes all five, in order. A gate is passed when its evidence is in Gi
 
 | # | Gate | What happens | Passed when |
 | --- | --- | --- | --- |
-| 1 | **Spec** | The planner writes `specs/NN-slug.md` (from `templates/spec.md`) and opens one issue per slice, each with a role in the title, a planned harness, `## Dependencies`, and a Codex second-review note where the slice is security-sensitive. | Michael has approved the scope (he merges the spec PR) and the issues exist. |
-| 2 | **Build** | Issues get their harness label once dependencies merge. Each harness opens PRs from `<harness>/<task>` branches. | CI is green on the PR: lint, types, tests, build, smoke (`Lint, test, build, smoke`). |
+| 1 | **Spec** | The planner writes `specs/NN-slug.md` (from `templates/spec.md`) with its slices in waves, wave 1 being the foundation (below). Once the spec is merged, `scripts/open-issues.py` opens one issue per slice: a role in the title, a `Planned harness:` line, `## Dependencies` as full issue URLs, and a Codex second-review note where the slice is security-sensitive. Only dependency-free issues get their harness label. | Michael has approved the scope (he merges the spec PR) and the issues exist. |
+| 2 | **Build** | `scripts/release-labels.py` adds each issue's planned harness label once every dependency is closed (Claude after each merge, the ops monitor nightly). Each harness opens PRs from `<harness>/<task>` branches. Only the wave 1 slice touches the schema, migrations, auth and access rules; a builder whose data layer isn't on `main` stops and comments. | CI is green on the PR: lint, types, tests, build, smoke (`Lint, test, build, smoke`). |
 | 3 | **Review** | Required. Claude Code (reviewer role) reviews every PR; Codex also reviews PRs labelled `security-sensitive`. Each posts a GitHub PR review ending in the reviewer marker (below). Once this gate and gate 2 are green on the current head, any harness may squash-merge an **app-repo** PR ([`AGENTS.md`](AGENTS.md)). | The `Reviewer sign-off` check is green on the head commit. **No merge without it.** |
 | 4 | **Release** | DevOps adds or bumps the app in `30-apps-infra` `apps.yaml` (a PR Claude Code merges once its checks and plan are clean), the deploy runs, and DevOps runs `scripts/smoke.sh` against the live URL. | Live smoke passes at `https://appN.breakthruventures.ai` and `/api/health` answers. |
 | 5 | **Close-out** | Run log written (`runs/NN-slug.md`), `catalog.yaml` status and `BRIEFING.md` "Where things stand" updated, README filled. Grok Bot drafts the X and LinkedIn posts and the two-minute demo script; Michael posts. | The definition of done below is met. |
+
+### Waves and the start signal
+
+Added 2026-11-14 after the app 13 incident below.
+
+- **Waves.** A spec's Issues section groups slices into waves. **Wave 1 is the foundation**: schema, migrations,
+  roles, access rules and auth config, always `claude` and `security-sensitive`. No slice outside wave 1 creates or
+  edits `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/` (where role and permission code lives),
+  `src/lib/access.ts` or other role and permission code. If a later slice needs a schema change, the spec gives
+  that change its own foundation slice, or the builder stops and comments on the issue. Later waves list their
+  dependencies as before, and every slice not planned for `claude` depends, directly or not, on wave 1.
+- **Planned harness vs start signal.** Every issue body has a `Planned harness: <name>` line (the owner) and a
+  `## Dependencies` section of full issue URLs (or `None`). The harness label is the start signal
+  and appears only when every dependency is closed. `scripts/open-issues.py` opens a spec's issues that way (it
+  checks the wave rules first, never duplicates an issue, and has `--dry-run`); `scripts/release-labels.py` adds the
+  planned label as dependencies close, once per issue. Claude runs it after every merge into an app repo or
+  `30-apps-infra`; the ops monitor runs it nightly. An issue labelled `hold` is left alone.
+- **The Mac runner fails closed.** `scripts/run-harness.sh` won't claim an issue without a `## Dependencies`
+  section, with a bare `#N` or `repo#N` there, or without a `Planned harness:` line naming its harness. Before
+  pushing, it refuses a branch that changes the wave 1 paths unless the issue is labelled `security-sensitive`:
+  the branch stays on the Mac and the issue gets a comment naming the files. A harness that finds its data layer
+  missing writes `.harness/blocked.md` instead of committing; the runner posts it and removes the harness label.
+- **Migrations.** A builder rebases on `main` before its PR and regenerates its migration if another merged first:
+  never two `drizzle/NNNN_*` files with the same number.
+
+**Incident, 2026-11-14 (app 13).** The issue-opening step labelled every app 13 issue at once, including Grok's
+UI issues whose dependency (13.1, the data layer, `claude`) was still open. Their `## Dependencies` used bare `#1`,
+which the runner's dependency check couldn't see (it read only full URLs), so the Mac runner started them. Grok
+invented its own schema, migrations, RBAC and session code in `13-field-service` PRs #9 and #10, each adding a
+different `drizzle/0004_*`, and started #6. The PRs are held, and Michael suspended Grok and Antigravity until the
+data layers are complete. Labels came off every issue with open dependencies, and dependency references were
+rewritten as full URLs. The rules above close each gap: the label waits for the dependencies, the runner refuses
+what it can't check, and no branch outside wave 1 can push foundation files.
 
 ### Gate 3 in detail: the reviewer marker
 

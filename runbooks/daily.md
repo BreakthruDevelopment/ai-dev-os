@@ -6,8 +6,8 @@ review (through the day), gate 4 release (afternoon), gate 5 close-out (evening)
 | When | Step | Who |
 | --- | --- | --- |
 | Start | Mark the app `create_repo: true` in `catalog.yaml`; the workflow creates and tags the repo (see below) | Claude Code |
-| Morning | Spec + issues (role in title, planned harness in the spec) on the board | Claude Code (planner) |
-| Through the day | Add an issue's harness label once its dependencies are merged (the start signal) | Claude Code |
+| Morning | Spec with slices in waves (wave 1 = foundation); once merged, `scripts/open-issues.py` opens the issues (only dependency-free ones labelled) and they go on the board | Claude Code (planner) |
+| Through the day | After every merge into an app repo or `30-apps-infra`, `python3 scripts/release-labels.py --repo <repo>` adds the start-signal label to issues whose dependencies are now closed | Claude Code |
 | Through the day | Run `scripts/run-harness.sh grok` (and `antigravity`) on the Mac; see `runbooks/harnesses-on-mac.md` | Michael |
 | Midday | Data/API PRs | Grok Build; Codex or Antigravity on the issues assigned to them |
 | Midday | AI feature PR; template changes | Claude Code |

@@ -6,9 +6,9 @@ state of every decision; the rules themselves are in [`AGENTS.md`](AGENTS.md).
 The process that builds the apps is called the **BreakthruSoftwareFactory**: this playbook, its eight roles, the five
 daily gates (spec, build, review, release, close-out) and the definition of done, all in [`FACTORY.md`](FACTORY.md).
 
-_Last updated: 2026-11-13 ("Where things stand" brought up to date: apps 1–12 live, apps 5, 7, 9 and 10 `done`,
-apps 31 and 32 in the catalog, branch protection re-checked). Since 2026-11-12, agents may squash-merge app-repo PRs
-once CI and review are green; Claude Code also merges green deploy and playbook PRs; spec PRs stay with Michael._
+_Last updated: 2026-11-14 (waves, `Planned harness:` lines, label release and a fail-closed Mac runner, after the
+app 13 incident below). Since 2026-11-12, agents may squash-merge app-repo PRs once CI and review are green; Claude
+Code also merges green deploy and playbook PRs; spec PRs stay with Michael._
 
 ## What we're building and why
 
@@ -31,6 +31,8 @@ The agent setup that builds them (this repo) is itself a portfolio piece: an AI 
 | GitHub | Org `BreakthruDevelopment`. It also holds unrelated apps that must never be touched: only repos tagged `30-apps-30-days` are in scope. |
 | Budget | Nothing beyond the existing subscriptions (Claude, X/Grok, ChatGPT Plus, Google AI Pro) and cloud free tiers. No extra credits, no paid services. |
 | Order | App 1 is the **Build Tracker**, built first so it serves as mission control for the month. Full list in [`catalog.yaml`](catalog.yaml). |
+| Waves | Every spec groups its issues into waves. Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and `security-sensitive`, and the only slice that may change `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/` or `src/lib/access.ts`. Builders who find the data layer missing stop and comment; they never invent schema or auth ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)). |
+| Start signal | Issue bodies carry a `Planned harness:` line and full-URL `## Dependencies`. The harness label appears only when every dependency is closed: `scripts/open-issues.py` labels only dependency-free issues, and `scripts/release-labels.py` (Claude after each merge, the ops monitor nightly) releases the rest. The Mac runner skips any issue it can't check. |
 
 ### The four clouds as built
 
@@ -70,9 +72,11 @@ calling the Claude API from the apps, paid DNS, and running many agents in paral
 reassigned on 2026-11-09 ([`specs/day-0-apps-5-8.md`](specs/day-0-apps-5-8.md#2026-11-09-reassignment)).
 
 **Labels are the start signal.** Grok Build and Antigravity are CLIs on Michael's Mac, not GitHub apps, so a label
-doesn't trigger them. Claude adds a harness label only once an issue's dependencies are merged; the runner script
-then picks it up, works it in `~/30apps/<repo>` and opens a PR (it also skips anything whose dependencies are
-still open). Setup and safety trade-offs: [`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md).
+doesn't trigger them. An issue gets its harness label only once its dependencies are closed
+(`scripts/release-labels.py`); the runner script then picks it up, works it in `~/30apps/<repo>` and opens a PR. It
+fails closed: it skips anything whose dependencies are still open, any issue without a `## Dependencies` section of
+full URLs or a matching `Planned harness:` line, and it won't push a branch that changes foundation files unless the
+issue is `security-sensitive`. Setup and safety trade-offs: [`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md).
 
 ## How work moves
 
@@ -80,9 +84,10 @@ GitHub is the only shared memory. Harnesses never talk to each other. The steps 
 BreakthruSoftwareFactory's five gates ([`FACTORY.md`](FACTORY.md)): spec (1), build (2–3), review (3), release (4–5)
 and close-out (7).
 
-1. The **planner** turns the day's catalog entry into `specs/NN-slug.md` and opens issues. Each issue names a role
-   in its title (`[ui-builder] Dashboard page`) and carries one harness label.
-2. Once its dependencies are merged, the issue gets its harness label. Each harness picks up only its own label,
+1. The **planner** turns the day's catalog entry into `specs/NN-slug.md`, slices grouped in waves (wave 1 the
+   foundation), and once it's merged opens the issues with `scripts/open-issues.py`. Each issue names a role in its
+   title (`[ui-builder] Dashboard page`) and its owner in a `Planned harness:` line.
+2. Once its dependencies are closed, the issue gets its harness label (`scripts/release-labels.py`). Each harness picks up only its own label,
    follows the named role file, and opens a PR from a `<harness>/<task>` branch.
 3. CI (lint, types, tests, build, smoke test) must pass. **Review is required:** Claude Code reviews every PR, Codex
    also reviews PRs labelled `security-sensitive`, and each posts a marked PR review that the `Reviewer sign-off`
@@ -157,6 +162,15 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
   close-out, not blocking: the app 12 demo workspace and a passing full live smoke, app 8's full live smoke (needs
   an admin-based smoke or an accepted exception), live smokes for 1–4. **Next: app 31 (Cloud Cost Scaler, Google
   Cloud, likely built on Google ADK for TypeScript), then 13–30, then 32.**
+- **Incident, 2026-11-14: Grok built before app 13's data layer existed.** The issue-opening step labelled every
+  app 13 issue at once, including Grok's UI issues whose dependency (13.1, data layer, `claude`) was still open.
+  Their `## Dependencies` used bare `#1`, which the runner's check couldn't see (it read only full URLs), so the Mac
+  runner started them. Grok invented its own schema, migrations, RBAC and session code in `13-field-service` PRs #9
+  and #10 (each adding a different `drizzle/0004_*`) and started #6. Those PRs are held. **Michael suspended Grok
+  and Antigravity until the data layers are complete.** Labels came off every issue with open dependencies, and
+  dependency references were rewritten as full URLs. The fix is the waves, `Planned harness:` lines, label release
+  and fail-closed runner in [`FACTORY.md`](FACTORY.md#waves-and-the-start-signal). Issues opened before it have no
+  `Planned harness:` line, so the runner and `release-labels.py` leave them alone until one is added.
 
 ## Where to read more
 

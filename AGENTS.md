@@ -89,27 +89,37 @@ Harnesses never talk to each other directly. Work moves through:
 | --- | --- |
 | What to build | `catalog.yaml` (this repo) and the app's spec at `specs/NN-slug.md` |
 | The queue | One GitHub Project board across every app repo |
-| Work items | Issues, each with a role in the title (`[ui-builder] Dashboard page`) and a harness label: `claude`, `codex`, `grok` or `antigravity` |
+| Work items | Issues, each with a role in the title (`[ui-builder] Dashboard page`), a `Planned harness:` line, and, once its dependencies are closed, that harness's label: `claude`, `codex`, `grok` or `antigravity` |
 | Changes | Pull requests from `<harness>/<task>` branches |
 | Status | PR checks, the board, and the Build Tracker (app 1) |
 | What happened | A run log per app in `runs/NN-slug.md` |
 
-**The harness label is the start signal.** Claude adds an issue's harness label only once the issues it depends
-on are merged; until then its planned owner is in the spec. **Pick up only issues with your
+**Waves.** Every spec groups its issues into waves ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)).
+Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and
+`security-sensitive`. No issue outside wave 1 creates or edits `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/`,
+`src/lib/access.ts` or role and permission code; a later slice that needs a schema change gets a foundation slice,
+or its builder stops and comments on the issue.
+
+**The harness label is the start signal.** Every issue body carries a `Planned harness: <name>` line and a
+`## Dependencies` section of full issue URLs (`https://github.com/BreakthruDevelopment/<repo>/issues/<n>`, never a
+bare `#n`). An issue carries its harness label only once every dependency is closed: `scripts/open-issues.py`
+labels only dependency-free issues, and `scripts/release-labels.py` adds the planned label as dependencies close.
+Claude runs `release-labels.py` after every merge into an app repo or `30-apps-infra`; the ops monitor runs it
+nightly. Never add a harness label by hand to an issue whose dependencies are open. **Pick up only issues with your
 harness's label**, and read the role file named in the title before starting. (`jules` labels may linger on old
 repos; nobody picks them up.)
 When a harness hits its usage limit, Michael (or the planner) relabels its open issues; nobody buys extra credits.
 
 ## 4. Daily flow (the BreakthruSoftwareFactory gates)
 
-1. **Gate 1, spec. Planner** writes `specs/NN-slug.md` from `templates/spec.md`, opens one issue per slice with a role and a planned harness, marks security-sensitive slices, and adds them to the board. Michael approves the scope by merging the spec.
-2. **Gate 2, build. Builders** open PRs against the app repo from `<harness>/<task>` branches. CI must be green: lint, typecheck, tests, build, smoke.
-3. **Gate 3, review (required). Reviewer** (Claude Code) reviews every PR; Codex adds a second review on PRs labelled `security-sensitive`. Each posts a PR review ending in `Reviewer: claude-code` (or `codex`) and `Verdict: ready` or `Verdict: blocking`; the `Reviewer sign-off` check reads it. No merge without the reviewer check. Once CI and `Reviewer sign-off` are green on the current head, any harness may squash-merge the **app-repo** PR (see section 1).
+1. **Gate 1, spec. Planner** writes `specs/NN-slug.md` from `templates/spec.md`, with its slices in waves (wave 1 the foundation) and security-sensitive slices marked. Michael approves the scope by merging the spec. The planner then opens one issue per slice with `scripts/open-issues.py` (role in the title, `Planned harness:` line, full-URL dependencies; only dependency-free issues get their label) and adds them to the board.
+2. **Gate 2, build.** Issues get their harness label from `release-labels.py` as their dependencies close. **Builders** open PRs against the app repo from `<harness>/<task>` branches. CI must be green: lint, typecheck, tests, build, smoke. A builder whose data layer isn't on `main` stops and comments; it never invents schema or auth.
+3. **Gate 3, review (required). Reviewer** (Claude Code) reviews every PR; Codex adds a second review on PRs labelled `security-sensitive`. Each posts a PR review ending in `Reviewer: claude-code` (or `codex`) and `Verdict: ready` or `Verdict: blocking`; the `Reviewer sign-off` check reads it. No merge without the reviewer check. Once CI and `Reviewer sign-off` are green on the current head, any harness may squash-merge the **app-repo** PR (see section 1). After any merge into an app repo or `30-apps-infra`, Claude runs `python3 scripts/release-labels.py --repo <repo>` (both repos when an infra issue unblocks app issues, or no `--repo` for all).
 4. **DevOps** adds the app to `apps.yaml` in `30-apps-infra` for the day's `live_cloud` (a PR Claude Code merges once green; AWS deploys itself within about 10 minutes), then runs the smoke test against the live URL. Migrations run when the app starts.
 5. **Docs writer** fills in the README from `templates/app-readme.md`. Grok Bot drafts the launch posts and demo script from it.
 6. **Claude Code** merges the `apps.yaml` PR once its checks are green and the plan holds no surprise; **Michael** posts the app. DNS records are created in Cloudflare by Terraform on deploy
    (`30-apps-infra` README, "Custom domains and DNS"); nobody adds them by hand.
-7. **Overnight:** Codex and scheduled Claude Code tasks work queued issues into PRs; Grok Build and Antigravity work theirs whenever Michael starts the runner on his Mac. The ops monitor (a scheduled Claude Code task) posts to the `Ops report (nightly)` issue. Agents may squash-merge app-repo PRs that go green; Claude Code also merges green deploy and playbook PRs; spec PRs wait for Michael.
+7. **Overnight:** Codex and scheduled Claude Code tasks work queued issues into PRs; Grok Build and Antigravity work theirs whenever Michael starts the runner on his Mac. The ops monitor (a scheduled Claude Code task) releases labels whose dependencies closed and posts to the `Ops report (nightly)` issue. Agents may squash-merge app-repo PRs that go green; Claude Code also merges green deploy and playbook PRs; spec PRs wait for Michael.
 
 Steps 4 and 6 are **gate 4, release** (devops updates `apps.yaml`, Claude Code merges it, live smoke). **Gate 5,
 close-out** is the run log in `runs/NN-slug.md`, the `catalog.yaml` status and `BRIEFING.md` "Where things stand",

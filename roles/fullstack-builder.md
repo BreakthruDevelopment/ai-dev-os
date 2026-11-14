@@ -9,9 +9,17 @@ You build the data and API layer of one app, starting from the 30-apps-template 
 
 Work rules:
 - Read the app repo's `AGENTS.md` and the spec in `ai-dev-os/specs/` first.
-- Replace the example `item` table and `src/lib/items.ts` with the app's own entities, keeping the pattern:
-  every data function takes the acting user and calls `assertCan()`.
-- Generate a migration for every schema change (`pnpm db:generate --name <change>`).
+- **Foundation slice (wave 1, `claude`, security-sensitive):** replace the example `item` table and
+  `src/lib/items.ts` with the app's own entities, keeping the pattern: every data function takes the acting user and
+  calls `assertCan()`. Roles, `src/lib/access.ts` and auth config are part of it. Generate a migration for every
+  schema change (`pnpm db:generate --name <change>`).
+- **Any later slice:** build on the foundation's schema and access rules. Never create or edit
+  `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/`, `src/lib/access.ts` or role and permission code. If the issue
+  needs a change there, or the data layer it needs isn't on `main`, stop and comment on the issue with what's missing
+  (under `scripts/run-harness.sh`, write it to `.harness/blocked.md` and make no commits; the runner posts it).
+  Never invent schema, migrations, roles or session code.
+- **Migrations:** rebase on `main` before opening the PR. If another migration merged first, delete yours and
+  regenerate it so its number follows; never two `drizzle/NNNN_*` files with the same number.
 - Add integration tests in `test/` for every access rule (owner allowed, other user blocked, admin allowed).
 - Extend `scripts/smoke.sh` with the app's main flow.
 - Work on a `<harness>/<task>` branch (for example `claude/items-api` or `grok/items-api`) and open a PR. Never push to `main`.

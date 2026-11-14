@@ -11,12 +11,12 @@
 #   --allow-nested  run even though a grok or agy session is one of this script's parent processes
 #
 # Grok Build and Antigravity are CLIs on Michael's Mac; GitHub labels don't trigger them. A harness label on an
-# issue is the START SIGNAL (scripts/release-labels.py adds it once the issue's dependencies are closed). For each
+# issue is the START SIGNAL (scripts/release-labels.py adds it once the issue's dependencies are done). For each
 # repo tagged 30-apps-30-days whose name is NN-slug, this script:
 #
 #   1. lists open issues labelled with the harness, skipping any that carry `in-progress`, have an open PR that
 #      closes them ("Closes #N" in the body, or a `<harness>/N-…` branch), failed under this harness in the last
-#      6 hours, or still have an open issue under "## Dependencies" in their body. It fails closed: it also skips
+#      6 hours, or list a dependency under "## Dependencies" that isn't done (completed or merged). Fails closed: it skips
 #      (logged, no claim) an issue with no "## Dependencies" section, one whose Dependencies hold a bare `#N` or
 #      `repo#N` instead of a full issue URL, and one without a "Planned harness: <this harness>" line;
 #   2. takes a per-repo lock (~/30apps/.locks/<repo>.lock), then clones the repo into ~/30apps/<repo>, or fetches
@@ -27,12 +27,13 @@
 #      role file, the issue, the checks); the harness edits and commits only; pushing is disabled in the clone
 #      while it runs. A run that fails with no commits on a transient network error is retried twice (30 s, 120 s);
 #   5. checks the result (still on the branch, commits exist, tree clean, local main untouched, and no foundation
-#      file — src/lib/db/schema.ts, drizzle/, src/lib/auth/, src/lib/access.ts — changed unless the issue is
-#      labelled security-sensitive), pushes the branch (never --force, never main), opens a PR whose body starts
+#      path — src/lib/db/, drizzle/, drizzle.config.ts, src/lib/auth/, src/lib/access.ts, src/proxy.ts,
+#      src/middleware.ts — changed against the main commit recorded before the run, unless the issue is labelled
+#      security-sensitive), pushes the branch (never --force, never main), opens a PR whose body starts
 #      with "Closes #N", waits up to 20 min for its CI checks and reports the result on the issue.
 #   On a failure with no commits it deletes the local branch, removes `in-progress` and comments once with the
-#   reason (the issue is then skipped for 6 hours); if the harness wrote .harness/blocked.md it posts that and also
-#   removes the harness label. With commits but no PR it keeps the branch and the label. A branch that changes
+#   reason (the issue is then skipped for 6 hours); if the harness wrote .harness/blocked.md it posts that, quoted,
+#   removes the harness label and adds `hold`. With commits but no PR it keeps the branch and the label. A branch that changes
 #   foundation files isn't pushed: it stays local, `in-progress` comes off and the issue gets a comment.
 #
 # Logs: ~/30apps/logs/<harness>-<date>.log. Stop: Ctrl-C, or `touch ~/30apps/STOP` to stop before the next issue.
@@ -73,7 +74,14 @@ CLAIM_WINDOW_SEC=600                     # claims older than this are stale (a k
 CLAIM_SETTLE_SEC="${CLAIM_SETTLE_SEC:-3}" # let GitHub list a just-posted comment before re-reading
 TRANSIENT_RE='tls|ECONNRESET|connection reset|timeout|timed out|503|502|429|UNAVAILABLE|bad record MAC'
 # Foundation (wave 1) paths: only a security-sensitive issue (the app's foundation slice) may change them.
-WAVE1_RE='^(src/lib/db/schema\.ts|drizzle/|src/lib/auth/|src/lib/access\.ts|src/lib/access/)'
+WAVE1_RE='^(src/lib/db/|drizzle/|drizzle\.config\.ts$|src/lib/auth/|src/lib/access\.ts$|src/lib/access/|src/proxy\.ts$|src/middleware\.ts$)'
+HOLD_LABEL="hold"
+# A dependency is done only when it was completed: an issue closed as completed (not "not planned" or a
+# duplicate), or a merged PR. Prints done, or why not. Same rule as dep_state() in scripts/issuelib.py.
+DEP_STATE_JQ='if .state != "closed" then (.state // "unknown")
+  elif .pull_request then (if .pull_request.merged_at then "done" else "closed without merging" end)
+  elif (.state_reason == "not_planned" or .state_reason == "duplicate") then "closed as \(.state_reason)"
+  else "done" end'
 HARNESS=""
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -104,6 +112,25 @@ planned_harness() { # stdin: issue body. Prints the "Planned harness:" value in 
 wave1_files() { # stdin: paths, one per line. Prints those under the foundation (wave 1) paths
   grep -E "$WAVE1_RE" || true
 }
+# Foundation files the branch changes compared with $3, the main commit recorded before the harness ran (never the
+# clone's origin/main, which the harness could move). Prints them; returns 3 if the branch doesn't build on that
+# commit and 2 if git can't list the changes: callers hold the push on any non-zero status.
+foundation_changes() { # $1 dir, $2 branch, $3 base commit
+  local names
+  git -C "$1" merge-base --is-ancestor "$3" "refs/heads/$2" 2>/dev/null || return 3
+  # -z and quotePath=false: names with quotes or non-ASCII letters come out as they are, not "\303\251"-quoted.
+  names=$(git -C "$1" -c core.quotePath=false diff -z --name-only --no-renames "$3" "refs/heads/$2" | tr '\0' '\n') \
+    || return 2
+  printf '%s\n' "$names" | wave1_files
+}
+# Text a harness wrote, made safe to post: no HTML comments (they could fake the runner's markers), no @mentions,
+# no fence breaks; the caller posts it inside a ~~~~ fence.
+quote_untrusted() { # stdin: text. $1 max bytes (default 1500)
+  local at
+  at=$(printf '\357\274\240')  # U+FF20 FULLWIDTH COMMERCIAL AT
+  # shellcheck disable=SC2016  # literal backticks, not command substitution
+  head -c "${1:-1500}" | sed -e 's/<!--/< !--/g' -e 's/-->/-- >/g' -e "s/@/$at/g" -e 's/~~~/~ ~ ~/g' -e 's/```/` ` `/g'
+}
 intake_problem() { # $1 issue body. Prints why $HARNESS mustn't start it and returns 0; returns 1 if it may
   local section refs planned
   if ! section=$(printf '%s\n' "$1" | deps_section); then
@@ -129,6 +156,9 @@ case "${1:-}" in
     printf '%s\n' "$body_in" | deps_section | dep_urls
     exit 0 ;;
   --wave1-files) wave1_files; exit 0 ;;
+  --foundation-changes) foundation_changes "$2" "$3" "$4"; exit $? ;;  # $2 dir, $3 branch, $4 base
+  --quote) quote_untrusted; exit 0 ;;
+  --dep-state) jq -r "$DEP_STATE_JQ"; exit $? ;;  # stdin: one issue's JSON (needs jq; gh --jq in real runs)
 esac
 
 usage() {
@@ -509,7 +539,7 @@ has_open_pr() { # $1 issue number
 
 issue_body() { gh api "repos/$OWNER/$1/issues/$2" --jq '.body // ""'; }  # $1 repo, $2 number
 
-# Issues/PRs listed under "## Dependencies" in the issue body that aren't closed (one per line). A state that
+# Issues/PRs listed under "## Dependencies" that aren't done (completed, or a merged PR), one per line. A state that
 # can't be read counts as open.
 open_dependencies() { # $1 issue body
   local url dep_repo dep_num state
@@ -517,8 +547,8 @@ open_dependencies() { # $1 issue body
     | while read -r url; do
         dep_repo=$(printf '%s' "$url" | cut -d/ -f5)
         dep_num=$(printf '%s' "$url" | cut -d/ -f7)
-        state=$(gh api "repos/$OWNER/$dep_repo/issues/$dep_num" --jq '.state' 2>/dev/null || echo unknown)
-        [ "$state" = "closed" ] || echo "$url ($state)"
+        state=$(gh api "repos/$OWNER/$dep_repo/issues/$dep_num" --jq "$DEP_STATE_JQ" 2>/dev/null || echo unknown)
+        [ "$state" = "done" ] || echo "$url (${state:-unknown})"
       done
 }
 
@@ -661,7 +691,7 @@ You are the $3 agent, running in the ${HARNESS} harness on Michael's Mac, unatte
 
 1. Read AGENTS.md in this repo and follow it. Then read your role file, saved at .harness/role.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/roles/$3.md). The issue is saved at .harness/issue.md; \`gh issue view $2 --comments\` shows it with comments. The spec it links is in ai-dev-os/specs/.
 2. Do what the issue asks and nothing outside it. Work only in this directory and only on branch $4.
-   Don't create or edit src/lib/db/schema.ts, anything in drizzle/ or src/lib/auth/, or src/lib/access.ts: the app's foundation (wave 1) issue owns the schema, migrations, roles, access rules and auth config, and the runner won't push a branch that changes them. If this issue needs tables, data functions, roles or access rules that aren't on main yet, or needs a change in those files, stop: make no commits and write what is missing to .harness/blocked.md (the runner posts it on the issue). Never invent your own schema, migrations, roles or session code.
+   Don't create or edit anything in src/lib/db/, drizzle/ or src/lib/auth/, or drizzle.config.ts, src/lib/access.ts, src/proxy.ts or src/middleware.ts: the app's foundation (wave 1) issue owns the schema, migrations, roles, access rules and auth config, and the runner won't push a branch that changes them. If this issue needs tables, data functions, roles or access rules that aren't on main yet, or needs a change in those files, stop: make no commits and write what is missing to .harness/blocked.md (the runner posts it on the issue). Never invent your own schema, migrations, roles or session code.
 3. Run the checks and fix anything you broke: pnpm install --frozen-lockfile (plain pnpm install only if the issue requires a dependency change), pnpm lint, pnpm typecheck, pnpm test, pnpm build. $db_note
 4. Commit your work with clear messages using git add and git commit. Do NOT run git push, gh pr, gh api, or anything that changes another branch, another repo, labels, settings or secrets: the runner script pushes this branch and opens the PR after you finish. Never commit secrets or .env files. Don't delete files outside this repo.
 5. Last, write the PR description to .harness/pr-body.md (ignored by git): what changed in a few bullets, then a "Checks" list with every command you ran and whether it passed, failed or was skipped, and why. Copy the passed/failed/skipped test counts from the pnpm test summary exactly. Never write that tests passed if any were skipped: list the skipped ones. Mention anything left undone. Don't add a "Closes" line; the runner adds it.
@@ -673,9 +703,9 @@ EOF
 # ---------------------------------------------------------------------------------------------------------------
 # One issue
 # ---------------------------------------------------------------------------------------------------------------
-commits_on() { # $1 dir, $2 branch: commits on the branch that origin/main doesn't have (0 if no branch)
+commits_on() { # $1 dir, $2 branch, $3 base (default origin/main): commits on the branch the base doesn't have
   git -C "$1" show-ref --verify --quiet "refs/heads/$2" || { echo 0; return; }
-  git -C "$1" rev-list --count "origin/main..refs/heads/$2" 2>/dev/null || echo 0
+  git -C "$1" rev-list --count "${3:-origin/main}..refs/heads/$2" 2>/dev/null || echo 0
 }
 
 run_harness_once() { # $1 prompt, $2 dir, $3 output file; returns the harness's exit status
@@ -703,7 +733,7 @@ is_transient() { # $1 output file: a network error near the end of the output
 
 work_issue() { # $1 repo, $2 number, $3 title, $4 role, $5 branch
   local repo=$1 n=$2 title=$3 role=$4 branch=$5 dir="$WORK_ROOT/$1" prompt rc ahead body_file pr_url sha ci
-  local attempt=1 max_attempts out waits wait_s denied="" blocked="" touched touched_md
+  local attempt=1 max_attempts out waits wait_s denied="" blocked="" touched touched_md frc hold_why base
 
   if git -C "$dir" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
     log "skip $repo#$n: branch $branch already exists on GitHub; open its PR or delete it by hand"
@@ -732,8 +762,8 @@ work_issue() { # $1 repo, $2 number, $3 title, $4 role, $5 branch
     local reason="$1" kept patch ahead_now main_moved=0
     [ -z "$denied" ] || reason="$reason; last refused or attempted tool call: $denied"
     log "FAILED $repo#$n: $reason"
-    ahead_now=$(commits_on "$dir" "$branch")
-    [ "$(git -C "$dir" rev-parse main 2>/dev/null)" = "$(git -C "$dir" rev-parse origin/main 2>/dev/null)" ] || main_moved=1
+    ahead_now=$(commits_on "$dir" "$branch" "${base:-origin/main}")
+    [ "$(git -C "$dir" rev-parse main 2>/dev/null)" = "$(git -C "$dir" rev-parse "${base:-origin/main}" 2>/dev/null)" ] || main_moved=1
     if [ "$ahead_now" -eq 0 ] && [ "$main_moved" -eq 0 ]; then
       if [ -n "$(git -C "$dir" status --porcelain)" ]; then
         patch="$LOG_DIR/$repo-$n-$(date +%Y%m%d-%H%M%S).patch"
@@ -747,10 +777,11 @@ work_issue() { # $1 repo, $2 number, $3 title, $4 role, $5 branch
       git -C "$dir" branch -q -D "$branch" 2>/dev/null || true
       remove_label "$repo" "$n"
       if [ -n "$blocked" ]; then
-        # The harness asked for help (e.g. the data layer isn't on main): take the start signal away, so it
-        # doesn't come back every 6 hours. A person or the planner sorts it out and adds the label again.
+        # The harness asked for help (e.g. the data layer isn't on main): take the start signal away and add
+        # `hold`, so neither this runner nor release-labels.py brings it back until a person has looked.
         gh api -X DELETE "repos/$OWNER/$repo/issues/$n/labels/$HARNESS" >/dev/null 2>&1 || true
-        kept="No commits were made; the local branch was deleted and the \`$HARNESS\` and \`$IN_PROGRESS\` labels removed. Sort out what it asks (or move the work into a foundation slice), then add \`$HARNESS\` back."
+        gh api "repos/$OWNER/$repo/issues/$n/labels" -f "labels[]=$HOLD_LABEL" >/dev/null 2>&1 || true
+        kept="No commits were made; the local branch was deleted, the \`$HARNESS\` and \`$IN_PROGRESS\` labels removed and \`$HOLD_LABEL\` added. Sort out what it asks (or move the work into a foundation slice), then remove \`$HOLD_LABEL\` and add \`$HARNESS\` back."
       else
         kept="Cleaned up: no commits were made, so the local branch was deleted and \`$IN_PROGRESS\` removed. It'll be picked up again after 6 hours, or sooner with \`--retry-failed\`."
       fi
@@ -770,7 +801,10 @@ $FAIL_MARK" >/dev/null 2>&1 || log "warning: couldn't comment on $repo#$n"
     return 1
   }
 
-  git -C "$dir" switch --quiet -c "$branch" || { fail "couldn't create the branch $branch"; return 1; }
+  # The main commit this run builds on, recorded before the harness runs: every later check compares with it, not
+  # with the clone's refs, which the harness could rewrite (git update-ref).
+  base=$(git -C "$dir" rev-parse --verify --quiet "origin/main^{commit}") || { fail "can't read origin/main"; return 1; }
+  git -C "$dir" switch --quiet -c "$branch" "$base" || { fail "couldn't create the branch $branch"; return 1; }
 
   prompt=$(build_prompt "$repo" "$n" "$role" "$branch")
   max_attempts=3
@@ -781,13 +815,13 @@ $FAIL_MARK" >/dev/null 2>&1 || log "warning: couldn't comment on $repo#$n"
     run_harness_once "$prompt" "$dir" "$out"
     rc=$?
     log "$HARNESS exited with status $rc"
-    ahead=$(commits_on "$dir" "$branch")
+    ahead=$(commits_on "$dir" "$branch" "$base")
     if [ "$ahead" -eq 0 ] && [ "$attempt" -lt "$max_attempts" ] && [ "$rc" -ne 124 ] && [ "$rc" -ne 130 ] \
        && [ "$(git -C "$dir" rev-parse --abbrev-ref HEAD)" = "$branch" ] && is_transient "$out"; then
       wait_s=${waits%% *}; waits=${waits#* }; [ -n "$wait_s" ] || wait_s=120
       log "no commits and the output ends with a network error ($(tail -n 40 "$out" | grep -Eio "$TRANSIENT_RE" | tail -1)); retrying in ${wait_s}s"
       sleep "$wait_s"
-      git -C "$dir" reset -q --hard origin/main && git -C "$dir" clean -fdq   # back to main's state on the same branch
+      git -C "$dir" reset -q --hard "$base" && git -C "$dir" clean -fdq   # back to main's state on the same branch
       attempt=$((attempt + 1))
       continue
     fi
@@ -801,13 +835,15 @@ $FAIL_MARK" >/dev/null 2>&1 || log "warning: couldn't comment on $repo#$n"
   fi
 
   [ "$(git -C "$dir" rev-parse --abbrev-ref HEAD)" = "$branch" ] || { fail "the harness left the clone on another branch"; return 1; }
-  [ "$(git -C "$dir" rev-parse main)" = "$(git -C "$dir" rev-parse origin/main)" ] \
+  [ "$(git -C "$dir" rev-parse main)" = "$base" ] \
     || { fail "local main has new commits (nothing was pushed; inspect $dir)"; return 1; }
   if [ "$ahead" -eq 0 ] && [ -s "$dir/.harness/blocked.md" ]; then
-    blocked=$(head -c 1500 "$dir/.harness/blocked.md")
-    fail "it stopped and asked for help:
+    blocked=$(quote_untrusted 1500 < "$dir/.harness/blocked.md")
+    fail "it stopped and asked for help (its words, quoted):
 
+~~~~text
 $blocked
+~~~~
 "
     return 1
   fi
@@ -820,17 +856,26 @@ $blocked
   [ -z "$(git -C "$dir" status --porcelain)" ] || { fail "uncommitted changes left in $dir"; return 1; }
 
   # Foundation (wave 1) files leave this Mac only on a security-sensitive issue (the foundation slice). Checked
-  # before pushing; a label that can't be read counts as missing.
-  touched=$(git -C "$dir" diff --name-only --no-renames "origin/main...refs/heads/$branch" | wave1_files)
-  if [ -n "$touched" ] && ! issue_has_label "$repo" "$n" security-sensitive; then
-    log "HOLD $repo#$n: $branch changes foundation files and the issue isn't security-sensitive; not pushing: $(printf '%s' "$touched" | tr '\n' ' ')"
+  # before pushing against the recorded base; a diff that fails, a branch that doesn't build on the base, or a
+  # label that can't be read all hold the push.
+  touched=$(foundation_changes "$dir" "$branch" "$base"); frc=$?
+  hold_why=""
+  case "$frc" in
+    0) if [ -n "$touched" ] && ! issue_has_label "$repo" "$n" security-sensitive; then
+         # shellcheck disable=SC2016  # Markdown backticks
+         touched_md=$(printf '%s\n' "$touched" | quote_untrusted 4000 | sed 's/^/- `/; s/$/`/')
+         hold_why="\`$branch\` changes foundation (wave 1) files, which only the app's foundation slice may change:
+
+$touched_md"
+       fi ;;
+    3) hold_why="\`$branch\` doesn't build on \`main\` as it was when the run started (\`${base:0:7}\`), so its changes can't be checked." ;;
+    *) hold_why="git couldn't list the files \`$branch\` changes (status $frc), so its changes can't be checked." ;;
+  esac
+  if [ -n "$hold_why" ]; then
+    log "HOLD $repo#$n: not pushing $branch: $(printf '%s' "$hold_why" | tr '\n' ' ')"
     git -C "$dir" checkout --quiet main 2>/dev/null || true
     remove_label "$repo" "$n"
-    # shellcheck disable=SC2016  # Markdown backticks
-    touched_md=$(printf '%s\n' "$touched" | sed 's/^/- `/; s/$/`/')
-    comment "$repo" "$n" "$HARNESS stopped before pushing: \`$branch\` changes foundation (wave 1) files, which only the app's foundation slice may change:
-
-$touched_md
+    comment "$repo" "$n" "$HARNESS stopped before pushing: $hold_why
 
 Nothing was pushed. The schema, migrations, roles, access rules and auth config come from the foundation issue; if this issue really needs a change there, it belongs in a foundation slice (see the spec). The branch has $ahead commit(s) and stays on Michael's Mac; the runner skips this issue while it exists. Delete it there once this is sorted: \`git -C ~/30apps/$repo branch -D $branch\`. Log: \`$(public "$LOG")\`.
 

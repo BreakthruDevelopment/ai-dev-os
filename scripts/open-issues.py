@@ -7,13 +7,17 @@
     python3 scripts/open-issues.py specs/NN-slug.md --check     # parse and validate only (no GitHub calls)
     python3 scripts/open-issues.py --self-test                  # parsing tests, incl. templates/spec.md (CI)
 
+Needs Python 3.10+ and the gh CLI (signed in).
+
 Options: --repo NAME (app repo, if the spec's **Repo:** line is missing), --spec-ref REF (commit or branch the
 spec links point at; default main).
 
 Every issue gets a `Planned harness: <name>` line, a `## Dependencies` section of full issue URLs and a hidden
 `<!-- open-issues id=NN.M -->` marker. Only an issue whose dependencies are all closed gets its harness label,
 which is the start signal; on a first run that means the dependency-free issues, the foundation (wave 1).
-scripts/release-labels.py adds the rest as their dependencies close. An issue that already exists (same marker,
+An issue labelled at creation also gets release-labels.py's "released" comment, so if the runner or a person later
+takes the label away, release-labels.py won't put it back. scripts/release-labels.py adds the rest as their
+dependencies close (closed as completed, or a merged PR). An issue that already exists (same marker,
 or same title in the same repo) is reused, never created twice or edited. `security-sensitive` is added at
 creation; it isn't a start signal. Add the new issues to the project board by hand (Projects need GraphQL).
 
@@ -21,6 +25,9 @@ Spec format (templates/spec.md, "Issues"): `### Wave N` headings; under them one
     1. **NN.1 `[role] Title`** · `harness` · **2nd: Codex** · repo **`30-apps-infra`**
        What it covers (indented lines). Dependencies: none.
 `2nd: Codex` (or `security-sensitive`) marks a security-sensitive slice; `repo` is optional (default: the app repo).
+`Dependencies:` lists slice ids separated by commas: `NN.1, NN.3`, ranges `NN.1–NN.3` or `NN.1-3` (expanded), and
+anything that isn't a slice id (`D4`, `Day 0 D4 (Michael)`) goes into the body as a plain dependency line. A token
+that mixes an id with other text (`NN.1 (schema)`) is refused, so an id can't be lost.
 
 JSON plan: {"repo": "NN-slug", "spec": "specs/NN-slug.md", "issues": [{"id": "NN.1", "title": "[role] Title",
 "harness": "claude", "wave": 1, "security_sensitive": true, "deps": [], "repo": null, "body": "markdown",
@@ -46,9 +53,9 @@ ID = r"(?:\d+|NN)\.\d+"
 ITEM = re.compile(rf"^\s*\d+\.\s+\*\*(?P<id>{ID})\s+`(?P<title>\[[a-z-]+\][^`]*)`\*\*(?P<rest>.*)$")
 WAVE = re.compile(r"^###\s+Wave\s+(\d+)\b", re.I)
 WAVE1_NOTE = ("Wave 1 (foundation): this slice owns the schema, migrations, roles, access rules and auth config. "
-              "Later slices don't change `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/` or `src/lib/access.ts`.")
-LATER_NOTE = ("Don't create or edit `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/`, `src/lib/access.ts` or role "
-              "and permission code: the foundation slice owns them. If the data layer this needs isn't on `main`, or it "
+              "Later slices don't change the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`).")
+LATER_NOTE = ("Don't create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) "
+              "unless this issue names you as a file's owner: the foundation slice owns them. If the data layer this needs isn't on `main`, or it "
               "needs a schema change, stop and comment here. Never invent schema, migrations, roles or session code.")
 
 
@@ -99,14 +106,56 @@ def parse_spec(text: str) -> dict:
         dm = re.search(r"\bDependencies:\s*(.*)$", text, re.I)
         if not dm:
             raise PlanError(f"{it['id']}: end the slice with 'Dependencies: none.' or 'Dependencies: NN.1, NN.2.'")
-        tail = dm.group(1).strip()
-        it["deps"] = [] if re.match(r"none\b", tail, re.I) else re.findall(ID, tail)
-        if not it["deps"] and not re.match(r"none\b", tail, re.I):
-            raise PlanError(f"{it['id']}: 'Dependencies:' lists no slice ids (write 'none' if there are none)")
+        it["deps"], it["extra_deps"] = parse_deps(it["id"], dm.group(1))
         it["text"] = text[:dm.start()].strip()
     if not issues:
         raise PlanError("no slices under '## Issues' (numbered items under '### Wave N' headings)")
     return {"repo": repo, "issues": issues}
+
+
+RANGE = re.compile(r"^(\d+|NN)\.(\d+)\s*[–-]\s*(?:(\d+|NN)\.)?(\d+)$")
+
+
+def _split_top(text: str) -> list[str]:
+    """Split on commas and semicolons outside parentheses ("and" is split by the caller)."""
+    parts, depth, cur = [], 0, ""
+    for ch in text:
+        depth += ch == "("
+        depth -= ch == ")" and depth > 0
+        if ch in ",;" and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    return parts + [cur]
+
+
+def parse_deps(sid: str, tail: str) -> tuple[list[str], list[str]]:
+    """(slice ids, other dependency text) from what follows `Dependencies:`."""
+    tail = tail.strip()
+    if re.match(r"none\b", tail, re.I):
+        return [], []
+    ids, extra = [], []
+    pieces = [x for raw in _split_top(tail.rstrip("."))
+              for x in ([raw] if "(" in raw else re.split(r"\s+and\s+", raw))]
+    for raw in pieces:
+        tok = re.sub(r"^and\s+", "", raw.strip()).strip().rstrip(".").strip()
+        if not tok:
+            continue
+        if re.fullmatch(ID, tok):
+            ids.append(tok)
+        elif (m := RANGE.match(tok)):
+            major, lo, major2, hi = m.group(1), int(m.group(2)), m.group(3) or m.group(1), int(m.group(4))
+            if major2 != major or hi <= lo:
+                raise PlanError(f"{sid}: can't read the range '{tok}' (write e.g. 77.1–77.3)")
+            ids += [f"{major}.{k}" for k in range(lo, hi + 1)]
+        elif re.search(ID, tok):
+            raise PlanError(f"{sid}: '{tok}' mixes a slice id with other text; list ids plainly (e.g. '14.1, 14.2')")
+        else:
+            extra.append(tok)
+    if not ids and not extra:
+        raise PlanError(f"{sid}: 'Dependencies:' lists nothing (write 'none' if there are none)")
+    return list(dict.fromkeys(ids)), extra
 
 
 def load_plan(path: str) -> dict:
@@ -234,8 +283,8 @@ def run(plan: dict, dry: bool, spec_ref: str) -> None:
         problem = issuelib.intake_problem(body)
         if problem:  # our own output must pass the runner's checks
             raise PlanError(f"{it['id']}: generated body fails the intake check: {problem}")
-        # The start signal only when every dependency is closed: on a first run, only dependency-free issues.
-        open_deps = [d for d in it["deps"] if d in fresh or states.state(*numbers[d]) != "closed"]
+        # The start signal only when every dependency is done: on a first run, only dependency-free issues.
+        open_deps = [d for d in it["deps"] if d in fresh or states.state(*numbers[d]) != "done"]
         labels = ([] if open_deps else [it["harness"]]) + (["security-sensitive"] if it["security_sensitive"] else [])
         fresh.add(it["id"])
         if dry:
@@ -246,6 +295,10 @@ def run(plan: dict, dry: bool, spec_ref: str) -> None:
         res = issuelib.gh(f"repos/{OWNER}/{repo}/issues", "POST", {"title": it["title"], "body": body, "labels": labels})
         numbers[it["id"]] = (repo, res["number"])
         by_mark[it["id"]] = res["number"]
+        if not open_deps:  # labelled now: record the release, so a label taken away later stays away
+            issuelib.gh(f"repos/{OWNER}/{repo}/issues/{res['number']}/comments", "POST", {"body": (
+                f"Labelled `{it['harness']}` at creation: no open dependencies, so this is the start signal. "
+                f"(`scripts/open-issues.py`)\n\n{issuelib.RELEASE_MARK.format(it['harness'])}")})
         print(f"created {it['id']:<6} {repo}#{res['number']}  labels {labels}  {res['html_url']}", flush=True)
     if not dry:
         print("Add the new issues to the project board. Labels for the rest come from scripts/release-labels.py.")
@@ -269,7 +322,7 @@ Intro text that isn't a slice.
 ### Wave 2
 
 2. **99.2 `[fullstack-builder] Data functions and routes`** · `antigravity`
-   On 99.1's schema. Dependencies: 99.1.
+   On 99.1's schema. Dependencies: 99.1, Day 0 D3 (Michael, not an issue).
 3. **99.3 `[ai-builder] Summaries`** · `claude` · **2nd: Codex** — prompt, schema, evals. Dependencies: 99.1.
 
 ### Wave 3
@@ -299,7 +352,7 @@ def self_test() -> None:
     want = [("99.1", "claude", 1, True, None, []), ("99.2", "antigravity", 2, False, None, ["99.1"]),
             ("99.3", "claude", 2, True, None, ["99.1"]), ("99.4", "grok", 3, False, None, ["99.2", "99.3"]),
             ("99.5", "claude", 3, False, "30-apps-infra", ["99.4"])]
-    if got != want or plan["repo"] != "99-sample":
+    if got != want or plan["repo"] != "99-sample" or plan["issues"][1]["extra_deps"] != ["Day 0 D3 (Michael, not an issue)"]:
         fails.append(f"parse_spec: {got} repo={plan['repo']}")
     if plan["issues"][2]["text"] != "prompt, schema, evals." or plan["issues"][0]["text"] != "Tables, migration, roles and `access.ts`.":
         fails.append(f"parse_spec text: {[i['text'] for i in plan['issues']]}")
@@ -347,6 +400,26 @@ def self_test() -> None:
             if frag not in str(e):
                 fails.append(f"parse_spec error {e!r}, wanted {frag!r}")
 
+    for tail, want in [("77.1–77.3, D4.", (["77.1", "77.2", "77.3"], ["D4"])),
+                       ("77.1-3 and 77.5", (["77.1", "77.2", "77.3", "77.5"], [])),
+                       ("NN.2, NN.1–NN.2.", (["NN.2", "NN.1"], [])),
+                       ("none.", ([], [])),
+                       ("14.1; Day 0 D4 (Michael, before this issue), D5", (["14.1"], ["Day 0 D4 (Michael, before this issue)", "D5"]))]:
+        try:
+            if parse_deps("t", tail) != want:
+                fails.append(f"parse_deps({tail!r}) = {parse_deps('t', tail)}")
+        except PlanError as e:
+            fails.append(f"parse_deps({tail!r}): {e}")
+    for tail in ["14.1 (schema)", "77.3–77.1", "77.1–78.2", ""]:
+        try:
+            parse_deps("t", tail)
+            fails.append(f"parse_deps accepted {tail!r}")
+        except PlanError:
+            pass
+    b2 = issue_body(plan["issues"][1], plan, numbers, "main")
+    if "- Day 0 D3 (Michael, not an issue)" not in b2 or issuelib.intake_problem(b2, "antigravity"):
+        fails.append("body 99.2: extra dependency text")
+
     template = (issuelib.ROOT / "templates" / "spec.md").read_text()
     try:
         tplan = parse_spec(template)
@@ -357,7 +430,7 @@ def self_test() -> None:
         fails.append(f"templates/spec.md doesn't parse: {e}")
     if fails:
         sys.exit("open-issues self-test FAILED:\n  " + "\n  ".join(fails))
-    print(f"open-issues self-test ok (sample spec, {len(tplan['issues'])} slices in templates/spec.md, 10 refusals)")
+    print(f"open-issues self-test ok (sample spec, {len(tplan['issues'])} slices in templates/spec.md, 14 refusals, 5 dependency lists)")
 
 
 def main(argv: list[str]) -> None:

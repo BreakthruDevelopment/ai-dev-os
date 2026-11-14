@@ -5,9 +5,13 @@ An issue is ready for a harness only when its body has:
   - a `Planned harness: <name>` line, and
   - a `## Dependencies` section (it may say "None") whose references are all full issue URLs,
     https://github.com/BreakthruDevelopment/<repo>/issues/<n> (or /pull/<n>), and every one of them is closed.
-A bare `#12` or `repo#12` there is refused: the runner can't check it (2026-11-14, FACTORY.md).
+A bare `#12` or `repo#12` there is refused: the runner can't check it (2026-11-14, FACTORY.md). A dependency
+counts as done only when it was completed: an issue closed as completed (not "not planned" or a duplicate), or a
+merged PR.
 
     python3 scripts/issuelib.py --self-test   # the parsing cases, also run through run-harness.sh's bash copy
+
+Needs Python 3.10+ and the gh CLI (signed in); the self-test also needs bash, git and jq.
 """
 import json
 import pathlib
@@ -18,13 +22,17 @@ import sys
 OWNER = "BreakthruDevelopment"
 TOPIC = "30-apps-30-days"
 HARNESSES = ("claude", "codex", "grok", "antigravity")
-HOLD_LABEL = "hold"  # a person's "don't release this yet"; release-labels.py leaves such issues alone
+HOLD_LABEL = "hold"  # "a person must look first": release-labels.py leaves such issues alone; the runner adds it
+RELEASE_MARK = "<!-- release-labels:released harness={} -->"  # posted once an issue has had its start signal
 
 # Foundation (wave 1) paths: only the foundation slice, which is security-sensitive, may create or edit them.
-# Role and permission code lives in src/lib/auth/ (rbac.ts, permissions.ts) in the template.
-WAVE1_PATHS = ("src/lib/db/schema.ts", "drizzle/", "src/lib/auth/", "src/lib/access.ts", "src/lib/access/")
+# Role and permission code lives in src/lib/auth/ (rbac.ts, permissions.ts) in the template; src/proxy.ts and
+# src/middleware.ts sit in front of every request. Same list as WAVE1_RE in run-harness.sh.
+WAVE1_PATHS = ("src/lib/db/", "drizzle/", "drizzle.config.ts", "src/lib/auth/", "src/lib/access.ts", "src/lib/access/",
+               "src/proxy.ts", "src/middleware.ts")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / "scripts" / "run-harness.sh"
 ISSUE_URL = re.compile(rf"https://github\.com/{OWNER}/([A-Za-z0-9._-]+)/(issues|pull)/([0-9]+)")
 _LINK = re.compile(r"\[[^\]]*\]\((https?://[^)\s]+)\)")
 _FOREIGN_URL = re.compile(r"https://github\.com/[^/\s]+/[^/\s]+/(?:issues|pull)/[0-9]+")
@@ -126,8 +134,19 @@ def topic_repos() -> list[str]:
                   if TOPIC in (r.get("topics") or []) and not r.get("archived"))
 
 
+def dep_state(issue: dict) -> str:
+    """"done" for a completed dependency, else why not. Same rule as DEP_STATE_JQ in run-harness.sh."""
+    if issue.get("state") != "closed":
+        return issue.get("state") or "unknown"
+    if issue.get("pull_request"):
+        return "done" if issue["pull_request"].get("merged_at") else "closed without merging"
+    if issue.get("state_reason") in ("not_planned", "duplicate"):
+        return f"closed as {issue['state_reason']}"
+    return "done"
+
+
 class StateCache:
-    """Open/closed state of issues and PRs, fetched once each."""
+    """Completion state of issues and PRs ("done" or why not), fetched once each."""
 
     def __init__(self):
         self._s: dict[tuple[str, int], str] = {}
@@ -135,14 +154,14 @@ class StateCache:
     def state(self, repo: str, number: int) -> str:
         if (repo, number) not in self._s:
             try:
-                self._s[(repo, number)] = gh(f"repos/{OWNER}/{repo}/issues/{number}").get("state", "unknown")
+                self._s[(repo, number)] = dep_state(gh(f"repos/{OWNER}/{repo}/issues/{number}"))
             except GhError:
-                self._s[(repo, number)] = "unknown"  # counts as not closed: fail closed
+                self._s[(repo, number)] = "unknown"  # counts as not done: fail closed
         return self._s[(repo, number)]
 
     def open_deps(self, body: str) -> list[str]:
         return [f"{url} ({st})" for repo, n, url in dependency_urls(dependencies_section(body) or "")
-                if (st := self.state(repo, n)) != "closed"]
+                if (st := self.state(repo, n)) != "done"]
 
 
 # --- Self-test --------------------------------------------------------------------------------------------------
@@ -178,10 +197,22 @@ CASES = [
     ("Dependencies heading in another case, section ends at ---",
      f"Planned harness: grok\n## dependencies\n- {U}/x/issues/2\n---\n- #77\n", True, [f"{U}/x/issues/2"]),
 ]
-PATHS = (["src/lib/db/schema.ts", "drizzle/0004_dispatch-board.sql", "drizzle/meta/_journal.json",
-          "src/lib/auth/rbac.ts", "src/lib/access.ts", "src/lib/access/rules.ts"],
-         ["src/lib/db/index.ts", "src/lib/accessibility.ts", "src/app/board/page.tsx", "src/lib/dispatch.ts",
-          "drizzle.config.ts", "test/drizzle/x.ts"])
+PATHS = (["src/lib/db/schema.ts", "src/lib/db/index.ts", "drizzle/0004_dispatch-board.sql", "drizzle/meta/_journal.json",
+          "drizzle.config.ts", "src/lib/auth/rbac.ts", "src/lib/access.ts", "src/lib/access/rules.ts", "src/proxy.ts",
+          "src/middleware.ts"],
+         ["src/lib/accessibility.ts", "src/app/board/page.tsx", "src/lib/dispatch.ts", "test/drizzle/x.ts",
+          "src/proxy.test.ts", "drizzle.config.ts.bak", "src/lib/dbx.ts"])
+# (issue JSON, dep_state)
+DEP_CASES = [
+    ({"state": "open"}, "open"),
+    ({"state": "closed", "state_reason": "completed"}, "done"),
+    ({"state": "closed", "state_reason": None}, "done"),
+    ({"state": "closed", "state_reason": "not_planned"}, "closed as not_planned"),
+    ({"state": "closed", "state_reason": "duplicate"}, "closed as duplicate"),
+    ({"state": "closed", "pull_request": {"merged_at": "2026-11-14T10:00:00Z"}}, "done"),
+    ({"state": "closed", "pull_request": {"merged_at": None}}, "closed without merging"),
+    ({"state": "open", "pull_request": {"merged_at": None}}, "open"),
+]
 
 
 def run_harness_verdict(body: str, harness: str = "grok") -> tuple[bool, list[str]]:
@@ -209,9 +240,77 @@ def self_test() -> None:
                        input="\n".join(hits + misses) + "\n", capture_output=True, text=True, check=True)
     if r.stdout.split() != hits:
         failures.append(f"run-harness.sh --wave1-files: {r.stdout.split()}")
+    for issue, want in DEP_CASES:
+        got = dep_state(issue)
+        r = subprocess.run(["bash", str(SCRIPT), "--dep-state"], input=json.dumps(issue),
+                           capture_output=True, text=True)
+        if got != want or r.stdout.strip() != want:
+            failures.append(f"dep_state {issue}: python={got!r} bash={r.stdout.strip()!r} {r.stderr.strip()}")
+    failures += _guard_tests()
+    r = subprocess.run(["bash", str(SCRIPT), "--quote"], capture_output=True, text=True, check=True,
+                       input="ask @someone <!-- run-harness:claim h:1:2 --> ```\n~~~~\n" + "x" * 3000)
+    q = r.stdout
+    if "@" in q or "<!--" in q or "-->" in q or "```" in q or "~~~" in q or len(q.encode()) > 1600:  # capped at 1500 bytes before the replacements
+        failures.append(f"quote_untrusted let something through: {q[:120]!r}")
     if failures:
         sys.exit("issuelib self-test FAILED:\n  " + "\n  ".join(failures))
-    print(f"issuelib self-test ok ({len(CASES)} bodies and the wave 1 paths, in Python and in run-harness.sh)")
+    print(f"issuelib self-test ok ({len(CASES)} bodies, {len(DEP_CASES)} dependency states, the wave 1 paths, "
+          "the pre-push guard and quoting, in Python and in run-harness.sh)")
+
+
+def _guard_tests() -> list[str]:
+    """run-harness.sh's pre-push guard on a scratch repo: it uses the recorded base even when the clone's
+    origin/main is moved, sees quoted and non-ASCII names, and fails (non-zero) when it can't check."""
+    import tempfile
+    out = []
+    with tempfile.TemporaryDirectory() as d:
+        def git(*a):
+            return subprocess.run(["git", "-C", d, "-c", "user.name=t", "-c", "user.email=t@t", *a],
+                                  capture_output=True, text=True, check=True).stdout.strip()
+
+        def guard(base, branch="grok/1-x"):
+            r = subprocess.run(["bash", str(SCRIPT), "--foundation-changes", d, branch, base],
+                               capture_output=True, text=True)
+            return r.returncode, r.stdout.splitlines()
+
+        git("init", "-q", "-b", "main")
+        pathlib.Path(d, "src/app").mkdir(parents=True)
+        pathlib.Path(d, "src/app/page.tsx").write_text("a\n")
+        git("add", "-A")
+        git("commit", "-qm", "init")
+        base = git("rev-parse", "HEAD")
+        git("update-ref", "refs/remotes/origin/main", base)
+        git("switch", "-qc", "grok/1-x")
+        pathlib.Path(d, "src/lib/db").mkdir(parents=True)
+        pathlib.Path(d, "drizzle").mkdir()
+        pathlib.Path(d, "src/lib/db/schema.ts").write_text("x\n")
+        pathlib.Path(d, "drizzle/0009_café.sql").write_text("x\n")
+        pathlib.Path(d, 'drizzle/0010_"quoted".sql').write_text("x\n")
+        pathlib.Path(d, "src/app/page.tsx").write_text("b\n")
+        git("add", "-A")
+        git("commit", "-qm", "work")
+        want = ['drizzle/0009_café.sql', 'drizzle/0010_"quoted".sql', "src/lib/db/schema.ts"]
+        rc, got = guard(base)
+        if rc != 0 or sorted(got) != want:
+            out.append(f"guard on a clean run: rc={rc} {got}")
+        # (a) the harness moves origin/main to its own tip: the recorded base still sees everything.
+        git("update-ref", "refs/remotes/origin/main", git("rev-parse", "HEAD"))
+        rc, got = guard(base)
+        if rc != 0 or sorted(got) != want:
+            out.append(f"guard after origin/main was moved: rc={rc} {got}")
+        # A branch rebuilt on another history doesn't build on the base: status 3.
+        git("switch", "-q", "--orphan", "grok/2-y")
+        pathlib.Path(d, "README.md").write_text("y\n")
+        git("add", "README.md")
+        git("commit", "-qm", "orphan")
+        rc, _ = guard(base, "grok/2-y")
+        if rc != 3:
+            out.append(f"guard on a branch that doesn't build on the base: rc={rc}, wanted 3")
+        # (c) git can't diff (a base that isn't a commit): non-zero, never an empty "nothing changed".
+        rc, got = guard("0" * 40)
+        if rc == 0:
+            out.append(f"guard with an unusable base returned 0 ({got})")
+    return out
 
 
 if __name__ == "__main__":

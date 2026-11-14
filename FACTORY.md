@@ -43,7 +43,7 @@ Every app passes all five, in order. A gate is passed when its evidence is in Gi
 | # | Gate | What happens | Passed when |
 | --- | --- | --- | --- |
 | 1 | **Spec** | The planner writes `specs/NN-slug.md` (from `templates/spec.md`) with its slices in waves, wave 1 being the foundation (below). Once the spec is merged, `scripts/open-issues.py` opens one issue per slice: a role in the title, a `Planned harness:` line, `## Dependencies` as full issue URLs, and a Codex second-review note where the slice is security-sensitive. Only dependency-free issues get their harness label. | Michael has approved the scope (he merges the spec PR) and the issues exist. |
-| 2 | **Build** | `scripts/release-labels.py` adds each issue's planned harness label once every dependency is closed (Claude after each merge, the ops monitor nightly). Each harness opens PRs from `<harness>/<task>` branches. Only the wave 1 slice touches the schema, migrations, auth and access rules; a builder whose data layer isn't on `main` stops and comments. | CI is green on the PR: lint, types, tests, build, smoke (`Lint, test, build, smoke`). |
+| 2 | **Build** | `scripts/release-labels.py` adds each issue's planned harness label once every dependency is done, i.e. completed or merged (Claude after each merge, the ops monitor nightly). Each harness opens PRs from `<harness>/<task>` branches. Only the wave 1 slice touches the schema, migrations, auth and access rules; a builder whose data layer isn't on `main` stops and comments. | CI is green on the PR: lint, types, tests, build, smoke (`Lint, test, build, smoke`). |
 | 3 | **Review** | Required. Claude Code (reviewer role) reviews every PR; Codex also reviews PRs labelled `security-sensitive`. Each posts a GitHub PR review ending in the reviewer marker (below). Once this gate and gate 2 are green on the current head, any harness may squash-merge an **app-repo** PR ([`AGENTS.md`](AGENTS.md)). | The `Reviewer sign-off` check is green on the head commit. **No merge without it.** |
 | 4 | **Release** | DevOps adds or bumps the app in `30-apps-infra` `apps.yaml` (a PR Claude Code merges once its checks and plan are clean), the deploy runs, and DevOps runs `scripts/smoke.sh` against the live URL. | Live smoke passes at `https://appN.breakthruventures.ai` and `/api/health` answers. |
 | 5 | **Close-out** | Run log written (`runs/NN-slug.md`), `catalog.yaml` status and `BRIEFING.md` "Where things stand" updated, README filled. Grok Bot drafts the X and LinkedIn posts and the two-minute demo script; Michael posts. | The definition of done below is met. |
@@ -53,22 +53,33 @@ Every app passes all five, in order. A gate is passed when its evidence is in Gi
 Added 2026-11-14 after the app 13 incident below.
 
 - **Waves.** A spec's Issues section groups slices into waves. **Wave 1 is the foundation**: schema, migrations,
-  roles, access rules and auth config, always `claude` and `security-sensitive`. No slice outside wave 1 creates or
-  edits `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/` (where role and permission code lives),
-  `src/lib/access.ts` or other role and permission code. If a later slice needs a schema change, the spec gives
-  that change its own foundation slice, or the builder stops and comments on the issue. Later waves list their
+  roles, access rules and auth config, always `claude` and `security-sensitive`. The **foundation paths** are
+  `src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/` (where role and permission code lives),
+  `src/lib/access.ts`, `src/proxy.ts` and `src/middleware.ts`. No slice outside wave 1 creates or edits them; the
+  one exception is a later slice the spec marks security-sensitive, `claude`, and the owner of a named file (e.g.
+  a CSP in `src/proxy.ts`). If a later slice needs a schema change, the spec gives that change its own foundation
+  slice, or the builder stops and comments on the issue. Later waves list their
   dependencies as before, and every slice not planned for `claude` depends, directly or not, on wave 1.
 - **Planned harness vs start signal.** Every issue body has a `Planned harness: <name>` line (the owner) and a
   `## Dependencies` section of full issue URLs (or `None`). The harness label is the start signal
-  and appears only when every dependency is closed. `scripts/open-issues.py` opens a spec's issues that way (it
+  and appears only when every dependency is done: an issue closed as completed (not "not planned" or a duplicate),
+  or a merged PR. `scripts/open-issues.py` opens a spec's issues that way (it
   checks the wave rules first, never duplicates an issue, and has `--dry-run`); `scripts/release-labels.py` adds the
   planned label as dependencies close, once per issue. Claude runs it after every merge into an app repo or
-  `30-apps-infra`; the ops monitor runs it nightly. An issue labelled `hold` is left alone.
+  `30-apps-infra`; the ops monitor runs it nightly. It leaves alone an issue labelled `hold`, and one whose label
+  was taken away after its release (by a person or the runner; `open-issues.py` records a release when it labels at
+  creation), so a removal sticks until a person adds the label back.
 - **The Mac runner fails closed.** `scripts/run-harness.sh` won't claim an issue without a `## Dependencies`
   section, with a bare `#N` or `repo#N` there, or without a `Planned harness:` line naming its harness. Before
-  pushing, it refuses a branch that changes the wave 1 paths unless the issue is labelled `security-sensitive`:
-  the branch stays on the Mac and the issue gets a comment naming the files. A harness that finds its data layer
-  missing writes `.harness/blocked.md` instead of committing; the runner posts it and removes the harness label.
+  pushing, it refuses a branch that changes the foundation paths unless the issue is labelled
+  `security-sensitive`: the branch stays on the Mac and the issue gets a comment naming the files. That check
+  compares with the `main` commit recorded before the harness ran (not the clone's `origin/main`, which the harness
+  could move), and holds the push if the branch doesn't build on that commit or git can't list its changes. A
+  harness that finds its data layer missing writes `.harness/blocked.md` instead of committing; the runner posts it
+  quoted (no HTML comments or @mentions), removes the harness label and adds `hold`.
+- **Follow-up, not built yet:** an app-repo CI check that fails when a PR not labelled `security-sensitive` changes
+  the foundation paths. The runner only guards Grok Build and Antigravity on the Mac; that check would also cover
+  Codex, Grok Bot and people.
 - **Migrations.** A builder rebases on `main` before its PR and regenerates its migration if another merged first:
   never two `drizzle/NNNN_*` files with the same number.
 

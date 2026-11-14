@@ -31,8 +31,8 @@ The agent setup that builds them (this repo) is itself a portfolio piece: an AI 
 | GitHub | Org `BreakthruDevelopment`. It also holds unrelated apps that must never be touched: only repos tagged `30-apps-30-days` are in scope. |
 | Budget | Nothing beyond the existing subscriptions (Claude, X/Grok, ChatGPT Plus, Google AI Pro) and cloud free tiers. No extra credits, no paid services. |
 | Order | App 1 is the **Build Tracker**, built first so it serves as mission control for the month. Full list in [`catalog.yaml`](catalog.yaml). |
-| Waves | Every spec groups its issues into waves. Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and `security-sensitive`, and the only slice that may change `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/` or `src/lib/access.ts`. Builders who find the data layer missing stop and comment; they never invent schema or auth ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)). |
-| Start signal | Issue bodies carry a `Planned harness:` line and full-URL `## Dependencies`. The harness label appears only when every dependency is closed: `scripts/open-issues.py` labels only dependency-free issues, and `scripts/release-labels.py` (Claude after each merge, the ops monitor nightly) releases the rest. The Mac runner skips any issue it can't check. |
+| Waves | Every spec groups its issues into waves. Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and `security-sensitive`, and the only slice that may change the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`). Builders who find the data layer missing stop and comment; they never invent schema or auth ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)). |
+| Start signal | Issue bodies carry a `Planned harness:` line and full-URL `## Dependencies`. The harness label appears only when every dependency is done (closed as completed, or a merged PR): `scripts/open-issues.py` labels only dependency-free issues, and `scripts/release-labels.py` (Claude after each merge, the ops monitor nightly) releases the rest. The Mac runner skips any issue it can't check. |
 
 ### The four clouds as built
 
@@ -72,7 +72,7 @@ calling the Claude API from the apps, paid DNS, and running many agents in paral
 reassigned on 2026-11-09 ([`specs/day-0-apps-5-8.md`](specs/day-0-apps-5-8.md#2026-11-09-reassignment)).
 
 **Labels are the start signal.** Grok Build and Antigravity are CLIs on Michael's Mac, not GitHub apps, so a label
-doesn't trigger them. An issue gets its harness label only once its dependencies are closed
+doesn't trigger them. An issue gets its harness label only once its dependencies are done (completed or merged)
 (`scripts/release-labels.py`); the runner script then picks it up, works it in `~/30apps/<repo>` and opens a PR. It
 fails closed: it skips anything whose dependencies are still open, any issue without a `## Dependencies` section of
 full URLs or a matching `Planned harness:` line, and it won't push a branch that changes foundation files unless the
@@ -87,7 +87,7 @@ and close-out (7).
 1. The **planner** turns the day's catalog entry into `specs/NN-slug.md`, slices grouped in waves (wave 1 the
    foundation), and once it's merged opens the issues with `scripts/open-issues.py`. Each issue names a role in its
    title (`[ui-builder] Dashboard page`) and its owner in a `Planned harness:` line.
-2. Once its dependencies are closed, the issue gets its harness label (`scripts/release-labels.py`). Each harness picks up only its own label,
+2. Once its dependencies are done (completed or merged), the issue gets its harness label (`scripts/release-labels.py`). Each harness picks up only its own label,
    follows the named role file, and opens a PR from a `<harness>/<task>` branch.
 3. CI (lint, types, tests, build, smoke test) must pass. **Review is required:** Claude Code reviews every PR, Codex
    also reviews PRs labelled `security-sensitive`, and each posts a marked PR review that the `Reviewer sign-off`

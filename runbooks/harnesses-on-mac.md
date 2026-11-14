@@ -210,8 +210,9 @@ Then, for each repo tagged `30-apps-30-days` whose name is `NN-slug`:
    connection reset, timeout, 502/503/429, `UNAVAILABLE`), the branch is reset to `main` and it's retried twice,
    after 30 s and 120 s.
 5. Checks the result: still on the work branch, at least one commit, nothing uncommitted, local `main` unchanged,
-   and no change to `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/` or `src/lib/access.ts` unless the issue is
-   labelled `security-sensitive` (the foundation slice). Then it pushes only that branch (never `--force`) and opens a PR whose body starts with `Closes #N`, followed by
+   and no change to the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) unless the issue is labelled `security-sensitive` (the
+   foundation slice). It compares with the `main` commit it recorded before the harness ran, not the clone's
+   `origin/main`; if the branch doesn't build on that commit, or git can't list the changes, it holds the push too. Then it pushes only that branch (never `--force`) and opens a PR whose body starts with `Closes #N`, followed by
    the harness's summary and checks list. It removes `in-progress`, since the open PR now marks the issue as taken.
 6. Waits up to 20 minutes for the PR's CI checks and comments the result on the issue (passed, failed with the
    failing check names, or still running), so a red PR shows up straight away.
@@ -225,10 +226,12 @@ refused tool call) and:
 - **Commits but no PR** (push or PR creation failed, or uncommitted changes on top of commits): keeps the branch
   and the label and says so. Push it and open the PR by hand, or delete the branch and remove the label to retry.
 - **Local `main` changed:** keeps everything for you to inspect; nothing was pushed.
-- **The harness asked for help** (`.harness/blocked.md`, e.g. the data layer isn't on `main`): posts what it wrote,
-  deletes the empty branch and removes both `in-progress` and the harness label, so it doesn't retry every 6 hours.
-  Add the label back once it's sorted.
-- **Foundation files changed on an issue that isn't `security-sensitive`:** nothing is pushed. The comment names the
+- **The harness asked for help** (`.harness/blocked.md`, e.g. the data layer isn't on `main`): posts what it wrote
+  inside a quote block (HTML comments and @mentions defused), deletes the empty branch, removes `in-progress` and
+  the harness label and adds `hold`, so neither the runner nor `release-labels.py` takes it again. Once it's sorted,
+  remove `hold` and add the label back.
+- **Foundation files changed on an issue that isn't `security-sensitive`** (or the change can't be checked):
+  nothing is pushed. The comment names the
   files; `in-progress` comes off and the branch stays in `~/30apps/<repo>`, so the issue is skipped while it exists.
   Delete it (`git -C ~/30apps/<repo> branch -D <branch>`) once the issue is sorted.
 

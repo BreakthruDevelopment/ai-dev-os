@@ -20,9 +20,9 @@ Produce `specs/NN-slug.md` from `templates/spec.md`:
    endpoint) and the control for each.
 7. **Issues, in waves.** One issue per slice, grouped into waves in the spec's Issues section (format in
    `templates/spec.md`). **Wave 1 is the foundation**: schema, migrations, roles, access rules and auth config,
-   always `claude` and security-sensitive. No later slice may create or edit `src/lib/db/schema.ts`, `drizzle/`,
-   `src/lib/auth/`, `src/lib/access.ts` or role and permission code; if one needs a schema change, give that change
-   its own foundation slice. Every slice not planned for `claude` depends, directly or not, on wave 1. Put the role
+   always `claude` and security-sensitive. No later slice may create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`),
+   unless you name a security-sensitive `claude` slice as a file's owner (e.g. a CSP in `src/proxy.ts`); if one
+   needs a schema change, give that change its own foundation slice. Every slice not planned for `claude` depends, directly or not, on wave 1. Put the role
    in the title (`[ui-builder] Dashboard page`), the planned harness (`claude`, `codex`, `grok` or `antigravity`,
    using the defaults in `AGENTS.md` section 2) beside it, and end each slice with `Dependencies:`.
    Once the spec is merged, open the issues with `python3 scripts/open-issues.py specs/NN-slug.md` (`--dry-run`

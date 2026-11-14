@@ -14,7 +14,7 @@ Work rules:
   calls `assertCan()`. Roles, `src/lib/access.ts` and auth config are part of it. Generate a migration for every
   schema change (`pnpm db:generate --name <change>`).
 - **Any later slice:** build on the foundation's schema and access rules. Never create or edit
-  `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/`, `src/lib/access.ts` or role and permission code. If the issue
+  the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) unless your issue names you as a file's owner. If the issue
   needs a change there, or the data layer it needs isn't on `main`, stop and comment on the issue with what's missing
   (under `scripts/run-harness.sh`, write it to `.harness/blocked.md` and make no commits; the runner posts it).
   Never invent schema, migrations, roles or session code.

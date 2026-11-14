@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Give an issue its planned harness label (the start signal) once every dependency is closed.
+"""Give an issue its planned harness label (the start signal) once every dependency is done.
 
     python3 scripts/release-labels.py --dry-run                       # what it would release, and why not the rest
     python3 scripts/release-labels.py                                 # every repo tagged 30-apps-30-days
@@ -9,14 +9,16 @@
 
 Who runs it: Claude Code after every merge into an app repo or 30-apps-infra (`--repo` for the repos involved),
 and the ops monitor nightly (all repos). Uses the gh CLI's own sign-in and REST only; no tokens of its own.
+Needs Python 3.10+.
 
 An open issue is released when it has a `Planned harness: <name>` line, no harness label (claude, codex, grok,
-antigravity), a `## Dependencies` section whose references are all full issue URLs, and every one of them closed.
+antigravity), a `## Dependencies` section whose references are all full issue URLs, and every one of them done:
+an issue closed as completed (not "not planned" or a duplicate), or a merged PR.
 Then it adds the planned label and comments once (a hidden marker). Safe to run again: it never touches an issue
 that already has a harness label, and it skips (and reports):
-  - an issue labelled `hold`;
-  - an issue it released before whose label someone has since removed (a person took the start signal away: add
-    the label back by hand when it's ready);
+  - an issue labelled `hold` (the runner adds it when a harness stops and asks for help);
+  - an issue released before (by this script, or labelled at creation by open-issues.py) whose label has since been
+    removed: a person or the runner took the start signal away, so add it back by hand when it's ready;
   - an issue with no Dependencies section, or with a bare `#12` / `repo#12` there (fix the body first);
 Issues without a harness label and without a `Planned harness:` line (made before 2026-11-14, or not slices,
 like the ops report) are left alone and only counted; `--verbose` lists them.
@@ -29,7 +31,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import issuelib
 from issuelib import HARNESSES, HOLD_LABEL, OWNER, TOPIC
 
-MARK = "<!-- release-labels:released harness={} -->"
+MARK = issuelib.RELEASE_MARK
 MARK_RE = re.compile(r"<!-- release-labels:released harness=")
 EXTRA_REPOS = ("30-apps-infra", "30-apps-template", "ai-dev-os")
 
@@ -120,7 +122,7 @@ def main(argv: list[str]) -> None:
                     continue
                 issuelib.gh(f"repos/{OWNER}/{repo}/issues/{n}/labels", "POST", {"labels": [detail]})
                 issuelib.gh(f"repos/{OWNER}/{repo}/issues/{n}/comments", "POST", {"body": (
-                    f"Every dependency is closed, so the planned harness label `{detail}` was added: that's the start "
+                    f"Every dependency is done (completed or merged), so the planned harness label `{detail}` was added: that's the start "
                     f"signal. (`scripts/release-labels.py`)\n\n{MARK.format(detail)}")})
                 print(f"added `{detail}` to {repo}#{n}  ({issue['title']})", flush=True)
         print(f"{'dry run: would release' if dry else 'released'} {released}; skipped {skipped}; "
@@ -136,17 +138,18 @@ def self_test() -> None:
     U = f"https://github.com/{OWNER}/14-real-estate/issues"
 
     class FakeStates(issuelib.StateCache):
-        def __init__(self, closed):
+        def __init__(self, closed, other="open"):
             super().__init__()
-            self._closed = closed
+            self._closed, self._other = closed, other
 
         def state(self, repo, number):
-            return "closed" if (repo, number) in self._closed else "open"
+            return "done" if (repo, number) in self._closed else self._other
 
     deps = f"## Dependencies\n\n- Depends on [#1]({U}/1) (14.1)\n- Depends on [#4]({U}/4) (14.4)\n"
     body = f"**14.7** · wave 3\nPlanned harness: grok\n\n## Scope\n\nx\n\n{deps}\n---\nfooter"
     closed = FakeStates({("14-real-estate", 1), ("14-real-estate", 4)})
     half = FakeStates({("14-real-estate", 1)})
+    not_planned = FakeStates({("14-real-estate", 1)}, "closed as not_planned")
     released = [{"body": "x\n\n" + MARK.format("grok")}]
 
     def issue(b=body, labels=()):
@@ -155,6 +158,7 @@ def self_test() -> None:
     cases = [
         ("all closed", issue(), closed, [], ("release", "grok")),
         ("one open", issue(), half, [], ("skip", "waiting on")),
+        ("one closed as not planned", issue(), not_planned, [], ("skip", "closed as not_planned")),
         ("already labelled", issue(labels=["grok"]), half, [], ("none", "")),
         ("claude-labelled", issue(labels=["claude", "security-sensitive"]), closed, [], ("none", "")),
         ("on hold", issue(labels=[HOLD_LABEL]), closed, [], ("skip", "labelled `hold`")),

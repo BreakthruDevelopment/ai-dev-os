@@ -48,11 +48,11 @@ Who would hire this out, what they need, and the roles in the app (for example c
 ## Issues
 
 Slices are grouped into waves. **Wave 1 is the foundation**: schema, migrations, roles, access rules and auth
-config, always `claude` and security-sensitive (**2nd: Codex**). No slice outside wave 1 creates or edits
-`src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/`, `src/lib/access.ts` or role and permission code; if a later
+config, always `claude` and security-sensitive (**2nd: Codex**). No slice outside wave 1 creates or edits the
+foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`), unless this spec names a security-sensitive `claude` slice as a file's owner; if a later
 slice needs a schema change, add a foundation slice for it here. Every slice not planned for `claude` depends,
-directly or not, on wave 1. Each slice names its role, its planned harness and ends with `Dependencies:` (slice ids,
-or `none`).
+directly or not, on wave 1. Each slice names its role, its planned harness and ends with `Dependencies:` (slice ids
+and ranges such as `NN.1–NN.3`, other prerequisites as plain text, or `none`).
 
 Once the spec is merged, `python3 scripts/open-issues.py specs/NN-slug.md --dry-run`, then without `--dry-run`. Each
 issue gets a `Planned harness:` line and full-URL dependency links; only issues with no open dependencies get their

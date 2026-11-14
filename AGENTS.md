@@ -89,20 +89,21 @@ Harnesses never talk to each other directly. Work moves through:
 | --- | --- |
 | What to build | `catalog.yaml` (this repo) and the app's spec at `specs/NN-slug.md` |
 | The queue | One GitHub Project board across every app repo |
-| Work items | Issues, each with a role in the title (`[ui-builder] Dashboard page`), a `Planned harness:` line, and, once its dependencies are closed, that harness's label: `claude`, `codex`, `grok` or `antigravity` |
+| Work items | Issues, each with a role in the title (`[ui-builder] Dashboard page`), a `Planned harness:` line, and, once its dependencies are done, that harness's label: `claude`, `codex`, `grok` or `antigravity` |
 | Changes | Pull requests from `<harness>/<task>` branches |
 | Status | PR checks, the board, and the Build Tracker (app 1) |
 | What happened | A run log per app in `runs/NN-slug.md` |
 
 **Waves.** Every spec groups its issues into waves ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)).
 Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and
-`security-sensitive`. No issue outside wave 1 creates or edits `src/lib/db/schema.ts`, `drizzle/`, `src/lib/auth/`,
-`src/lib/access.ts` or role and permission code; a later slice that needs a schema change gets a foundation slice,
-or its builder stops and comments on the issue.
+`security-sensitive`. No issue outside wave 1 creates or edits the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`; role and permission code
+lives in `src/lib/auth/`), except a security-sensitive `claude` slice the spec names as a file's owner. A later
+slice that needs a schema change gets a foundation slice, or its builder stops and comments on the issue.
 
 **The harness label is the start signal.** Every issue body carries a `Planned harness: <name>` line and a
 `## Dependencies` section of full issue URLs (`https://github.com/BreakthruDevelopment/<repo>/issues/<n>`, never a
-bare `#n`). An issue carries its harness label only once every dependency is closed: `scripts/open-issues.py`
+bare `#n`). An issue carries its harness label only once every dependency is done (closed as completed, or a merged
+PR): `scripts/open-issues.py`
 labels only dependency-free issues, and `scripts/release-labels.py` adds the planned label as dependencies close.
 Claude runs `release-labels.py` after every merge into an app repo or `30-apps-infra`; the ops monitor runs it
 nightly. Never add a harness label by hand to an issue whose dependencies are open. **Pick up only issues with your

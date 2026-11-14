@@ -142,6 +142,7 @@ apps:
     status: planned
   - n: 14
     repo: 14-real-estate
+    create_repo: true
     name: "Real Estate Listings"
     subdomain: app14.breakthruventures.ai
     live_cloud: azure

@@ -151,6 +151,7 @@ apps:
     status: planned
   - n: 15
     repo: 15-event-ticketing
+    create_repo: true
     name: "Event Ticketing and Check-in"
     subdomain: app15.breakthruventures.ai
     live_cloud: gcp

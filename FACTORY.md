@@ -113,8 +113,7 @@ plus the required checks listed.
 | --- | --- |
 | `ai-dev-os` | `check` and `Reviewer sign-off` |
 | `30-apps-infra` | `Validate aws`, `Validate azure`, `Validate gcp`, `Validate oci` |
-| `05`–`12` app repos | `Lint, test, build, smoke` and `review / Reviewer sign-off` |
-| `30-apps-template`, `01`–`04` app repos | **None yet**: no ruleset and no classic branch protection. Michael is importing a ruleset for them |
+| `30-apps-template`, `01`–`12` app repos | `Lint, test, build, smoke` and `review / Reviewer sign-off` (template and 01–04 added by Michael 2026-11-14) |
 
 For the remaining repos, the recommended ruleset is in
 [`runbooks/daily.md`](runbooks/daily.md#review-gate-turning-it-on).

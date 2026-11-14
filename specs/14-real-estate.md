@@ -27,9 +27,10 @@ only the listing's agent**.
 ["admin"]`, `ROLES = ["user", "agent", "admin"]`, `toRole()` returns one role (`admin` > `agent` > `user`); admin is
 not a superset of `agent`; sign-up can't set a role (tested by posting `role`); only an admin grants, logged
 `role.changed`. Copy app 11's files and tests. **Revoking `agent`** (decision, Q11) hides that agent's `active` and
-`pending` listings in the same transaction (`hidden_reason = 'agent_revoked'`, so they leave search and their public
-pages and photos 404); drafts stay but are unreachable; open inquiries stay for an admin count only. Granting `agent`
-again unhides only the listings hidden with that reason.
+`pending` listings **that aren't already hidden** (`where hidden_at is null`, so an admin hide and its reason are never
+overwritten) in the same transaction, with `hidden_reason = 'agent_revoked'`: they leave search and their public pages
+and photos 404. Drafts stay but are unreachable; open inquiries stay for an admin count only. Granting `agent` again
+unhides only listings with `hidden_reason = 'agent_revoked'`; an admin-hidden listing stays hidden.
 
 ## Scope for today
 
@@ -82,14 +83,15 @@ Originals are never stored. Each photo becomes three WebP variants: `lg` 1280 px
    noisy RGBA PNG just under 4 MB, a 2048 × 2048 q100 JPEG, and a 4 MB WebP, with a second request waiting. **Over
    400 MB → stop and ask** (Decisions Q2).
 4. **Store:** one transaction writes `listing_photo` and three `photo_blob` rows (`sha256`, width, height, bytes).
-5. **Serve (`GET /img/[photoId]/[variant]`, URL carries `?v=<sha8>`):** a photo of an **active, not hidden** listing:
-   `Cache-Control: public, max-age=31536000, immutable`, `ETag` = sha256, 304 on `If-None-Match` from a query that
-   never reads the `bytes` column but **applies the same active/not-hidden/owner check first** (a hidden or draft
-   photo gets 404, not 304). Immutable caching means a photo already in a browser's cache stays viewable there after
-   its listing is hidden or withdrawn; the URL itself stops answering. A draft's photo: only its agent, `private, no-store`; everyone else 404 (same answer
-   as a missing id). Always `Content-Type: image/webp`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy:
-   default-src 'none'`. Pages use `<img>` with `srcset` of the three variants and `loading="lazy"`; `next/image`'s
-   optimizer is not used (it would re-encode on the 0.25 vCPU replica).
+5. **Serve (`GET /img/[photoId]/[variant]`, URL carries `?v=<sha8>`):** a photo of an **active, not hidden**
+   listing: `Cache-Control: public, max-age=31536000, immutable`, `ETag` = sha256, 304 on `If-None-Match` from a
+   query that never reads the `bytes` column but **applies the same active/not-hidden/owner check first** (a hidden
+   or draft photo gets 404, not 304). Immutable caching means a photo already in a browser's cache stays viewable
+   there after its listing is hidden or withdrawn; the URL itself stops answering. A draft's photo: only its agent,
+   `private, no-store`; everyone else 404 (same answer as a missing id). Always `Content-Type: image/webp`,
+   `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'`. Pages use `<img>` with `srcset`
+   of the three variants and `loading="lazy"`; `next/image`'s optimizer is not used (it would re-encode on the 0.25
+   vCPU replica).
 
 Deleting a photo deletes its blobs (FK cascade); reordering changes `position` only; the listing's cover is
 `position = 0`. Server-only dependency: `sharp` pinned, in `serverExternalPackages`; the Alpine runner image must load
@@ -164,9 +166,10 @@ change is needed.
 **Kinds.** Per-user rate kinds (`rate_event`, `RATE_KINDS`): `api_write`, `ai`, `photo_upload` (the template's
 `upload`, renamed in 14.1's migration), `inquiry`. Daily app-wide kinds (`daily_usage`, `DAILY_USAGE_KINDS`): `ai`,
 `demo_load`, `embed_doc`, `embed_query`. **Per-IP limiter:** the template's `ip-limit.ts` keeps one in-memory map, so
-the three per-IP limits above would share a counter; 14.4 adds a namespace argument (`allowPublicRequest(ip, { ns,
-limit })`, key `ns:ip`, the same 10,000-entry bound across namespaces) with a test that `img` hits don't consume
-`public`.
+the three per-IP limits above would share a counter; 14.4 adds a namespace as an **optional fourth argument**,
+keeping the template's signature that `ip-limit.test.ts` relies on: `allowPublicRequest(ip, now, limit, ns =
+"public")`, key `ns:ip`, the same 10,000-entry bound across namespaces, with a test that `img` hits don't consume
+`public` and the existing tests unchanged.
 
 ## Free-tier budget
 
@@ -285,8 +288,8 @@ Two tasks: **`listing-description`** (`generate()`, below) and **`embed-listing`
   three-paragraph description built only from those facts, highlights for beds, year and fenced yard, one photo
   suggestion "built-in shelving" on the seeded living-room photo. The listing and that photo have **fixed UUIDs**,
   exported as `DEMO_BUNGALOW_LISTING_ID` and `DEMO_LIVING_ROOM_PHOTO_ID` from `src/lib/demo/ids.ts` (created in 14.5,
-  seeded with exactly those ids in 14.10), so the fixture's `photoId` passes the photo check. Against other listings the number and feature checks
-  flag what doesn't match and the UI says so, so demos stay honest.
+  seeded with exactly those ids in 14.10), so the fixture's `photoId` passes the photo check. Against other listings
+  the number and feature checks flag what doesn't match and the UI says so, so demos stay honest.
 - **Evals** (`test/ai-evals.test.ts` stubbed; `pnpm eval:description` and `pnpm eval:search` live with a key):
 
 | Input | A good answer must… |
@@ -330,9 +333,9 @@ for the agent; a description containing a fair-housing test phrase → 400 namin
 publish → public listing and photo (`immutable`); search with "within 10 mi of 78704" finds it; A favorites and sends
 an inquiry (retry → one); the agent sees it; buyer B gets 404 on A's inquiry; a second agent gets 404 on PATCH; the run
 withdraws and then **deletes** its listing at the end (a trap on exit does the same after a failure), so the smoke
-agent's 50-listing cap and the photo store never grow across runs. Without the smoke secrets the live run fails loudly. 375px: result cards stack,
-filter chips wrap, the editor's photo grid is two columns with reorder buttons (no drag), and a 60-character unbroken
-title, alt text and inquiry wrap.
+agent's 50-listing cap and the photo store never grow across runs. Without the smoke secrets the live run fails
+loudly. 375px: result cards stack, filter chips wrap, the editor's photo grid is two columns with reorder buttons (no
+drag), and a 60-character unbroken title, alt text and inquiry wrap.
 
 ## Decisions
 
@@ -385,17 +388,20 @@ after everything it seeds.
 
 1. **14.1 `[fullstack-builder] Roles, schema, access rules and listing data layer`** · `claude` · **2nd: Codex**
    Files: `src/lib/auth/*` (role, app 11 pattern, revoke hides listings), `src/lib/db/schema.ts` (incl. kinds, with
-   `upload` renamed `photo_upload`), `drizzle/0001_enable-pgvector.sql` (custom), `drizzle/0002_*`,
+   `upload` renamed `photo_upload`, and the template's `test/usage.integration.test.ts` updated to the new kind, about
+   line 54), `drizzle/0001_enable-pgvector.sql` (custom), `drizzle/0002_*`,
    `drizzle/0003_photo-blob-storage.sql` (custom, `SET STORAGE EXTERNAL`), `src/lib/access.ts`, `src/lib/listings.ts`
    (incl. location distance checks), `src/lib/inquiries.ts`, `src/lib/favorites.ts`, the listing, favorites and
    inquiry routes, admin **stats (incl. database sizes), roles and hide** routes (reindex is 14.6, demo is 14.10),
    `test/access.integration.test.ts`, `test/listings.integration.test.ts`. Done when every access rule has a test, a
    duplicate `client_op_id` makes one row, stale `version` → 409, NUL → 400, sign-up with `role` stays `user`, publish
    without a photo is refused, deleting a withdrawn listing cascades, revoking `agent` hides their active listings,
+   **revoking leaves an admin-hidden listing's `hidden_reason` unchanged and re-granting doesn't unhide it** (test),
    and a device location 6 mi from the ZIP centroid is refused. Dependencies: none.
 2. **14.2 `[fullstack-builder] Image processing module (sharp variants, client resize)`** · `claude` · **2nd: Codex**
    Files: `src/lib/images/process.ts`, `process.test.ts`, `src/lib/images/client-resize.ts` (+ size-math test),
-   `test/fixtures/images/` (EXIF GPS JPEG, orientation-6 JPEG, PNG, WebP, 2048×2048 noisy PNG under 4 MB, 2048×2048
+   `test/fixtures/images/` (`exif-gps.jpg`: at most 2048×2048 and still carrying GPS EXIF, because the smoke
+   uploads it raw; orientation-6 JPEG, PNG, WebP, 2048×2048 noisy PNG under 4 MB, 2048×2048
    q100 JPEG, 2049×2048 PNG, 20,000×20,000 PNG header, truncated JPEG, GIF, SVG), `package.json` (`sharp` pinned),
    `next.config.ts` (`serverExternalPackages`), CI step loading sharp in the built image. No routes, no database. Done
    when: variants are 1280/640/320 WebP and never upscaled; no EXIF/XMP in any output; orientation applied; 2049×2048
@@ -436,11 +442,11 @@ after everything it seeds.
 7. **14.7 `[ui-builder] Landing, search results and listing page`** · `grok` — `/`, `/search`, `/listings/[id]`
    (`srcset`, chips, "near me" with rounding, favorite and inquiry form with the email notice). Done when a visitor can
    search by text and radius and open a listing at 375px and desktop. Dependencies: 14.1, 14.4, 14.6.
-8. **14.8 `[ui-builder] Agent dashboard and listing editor`** · `grok` — `/agent`, `/agent/listings/[id]` (and new):
-   facts, ZIP lookup and location buttons (far-location refusal and confirm), photo grid using `client-resize.ts` and
-   `useAsyncAction`, description panel with flags and photo suggestions, publish, delete for drafts and withdrawn. Done
-   when the demo agent can create, photograph, describe and publish a listing at 375px. Dependencies: 14.1, 14.2, 14.3,
-   14.4, 14.5.
+8. **14.8 `[ui-builder] Agent dashboard and listing editor`** · `grok` — `/agent`, `/agent/listings/[id]` (and
+   new): facts, ZIP lookup and location buttons (far-location refusal and confirm), photo grid using
+   `client-resize.ts` and `useAsyncAction`, description panel with flags and photo suggestions, publish, delete for
+   drafts and withdrawn. Done when an agent seeded by the test can create, photograph, describe and publish a listing
+   at 375px. Dependencies: 14.1, 14.2, 14.3, 14.4, 14.5.
 9. **14.9 `[ui-builder] Agent inquiries, buyer account and admin`** · `grok` — `/agent/inquiries`, `/account`,
    `/admin` (database sizes and banner, reindex with pending count, demo button). Done when 375px and desktop pass.
    Dependencies: 14.1, 14.6, 14.10.

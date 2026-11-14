@@ -26,7 +26,12 @@ only the listing's agent**.
 ([13 "Roles"](13-field-service.md#problem-and-users)): `ac.newRole({ user: [], session: [] })`, `adminRoles:
 ["admin"]`, `ROLES = ["user", "agent", "admin"]`, `toRole()` returns one role (`admin` > `agent` > `user`); admin is
 not a superset of `agent`; sign-up can't set a role (tested by posting `role`); only an admin grants, logged
-`role.changed`. Copy app 11's files and tests. **Revoking `agent`** (decision, Q11) hides that agent's `active` and
+`role.changed`. Copy app 11's files and tests. **Roles change only through `POST /api/admin/roles`**, which writes
+`user.role` with Drizzle in the same transaction as the hide/unhide below. Better Auth's admin user-write endpoints
+would skip that, so 14.1 adds **`/admin/set-role`, `/admin/create-user`, `/admin/update-user` and
+`/admin/remove-user`** to `DISABLED_AUTH_PATHS` in `src/lib/auth/permissions.ts` (list and ban stay). **Account
+deletion is out of scope**: with `/admin/remove-user` disabled nothing deletes users, and user FKs (`agent_id`,
+`buyer_id`, `user_id`) stay `restrict`. **Revoking `agent`** (decision, Q11) hides that agent's `active` and
 `pending` listings **that aren't already hidden** (`where hidden_at is null`, so an admin hide and its reason are never
 overwritten) in the same transaction, with `hidden_reason = 'agent_revoked'`: they leave search and their public pages
 and photos 404. Drafts stay but are unreachable; open inquiries stay for an admin count only. Granting `agent` again
@@ -44,7 +49,8 @@ unhides only listings with `hidden_reason = 'agent_revoked'`; an admin-hidden li
   from the server), city or neighbourhood name lookup (ZIP only), saved searches and email alerts, inquiry replies in
   the app (the agent sees the buyer's email), MLS/IDX feeds, mortgage calculators, virtual tours and video, photo
   import from a URL (no outbound fetch at all), HEIC on the server (the browser converts; see image pipeline),
-  multiple agents per listing, brokerage tenancy, self-serve agent role, running on Google Cloud or Oracle (their
+  multiple agents per listing, brokerage tenancy, self-serve agent role, account deletion (Better Auth's
+  `/admin/remove-user` is disabled), running on Google Cloud or Oracle (their
   Postgres images lack pgvector; Decisions Q8).
 
 **Platform (Azure, from `30-apps-infra` `stacks/azure/main.tf` and README at `5e5ad6a`).** Container Apps,
@@ -319,7 +325,7 @@ Two tasks: **`listing-description`** (`generate()`, below) and **`embed-listing`
 | Location of buyers | "Near me" rounded to 2 decimals in the browser, never stored or logged |
 | Wrong or spoofed listing location | Device location >5 mi from the ZIP centroid refused; typed far coordinates need a confirm and are logged; `zip` source labelled approximate |
 | Fake listings | `agent` granted by admin only, audited; revoking hides their listings; admin hide with reason; hidden listings 404 publicly |
-| Role escalation | Roles not client-writable; tests |
+| Role escalation | Roles not client-writable; `agent` granted only through `POST /api/admin/roles` (audited, runs hide/unhide); Better Auth's set-role, create-user, update-user and remove-user disabled; tests |
 | Stored XSS | Plain-text rendering everywhere; alt text through `text()` |
 | Demo seed against production | `demoSeedConfig()`; admin button only; marker `urn:breakthru:real-estate-demo:v1` |
 
@@ -387,7 +393,7 @@ Order: 14.1 and 14.2 first; then 14.3 and 14.5; 14.4 after 14.1 + 14.2; 14.6 aft
 after everything it seeds.
 
 1. **14.1 `[fullstack-builder] Roles, schema, access rules and listing data layer`** · `claude` · **2nd: Codex**
-   Files: `src/lib/auth/*` (role, app 11 pattern, revoke hides listings), `src/lib/db/schema.ts` (incl. kinds, with
+   Files: `src/lib/auth/*` (role, app 11 pattern, revoke hides listings, four admin user-write paths disabled), `src/lib/db/schema.ts` (incl. kinds, with
    `upload` renamed `photo_upload`, and the template's `test/usage.integration.test.ts` updated to the new kind, about
    line 54), `drizzle/0001_enable-pgvector.sql` (custom), `drizzle/0002_*`,
    `drizzle/0003_photo-blob-storage.sql` (custom, `SET STORAGE EXTERNAL`), `src/lib/access.ts`, `src/lib/listings.ts`
@@ -397,7 +403,13 @@ after everything it seeds.
    duplicate `client_op_id` makes one row, stale `version` → 409, NUL → 400, sign-up with `role` stays `user`, publish
    without a photo is refused, deleting a withdrawn listing cascades, revoking `agent` hides their active listings,
    **revoking leaves an admin-hidden listing's `hidden_reason` unchanged and re-granting doesn't unhide it** (test),
-   and a device location 6 mi from the ZIP centroid is refused. Dependencies: none.
+   a device location 6 mi from the ZIP centroid is refused, and **`/admin/set-role`, `/admin/create-user`,
+   `/admin/update-user` and `/admin/remove-user` each answer 403 or 404 for an admin and change nothing** (test), so
+   roles change only through `POST /api/admin/roles` and its hide/unhide always runs. The template's
+   `test/admin-permissions.integration.test.ts` has two cases this breaks on purpose: "still lets an admin promote and
+   demote a user" (about line 166) and "still lets an admin remove a user" (about line 189); 14.1 rewrites them to
+   expect 403/404 and moves promote/demote to `POST /api/admin/roles`; the impersonation, password, session, list and
+   ban cases stay unchanged. Dependencies: none.
 2. **14.2 `[fullstack-builder] Image processing module (sharp variants, client resize)`** · `claude` · **2nd: Codex**
    Files: `src/lib/images/process.ts`, `process.test.ts`, `src/lib/images/client-resize.ts` (+ size-math test),
    `test/fixtures/images/` (`exif-gps.jpg`: at most 2048×2048 and still carrying GPS EXIF, because the smoke

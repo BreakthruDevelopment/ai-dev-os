@@ -74,23 +74,24 @@ the ticket id gives a re-derivable, unforgeable token with no stored secret and 
 status, epoch, already used) is still decided by the database on every scan, so revocation is instant.
 
 - **Keys** (`src/lib/tickets/keys.ts`): `kQr = HKDF-SHA256(ikm = BETTER_AUTH_SECRET, salt =
-  "breakthru:15-event-ticketing", info = "ticket-qr:v1")`, `kDoor` the same with `info = "door-code:v1"`; 32 bytes
-  each, derived once per process. `BETTER_AUTH_SECRET` is per app on Google Cloud (`random_password.auth[name]`, 48
+  "breakthru:15-event-ticketing", info = "ticket-qr:v1")`, `kDoor` the same with `info = "door-code:v1"`, and
+  `kDoorIdx` with `info = "door-index:v1"`; 32 bytes each, derived once per process. `BETTER_AUTH_SECRET` is per app on Google Cloud (`random_password.auth[name]`, 48
   chars). **Rotating it invalidates every QR and door code** (and every session); the README says so and Decisions Q6
   offers a separate key once Google Cloud secrets are wired.
 - **QR payload** (`src/lib/tickets/token.ts`): bytes `0x01 ‖ ticketId (16 bytes, uuid v4 from gen_random_uuid) ‖
   qr_epoch (uint16 BE)`, then `mac = HMAC-SHA256(kQr, "ET1" ‖ bytes)` truncated to 16 bytes (128 bits). Text = `ET1:`
-  + Crockford base32 of `bytes ‖ mac` (35 bytes → 56 chars). Every character is in the QR **alphanumeric** set, so the
-  code is version 4 (33×33) at ECC level M: large modules that scan off a dim phone screen. **No personal data, no
+  + Crockford base32 of `bytes ‖ mac` (35 bytes → 56 chars), 60 characters in all. Every character is in the QR **alphanumeric** set,
+  and version 3 at ECC level M holds 61 alphanumeric characters, so the code is **version 3 (29×29), level M**: large
+  modules that scan off a dim phone screen. **No personal data, no
   event id, no URL** (a phone's own camera app finds nothing to open; nothing lands in browser history or logs).
 - **Verify:** strict regex `^ET1:[0-9A-HJKMNP-TV-Z]{56}$`, decode, recompute, `crypto.timingSafeEqual`; then the
   database decides. A bad MAC, unknown ticket, other event or stale epoch all answer `invalid` ("Not a valid ticket for
   this event"), so a scan can't tell a forged code from another event's ticket.
 - **Door code** (manual entry when a screen is cracked or the camera won't focus): first 10 Crockford chars of
   `HMAC-SHA256(kDoor, ticketId ‖ epoch)`, shown as `XXXXX-XXXXX` under the QR. Entry normalises case, strips spaces and
-  hyphens, maps `O→0`, `I/L→1`. Lookup is by `door_code_digest = sha256(code)`, unique per (`event_id`, digest). 50 bits
-  per event, staff-only, and invalid entries count against `checkin_miss` (60 per staff per hour): guessing is out of
-  reach. The digest is written whenever a ticket is issued or reissued.
+  hyphens, maps `O→0`, `I/L→1`. Lookup is by `door_code_digest = HMAC-SHA256(kDoorIdx, code)` (keyed, so a database
+  dump alone can't be brute-forced offline), unique per (`event_id`, digest). 50 bits per event, staff-only, and invalid entries count against `checkin_miss` (60 per staff per hour, checked before the
+  lookup): guessing is out of reach. The digest is written whenever a ticket is issued or reissued.
 - **Reissue:** the holder (5 per ticket per day, ≤20 per ticket ever) or the organiser bumps `qr_epoch` and the door
   digest in one update; the old QR and code answer `invalid` from then on. This is the answer to "someone has a
   screenshot of my ticket".
@@ -117,24 +118,46 @@ Free tickets only. `registerForEvent(actor, { eventId, ticketTypeId, quantity, c
 4. Insert `quantity` tickets (holder name = the account name for the first, "Jane Doe, guest 2" for the rest), with door
    digests; commit.
 
-Cancelling a registration (holder, before the event starts, only if none of its tickets is checked in) sets the
-tickets `cancelled` and decrements `issued` in one transaction. An organiser voiding one ticket does the same for one.
+**Cancel and void never decrement twice.** Both use a conditional update and decrement `issued` by the number of rows
+it returned, in one transaction:
+
+```sql
+update ticket set status = 'cancelled'
+ where <id = $ticket | registration_id = $reg> and event_id = $event and status = 'valid' and checked_in_at is null
+returning id, ticket_type_id
+-- then: update ticket_type set issued = issued - <returned rows for that type> where id = …
+```
+
+- **Holder cancels a registration** (before the event starts): first `select … from ticket where registration_id = $reg
+  for update`; if any is checked in → 409 `checked_in` and nothing changes; otherwise the update above, and the
+  registration becomes `cancelled`. A second cancel returns zero rows and changes nothing (200, idempotent).
+- **Organiser voids one ticket:** the update above for one id; zero rows (already cancelled, or checked in) → 409 with
+  the current state, `issued` untouched. When a registration has no valid tickets left it becomes `cancelled`.
+- Check-in's update also requires `status = 'valid' and checked_in_at is null`, so a cancel or void racing a scan
+  serialises on the row lock and exactly one wins.
+
 Lowering a capacity below `issued` is refused. **Required tests:** 50 parallel registrations for 10 seats → exactly 10
 tickets and `issued = 10`; parallel double registration by one user → one; replay → same tickets; cancel then
-re-register works; cancel after a check-in refused; registration racing an organiser cancel → either registered then
+re-register works; cancel after a check-in refused; **holder cancel and organiser void of the same ticket in parallel →
+`issued` drops by exactly one**; **cancel racing a check-in → exactly one wins** (either a cancelled ticket and no
+check-in, or a checked-in ticket and a 409 cancel); registration racing an organiser cancel → either registered then
 cancelled, or refused, never a ticket for a cancelled event.
 
 ## Check-in (decision: online-only, race-safe and idempotent)
 
 `POST /api/door/[eventId]/checkin` with `{ opId: uuid, method: "qr" | "code" | "list", qr? | code? | ticketId? }`.
 
-1. `requireUser()`, `requireSameOrigin()`, zod; actor must be the event's organiser or have an `event_staff` row,
-   else 404. Event `published`, not cancelled, and now within the check-in window (`checkin_opens_at`, default 3 h
-   before start, until 6 h after `ends_at`), else 409 `checkin_closed`. `consumeRate("checkin", 1200/h)`.
-2. Resolve the ticket id: `qr` → verify the token (above); `code` → digest lookup in this event; `list` → the id from
-   name search, which must belong to this event (the UI asks "ID checked?" first).
-3. One transaction: `insert into checkin_event (actor_id, op_id, …) on conflict do nothing`; an existing row returns
-   its stored outcome with `replayed: true` (a retried request after a lost response still shows green). Then:
+1. `requireUser()`, `requireSameOrigin()`, zod; the actor must be the event's organiser **and currently hold the
+   `organizer` role**, or have an `event_staff` row; else 404. Event `published`, not cancelled, **not hidden** (admin
+   hide or `organizer_revoked`), and now within the check-in window (`checkin_opens_at`, default 3 h before start, until
+   6 h after `ends_at`), else 409 `checkin_closed`. **`rateIsFull(actor, "checkin_miss", 60)` → 429 before any token
+   check or lookup**, so the 61st guess is never evaluated. `consumeRate("checkin", 1200/h)`.
+2. Resolve the ticket id: `qr` → verify the token (above); `code` → keyed digest lookup in this event; `list` → the id
+   from name search, which must belong to this event (the UI asks "ID checked?" first).
+3. One transaction. **Ledger first:** `select outcome, payload_hash from checkin_event where actor_id = $actor and
+   op_id = $op`. Found with the same `payload_hash` (sha256 of method and the qr/code/ticketId value) → return the
+   stored outcome with `replayed: true` (a retried request after a lost response still shows green); found with a
+   different hash → 409 `op_id_reused`. Otherwise:
    ```sql
    update ticket set checked_in_at = now(), checked_in_by = $actor, checkin_op_id = $op
     where id = $id and event_id = $event and status = 'valid' and qr_epoch = $epoch and checked_in_at is null
@@ -142,16 +165,21 @@ cancelled, or refused, never a ticket for a cancelled event.
    ```
    (`qr_epoch` only for `qr`/`code`.) One row → `checked_in`. None → read the ticket: missing, other event or stale
    epoch → `invalid`; `cancelled` → `cancelled`; `checked_in_at` set → `already` with the time in the event's time zone
-   and the staffer's display name ("Sam K."). Store the outcome on the `checkin_event` row; commit.
-   `invalid` also consumes `checkin_miss` (60 per staff per hour; over → 429 for that staffer).
+   and the staffer's display name ("Sam K."). Then insert the `checkin_event` row **with its final outcome** (never
+   null) and `ticket_id` set only when the ticket belongs to this event (null for `invalid`); `invalid` also
+   `consumeRate("checkin_miss")` in the same transaction; commit. If two requests with the same op id race, the
+   second's insert hits the unique (`actor_id`, `op_id`) index, its transaction rolls back (its ticket update matched
+   nothing anyway), and the route re-reads and returns the first row as `replayed`.
 4. Response: `{ outcome, replayed, holderName, ticketType, guestLabel, at?, by? }`. No email, no other tickets.
 
 **Why exactly one wins:** two concurrent updates on the same row serialise on the row lock; under READ COMMITTED the
 second re-evaluates `checked_in_at is null` after the first commits, matches nothing, and reads the winner. **Required
 tests:** 10 parallel scans of one ticket by two staff → exactly one `checked_in`, nine `already` naming the winner;
-same `opId` replayed → `checked_in` with `replayed: true`; reissued ticket's old QR → `invalid`; tampered MAC, wrong
-event, cancelled ticket; revoked staff → 404 on the next scan; a user who isn't staff → 404; outside the window → 409;
-miss limit → 429.
+same `opId` replayed → `checked_in` with `replayed: true`; same `opId` with a different code → 409; two parallel
+requests with one `opId` → one ledger row, both answers `checked_in`; `invalid` rows carry no `ticket_id`; reissued ticket's old QR → `invalid`; tampered MAC, wrong
+event, cancelled ticket; revoked staff → 404 on the next scan; an organiser whose role was revoked → 404 (and the hidden event is
+closed to their staff, 409); a user who isn't staff → 404; outside the window → 409; after 60 misses the next request
+→ 429 without a lookup (spy on the resolver).
 
 **Offline (decision): online-only in v1, with fast retry.** An offline queue would let two doors each admit the same
 screenshot and reconcile later, which is exactly the fraud the check-in exists to stop; app 13's offline ledger is for
@@ -161,8 +189,10 @@ isn't doubled); an offline banner from `navigator.onLine` and failed fetches; th
 is visible) keeps the Cloud Run instance warm during doors. The paper fallback is the organiser's **door list CSV**
 (name, ticket type, status; no emails, no codes), printed before doors (Decisions Q3).
 
-**Undo:** the organiser only (`POST /api/organizer/events/[id]/tickets/[ticketId]/undo-checkin`), logged `undone` in
-`checkin_event` (Decisions Q7).
+**Undo:** the organiser only (`POST /api/organizer/events/[id]/tickets/[ticketId]/undo-checkin`), a conditional
+`update ticket set checked_in_at = null, checked_in_by = null, checkin_op_id = null where id = $t and event_id = $e and
+checked_in_at is not null returning id`. One row → logged `undone` in `checkin_event`; zero rows → 200 `{ undone: false
+}` with the current state and no log row, so a double tap is harmless (Decisions Q7).
 
 ## Scanner in a phone browser (decision: no paid SDKs)
 
@@ -174,8 +204,12 @@ is visible) keeps the Cloud Run instance warm during doors. The paper fallback i
   (Android Chrome). `Permissions-Policy: camera=(self)` on `/door/*` and `camera=()` everywhere else (`next.config.ts`
   headers).
 - **Decoder:** native `BarcodeDetector` when `BarcodeDetector.getSupportedFormats()` includes `qr_code` (Chrome on
-  Android, Chrome and Edge on desktop). Otherwise **`jsqr`** (Apache-2.0, pure JS, no network, pinned exactly) in a
-  module Web Worker fed by `createImageBitmap` frames scaled to 640 px at about 8 fps. **iOS Safari has no
+  Android, Chrome and Edge on desktop). Otherwise **`jsqr` 1.4.0** (Apache-2.0, pure JS, no install scripts, no network;
+  pinned exactly with its lockfile integrity hash, and the reviewer checks the published tarball's contents) in a Web
+  Worker. Frames are drawn to a 640 px canvas **on the main thread**, read with `getImageData`, and the pixel buffer is
+  **transferred** to the worker (`postMessage(img.data, [img.data.buffer])`) at about 8 fps; the worker needs no
+  `OffscreenCanvas` or `createImageBitmap`, so it runs on every iOS version with `getUserMedia` (minimum stated in the
+  README: iOS 15). **iOS Safari has no
   `BarcodeDetector`** (WebKit keeps it behind an experimental flag), and every iOS browser is WebKit, so **all iPhones
   use the jsQR path**; 15.4 tests it on a real iPhone and records the scan time. No CDN, no WASM download.
 - **Flow:** a decode must match the `ET1:` regex before anything is sent (other QR codes show "Not a ticket"); the same
@@ -187,6 +221,11 @@ is visible) keeps the Cloud Run instance warm during doors. The paper fallback i
   accepts a door code (or a full `ET1:` text from a wedge scanner); **name search** (≥2 letters, prefix match, ≤10
   results: name, ticket type, status) with a check-in button behind "ID checked?".
 - **Denied camera or no camera:** the page says how to allow it per browser and keeps manual entry and search working.
+- **Content Security Policy on `/door/*` and `/tickets/*`** (`src/proxy.ts`, the Next 16 name for middleware; read the
+  CSP guide in `node_modules/next/dist/docs/` first): a per-request nonce and `default-src 'self'; script-src 'self'
+  'nonce-<n>' 'strict-dynamic'; worker-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'self'
+  'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`. Owned by 15.2; the
+  scanner worker and the PNG export (15.4, 15.8) must work under it.
 
 ## FAQ bot retrieval (decision: put the whole FAQ in the prompt)
 
@@ -196,7 +235,8 @@ index to keep fresh, deterministic citations, and one model call. To make it fit
 `MAX_PROMPT_CHARS` (12,000), the organiser's FAQ has a **budget of 40 entries and 8,500 characters** (question ≤200,
 answer ≤800 each, enforced on save, shown as a meter in the editor); the event block (when, doors, where, about, ticket
 type names, contact) is ≤2,600; the question ≤300; tags and labels ≤500. `buildFaqPrompt()` asserts the total, with a test at the maximum
-sizes. Full-text search is used only for the demo-mode lookup (below).
+sizes. **If that test fails, the FAQ budget shrinks** (in steps of 250 characters, the editor meter following); the
+event block and question caps stay as they are. Full-text search is used only for the demo-mode lookup (below).
 
 ## Rate limits and caps
 
@@ -236,9 +276,16 @@ it; removing it would break that test. `DAILY_USAGE_KINDS` stays `["ai", "demo_l
 | `event_staff` | PK (`event_id`, `user_id`), `invited_by`, `created_at` | `event_id` → organiser manages | Deleted on removal |
 | `staff_invite` | `id`, `event_id`, `token_digest` bytea unique (sha256 of a random 128-bit token), `expires_at`, `used_by`, `used_at`, `created_by` | via `event` | Token shown once to the organiser as a link; only its digest is stored |
 | `checkin_event` | `id`, `event_id`, `ticket_id` null, `actor_id`, `op_id` uuid, `method` (`qr`, `code`, `list`, `undo`), `outcome` (`checked_in`, `already`, `invalid`, `cancelled`, `undone`), `at` | `actor_id` | Unique (`actor_id`, `op_id`); the audit log and replay ledger |
-| `faq_entry` | `id`, `event_id` FK cascade, `ref_no` int (per event, never reused), `question` ≤200, `answer` ≤800, `position`, timestamps | via `event` | Unique (`event_id`, `ref_no`); cited as `F<ref_no>`; every write bumps `event.faq_version` |
-| `faq_ask` | `id`, `event_id`, `question` ≤300, `q_hash` (sha256 of normalised question), `faq_version`, `status`, `answer` ≤600, `citations` text[], `mode` (`model`, `quoted`, `lookup`, `cached`), `flags` text[], `created_at` | — (**no user id**: anonymous by design) | Index (`event_id`, `q_hash`, `faq_version`); pruned at 30 days; shown to the event's organiser only |
+| `faq_entry` | `id`, `event_id` FK cascade, `ref_no` int 1–9,999 (per event, never reused), `question` ≤200, `answer` ≤800, `position`, timestamps | via `event` | Unique (`event_id`, `ref_no`); cited as `F<ref_no>`; every write bumps `event.faq_version` (so does every edit to a field in E1–E5: title, times, venue, address, description, ticket type names, registration close, contact) |
+| `faq_ask` | `id`, `event_id`, `question` ≤300, `q_hash` (sha256 of normalised question), `faq_version`, `status`, `answer` ≤600 null (the model's text in `model` mode; null in `quoted`, `lookup` and `not_in_faq`, which are rendered from `citations` against the entries of the same `faq_version`), `citations` text[], `mode` (`model`, `quoted`, `lookup`, `cached`), `flags` text[], `created_at` **stored to the hour** (`date_trunc('hour', now())`) | — (**no user id**: anonymous by design) | Index (`event_id`, `q_hash`, `faq_version`); pruned at 30 days; shown to the event's organiser only, grouped by day |
 | `rate_event`, `daily_usage` | template | | Kinds above |
+
+**Deletes.** `event_id` on `ticket_type`, `registration`, `ticket`, `event_staff`, `staff_invite`, `checkin_event`,
+`faq_entry` and `faq_ask` is `on delete cascade`, as are `ticket.ticket_type_id`, `ticket.registration_id` and
+`registration.ticket_type_id`, so deleting a draft or cancelled event (organiser, typed confirm; the smoke does it every
+run) removes everything about it in one statement. User FKs that own rows (`event.organizer_id`,
+`registration.user_id`, `ticket.holder_user_id`, `checkin_event.actor_id`, `event_staff.user_id`) are `restrict`
+(account deletion is out of scope); `checked_in_by`, `invited_by`, `used_by` and `created_by` are `on delete set null`.
 
 **Access rules** (`src/lib/access.ts`, integration-tested per row): public → `published`, not hidden events, their
 ticket types (name, seats left) and FAQ entries; never attendee data. Attendee → own registrations and tickets (QR text
@@ -259,7 +306,7 @@ Each route has one owning issue (last column); a UI issue depends on every route
 | `/e/[slug]` | page | public / user | Details in the event's time zone, ticket types with seats left, register (signed in; quantity, "Your name and email go to the organiser"), FAQ list with `#F<n>` anchors, "Ask a question" (signed in) | 15.7 |
 | `/tickets` | page | user | My upcoming and past tickets | 15.8 |
 | `/tickets/[id]` | page | user (holder) | QR (inline SVG), door code, holder, type, event; Download PNG, Print, Reissue, Cancel registration | 15.8 |
-| `/staff-invite/[token]` | page | user | "Join the door team for <event>?" → accept; `Referrer-Policy: no-referrer`, token dropped from the address bar after accepting | 15.8 |
+| `/staff-invite` | page | user | The invite link is `/staff-invite#t=<token>`: the token is in the **fragment**, which browsers never send, so Cloud Run request logs and referrers never see it. The page reads `location.hash`, shows "Join the door team?", POSTs `{ token }` to accept, then `history.replaceState` drops the fragment | 15.8 |
 | `/organizer` | page | organizer | My events by status, new event | 15.9 |
 | `/organizer/events/[id]` (`new` uses the same editor) | page | organizer | Details, ticket types and capacity, publish / cancel / delete | 15.9 |
 | `/organizer/events/[id]/faq` | page | organizer | FAQ editor with the budget meter, "Try the bot", unanswered questions (last 30 days) | 15.9 |
@@ -267,18 +314,18 @@ Each route has one owning issue (last column); a UI issue depends on every route
 | `/door` | page | user (staff or organiser) | Events I can check in for today and the next 7 days | 15.10 |
 | `/door/[eventId]` | page | staff / organiser | Scanner, manual code, name search, counter | 15.10 |
 | `/admin` | page | admin | Counts, roles, hide/unhide event by id, demo button | 15.11 |
-| `GET /api/events`, `GET /api/events/[slug]` | route | public (ip-limit) | Published events; one event with types and seats left | 15.1 |
+| `GET /api/events`, `GET /api/events/by-slug/[slug]` | route | public (ip-limit) | Published events; one event by slug with types and seats left (a static `by-slug` segment, so `/api/events/[id]/…` keeps a single dynamic name) | 15.1 |
 | `GET/POST /api/organizer/events`, `GET/PATCH/DELETE /api/organizer/events/[id]` | route + actions | organizer (own) | Idempotent create; `version` on PATCH (stale → 409); publish needs ≥1 ticket type; status transitions on the server | 15.1 |
 | `POST /api/organizer/events/[id]/ticket-types`, `PATCH/DELETE …/ticket-types/[typeId]` | route + actions | organizer (own) | Delete only with `issued = 0` | 15.1 |
 | `GET/POST /api/organizer/events/[id]/staff`, `DELETE …/staff/[userId]`, `POST …/staff/invites`, `DELETE …/staff/invites/[inviteId]` | route + actions | organizer (own) | Staff list, remove, create invite (returns the link once), revoke invite | 15.1 |
-| `POST /api/staff-invites/accept` | route + action | user | Body `{ token }`; digest lookup, not expired, unused → `event_staff` row; same answer for unknown, used and expired | 15.1 |
+| `POST /api/staff-invites/accept` | route + action | user | Body `{ token }`; one transaction: `update staff_invite set used_by = $actor, used_at = now() where token_digest = $d and used_at is null and expires_at > now() returning event_id`, then `insert into event_staff … on conflict do nothing`; zero rows → the same 404 for unknown, used and expired | 15.1 |
 | `GET /api/door/events` | route | user | Events the actor can check in for | 15.1 |
 | `POST /api/events/[id]/register`, `DELETE /api/registrations/[id]` | route + actions | user | Register (above); cancel own | 15.2 |
 | `GET /api/tickets`, `GET /api/tickets/[id]`, `POST /api/tickets/[id]/reissue` | route + actions | user (holder) | Own tickets; one ticket with `qrText` and `doorCode`; reissue | 15.2 |
 | `GET /api/organizer/events/[id]/attendees`, `POST …/guests`, `POST …/tickets/[ticketId]/void`, `POST …/tickets/[ticketId]/reissue` | route + actions | organizer (own) | Attendee list (paged, 50), guest-list tickets, void, reissue | 15.2 |
 | `POST /api/door/[eventId]/checkin` | route | staff / organiser | Check-in (above) | 15.3 |
 | `GET /api/door/[eventId]/search?q=`, `GET /api/door/[eventId]/stats` | route | staff / organiser | Name search; checked in / issued per type | 15.3 |
-| `POST /api/organizer/events/[id]/tickets/[ticketId]/undo-checkin`, `GET /api/organizer/events/[id]/door-list.csv` | route | organizer (own) | Undo; CSV (formula-injection safe: cells starting `=+-@` get a leading `'`) | 15.3 |
+| `POST /api/organizer/events/[id]/tickets/[ticketId]/undo-checkin`, `GET /api/organizer/events/[id]/door-list.csv` | route | organizer (own) | Undo; CSV: every field quoted (`"` doubled), cells starting `=`, `+`, `-`, `@`, tab or CR get a leading `'`; `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment; filename="door-list-<slug>.csv"`, `Cache-Control: no-store` | 15.3 |
 | `GET /api/events/[id]/faq`, `POST /api/organizer/events/[id]/faq`, `PATCH/DELETE /api/organizer/events/[id]/faq/[entryId]` | route + actions | public (published) / organizer (own) | FAQ read; CRUD with the budget | 15.5 |
 | `POST /api/events/[id]/ask` | route | user | FAQ bot | 15.5 |
 | `GET /api/organizer/events/[id]/questions` | route | organizer (own) | Unanswered and recent questions | 15.5 |
@@ -302,7 +349,7 @@ use them).
   z.object({
     status: z.enum(["answered", "not_in_faq", "off_topic"]),
     answer: z.string().max(600),                              // plain text
-    citations: z.array(z.string().regex(/^[EF][0-9]{1,3}$/)).max(3),
+    citations: z.array(z.string().regex(/^[EF][0-9]{1,4}$/)).max(3),
   })
   ```
 - **Server checks** (`src/lib/faq-checks.ts`, every answer):
@@ -351,14 +398,15 @@ use them).
 | QR leaks personal data | Payload is version, ticket id, epoch and MAC only; no URL; QR text only on the holder's own page and API; `no-store`, `no-referrer` |
 | Shared screenshot / duplicate entry | First scan wins atomically; later scans show who and when; holder or organiser reissues (old QR dies); online-only so two doors can't both admit |
 | Two staff scanning at once | Single conditional `update … where checked_in_at is null`; row lock; parallel test; idempotent op ids so retries don't flip green to red |
-| Overselling | Conditional `issued` increment plus check constraint in the registration transaction; event `for share` vs cancel `for update`; 50-way parallel test |
+| Overselling or seat leaks | Conditional `issued` increment plus check constraint in the registration transaction; event `for share` vs cancel `for update`; cancel and void decrement by rows actually changed; 50-way and cancel-vs-void parallel tests |
 | Registration hoarding by bots | Sign-up limits (Better Auth), one active registration per user per event, quantity cap, `register` rate; organiser can void; capacity is free tickets only |
 | Attendee data across users or events | Holder filter on attendee rows; organiser filter on event rows; staff see name/type/status only; 404 for foreign and missing ids alike; integration test per access rule incl. id guessing on tickets and events |
-| Stale door access | `event_staff` checked on every door request; removal immediate; invites single-use, 72 h, digest-only, same answer for unknown/used/expired |
+| Stale door access | `event_staff` checked on every door request; removal immediate; organiser branch requires the current `organizer` role; hidden events closed to check-in; invites single-use (conditional update), 72 h, digest-only, token only in the URL fragment, same answer for unknown/used/expired |
+| Script injection on the ticket and door pages | Nonce CSP with `strict-dynamic`, `worker-src`/`connect-src 'self'`, `frame-ancestors 'none'`; `jsqr` pinned with integrity and tarball reviewed |
 | Prompt injection via questions or FAQ text | Framed as data, `‹ ›` escaping, no tools, schema-validated, per-event citation check, number/link check, plain-text rendering |
 | Bot invents times, prices or policies | Grounded prompt; uncited or unsupported numbers and links → verbatim quote or `not_in_faq` |
 | AI endpoint abuse | Signed-in, 10/hour per user, 300/day per event, app-wide daily cap, 300-char input, 24 h cache, demo fallback |
-| CSV formula injection | Leading `'` on cells starting `=+-@`; no emails or codes in the door list |
+| CSV formula injection | Every field quoted; leading `'` on cells starting `=`, `+`, `-`, `@`, tab or CR; served as an attachment; no emails or codes in the door list |
 | Camera misuse | `camera=(self)` only on `/door/*`, `camera=()` elsewhere; started by a tap, stopped on hide |
 | Sensitive values in logs | Never log QR text, door codes, invite tokens, names, emails or questions; check-in logs carry event id, outcome and method |
 | Role escalation / fake events | Roles not client-writable; `organizer` admin-granted and audited; admin hide; revoking hides events |
@@ -436,24 +484,27 @@ everything it seeds; no backend issue depends on a UI issue.
    revoking `organizer` hides their published events and re-granting unhides only those, and the template's
    `test/usage.integration.test.ts` passes unchanged. Dependencies: none.
 2. **15.2 `[fullstack-builder] Registration, capacity, ticket issuing and QR signing`** · `claude` · **2nd: Codex**
-   Files: `src/lib/tickets/keys.ts`, `token.ts` (+ test), `qr.ts` (pinned encoder, `qrSvg`) (+ test),
+   Files: `src/lib/tickets/keys.ts`, `token.ts` (+ test), `src/proxy.ts` (CSP), `qr.ts` (pinned encoder, `qrSvg`) (+ test),
    `src/lib/registrations.ts`, `src/lib/tickets.ts`, the routes owned by 15.2, `test/registration.integration.test.ts`,
    `test/tickets.integration.test.ts`. Done when every test in "Registration and capacity" passes; the token round-trips;
    a flipped bit in id, epoch or MAC fails; the payload contains no name, email or event id (test); the QR is
-   alphanumeric mode, version ≤5; the door code normalises `O/I/L`; reissue changes QR text and door code and bumps
-   `qr_epoch`; reissue limits hold; `GET /api/tickets/[id]` is 404 for anyone but the holder and sends `no-store`.
-   Dependencies: 15.1.
+   alphanumeric mode, version 3-M; the door digest is the keyed HMAC (no bare sha256 anywhere); the door code normalises `O/I/L`; reissue changes QR text and door code and bumps
+   `qr_epoch`; reissue limits hold; `GET /api/tickets/[id]` is 404 for anyone but the holder and sends `no-store`;
+   `/tickets/*` and `/door/*` carry the CSP above with a fresh nonce per request (`src/proxy.ts`, test). Dependencies:
+   15.1.
 3. **15.3 `[fullstack-builder] Check-in API, door search, counter, undo and door list`** · `claude` · **2nd: Codex**
    Files: `src/lib/checkin.ts`, the routes owned by 15.3, `test/checkin.integration.test.ts`. Done when every test in
    "Check-in" passes, a check-in answers in ≤200 ms p95 locally (50 sequential), search returns no email and only this
    event's tickets, the counter matches the table, undo is organiser-only and logged, and the CSV has no emails or
-   codes and escapes formula cells. Dependencies: 15.1, 15.2.
+   codes, quotes every field, escapes cells starting `= + - @`, tab or CR (test per character) and is sent as an
+   attachment; undo twice → one `undone` row; the ledger, miss-limit and revoked-organiser tests above pass. Dependencies: 15.1, 15.2.
 4. **15.4 `[fullstack-builder] Phone-browser QR scanner module`** · `antigravity`
    Files: `src/lib/scanner/detect.ts` (BarcodeDetector feature check), `camera.ts`, `frame-loop.ts`, `jsqr.worker.ts`,
    `dedupe.ts`, `manual.ts` (door code and `ET1:` parsing), `use-scanner.ts`, `next.config.ts` (`Permissions-Policy`
-   headers), `package.json` (`jsqr` pinned exactly), tests with a mocked `BarcodeDetector` and a QR rendered by 15.2's
+   headers), `package.json` (`jsqr` 1.4.0 exact, integrity in `pnpm-lock.yaml`), tests with a mocked `BarcodeDetector` and a QR rendered by 15.2's
    `qrSvg` rasterised in the test. No routes, no database, no UI page. Done when: the native path is chosen only when
-   `qr_code` is supported; the jsQR worker decodes the test QR; a non-`ET1` code is rejected locally; the same text
+   `qr_code` is supported; the jsQR worker decodes the test QR from a transferred `ImageData` buffer;
+   the worker loads under 15.2's CSP; a non-`ET1` code is rejected locally; the same text
    within 3 s is ignored; the camera stops on `visibilitychange`; `camera=(self)` is sent only under `/door`; and the PR
    reports a manual test on a real iPhone (Safari) and an Android phone (Chrome) with time-to-decode for each.
    Dependencies: 15.2.
@@ -464,7 +515,8 @@ everything it seeds; no backend issue depends on a UI issue.
    `test/ai-evals.test.ts`, `test/faq.integration.test.ts`, `pnpm eval:faq`. Done when the evals pass stubbed; a
    41st entry or 8,501st character is refused; a maximum-size event's prompt is ≤ `MAX_PROMPT_CHARS`; the prompt test
    shows no attendee data or seats-left numbers; a citation of another event's entry is dropped (test); the cache hits
-   on the same `faq_version` and misses after an edit; `faq_ask` rows carry no user id; demo mode uses the fixture only
+   on the same `faq_version` and misses after an FAQ edit **and after an event-detail edit** (e.g. doors time changed:
+   test); a quoted or lookup answer stores `answer` null and renders from citations; `faq_ask.created_at` is hour-rounded; `faq_ask` rows carry no user id; demo mode uses the fixture only
    when `matchFaq` agrees, against a test entry inserted with `DEMO_FAQ_PARKING_ID`. Dependencies: 15.1.
 6. **15.6 `[fullstack-builder] Demo workspace and smoke script`** · `antigravity`
    Files: `src/lib/demo/seed.ts` (2 organisers, 4 staff, 8 attendees written with Drizzle and one shared password
@@ -473,17 +525,20 @@ everything it seeds; no backend issue depends on a UI issue.
    `POST /api/admin/demo` (sole owner; admin, `demo_load` cap), `scripts/smoke.sh` per "Smoke and 375px". Inserts in
    batches of 500. Done when one demo load finishes in **≤20 s inside a `--cpus=1 --memory=512m` container** against a
    Postgres with `shared_buffers=96MB` (the PR states the time), a second load replaces the demo rows without
-   duplicates or touching non-demo data, and `pnpm smoke` passes twice back-to-back with the organiser's event count
-   unchanged after the second run. Dependencies: 15.1, 15.2, 15.3, 15.5.
+   duplicates or touching non-demo data (a test inserts non-demo users, events and tickets and asserts they're
+   unchanged after two loads), and `pnpm smoke` passes twice back-to-back with the organiser's event count
+   unchanged after the second run. **Reviewer focus** (an Antigravity slice with no Codex review): `POST
+   /api/admin/demo` deletes and rewrites only rows owned by users carrying the demo marker and the fixed ids in
+   `src/lib/demo/ids.ts`; every delete is scoped by them. Dependencies: 15.1, 15.2, 15.3, 15.5.
 7. **15.7 `[ui-builder] Landing, events list and event page`** · `grok` — `/`, `/events`, `/e/[slug]` (register
    with `opFor` + `useAsyncAction`, sold-out and already-registered states, FAQ list with anchors, ask box with
    citation chips, mode badge for quoted/lookup/demo, the anonymity note), nav without `/dashboard` and `/dashboard`
    redirecting to `/tickets`. Done when a visitor can find the demo event, sign up, register and ask a question at
    375px and desktop. Dependencies: 15.1, 15.2, 15.5.
 8. **15.8 `[ui-builder] My tickets, ticket page and staff invite`** · `grok` — `/tickets`, `/tickets/[id]` (inline
-   QR, door code, PNG download, print stylesheet, reissue with confirm, cancel registration), `/staff-invite/[token]`.
+   QR, door code, PNG download, print stylesheet, reissue with confirm, cancel registration), `/staff-invite`.
    Done when a ticket downloads as a PNG on iOS Safari and Android Chrome, prints one per page, and the invite page
-   drops the token from the address bar after accepting. Dependencies: 15.1, 15.2.
+   reads the token from the fragment (never a path or query) and drops it from the address bar after accepting. Dependencies: 15.1, 15.2.
 9. **15.9 `[ui-builder] Organiser dashboard, event editor and FAQ editor`** · `grok` — `/organizer`,
    `/organizer/events/[id]` (and new: details with time-zone picker, ticket types, publish / cancel / delete with typed
    confirm), `/organizer/events/[id]/faq` (budget meter, reorder buttons, "Try the bot", questions list). Done when an
@@ -492,14 +547,16 @@ everything it seeds; no backend issue depends on a UI issue.
     (search, void, undo, guest add, staff and invite links with copy, CSV), `/door`, `/door/[eventId]` on
     `useScanner()` only (no direct camera or decoder calls): result banners, tone, manual entry, name search with "ID
     checked?", counter polled every 15 s while visible, retry with the same `opId` and the offline banner. Done when a
-    staffer can scan the demo ticket on a phone, see green then red on a second scan, and check in by door code and by
+    staffer can scan a ticket created by the test on a phone, see green then red on a second scan, and check in by door code and by
     name at 375px. Dependencies: 15.1, 15.2, 15.3, 15.4.
 11. **15.11 `[ui-builder] Admin`** · `grok` — `/admin` (counts, grant/revoke organiser, hide/unhide event with reason,
     demo button). Done when 375px and desktop pass. Dependencies: 15.1, 15.6.
 12. **15.12 `[devops] Deploy app 15 to Google Cloud (default URL)`** · `claude` · repo **`30-apps-infra`** · **2nd:
     Codex** — `event-ticketing` (`title: Event Ticketing and Check-in`, `clouds: [gcp]`, `sha-` tag, **`domain: null`**,
     `ai: gemini`; no `secrets`, no `storage`, no `timeout`). Done when the plan adds only app 15's service, database and
-    IAM binding, health shows the tag on the run.app URL, the camera works over its HTTPS, and the full live smoke passes
+    IAM binding, health shows the tag on the run.app URL, the camera works over its HTTPS, **one demo load timed
+    on the live service against the e2-micro finishes in ≤20 s** (time in the PR; over 25 s, stop and ask before the
+    button is used), and the full live smoke passes
     after D5. Dependencies: 15.1–15.11, D4.
 13. **15.13 `[devops] Custom domain for app 15`** · `claude` · repo **`30-apps-infra`** — `domain:
     app15.breakthruventures.ai`. Done when the mapping is `Ready`, `APP_URL` switched (`custom_domain_ready` output),

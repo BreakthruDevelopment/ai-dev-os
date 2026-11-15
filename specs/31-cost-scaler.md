@@ -391,7 +391,9 @@ the advisor (demo) and every figure is marked verified; unauthenticated `POST /a
 
 7. **Multi-agent advisor (Michael, 2026-11-15):** the scaling advisor becomes a coordinator, pricing and migration team on Google ADK now (issue 31.12, design in "Multi-agent advisor (amendment, 2026-11-15)"). 31.4's single agent stays as the first fallback.
 
-**Open questions for Michael (amendment, 2026-11-15), each with a recommendation:**
+**Amendment decisions (Michael, 2026-11-15).** Q1: the Gemini key's project has **no billing linked** (Michael checked); re-check it periodically (a monthly reminder is posted to the `Ops report (nightly)` issue). Q2–Q5: recommendations accepted as written below.
+
+**Questions as asked (amendment, 2026-11-15), each with its recommendation:**
 
 1. **Is the shared `GEMINI_API_KEY` on a billed project?** This affects **every `ai: gemini` app on that key**, not
    just app 31: if the key was created in the billed Cloud Run project, they are all billed. App 31 can't get its own

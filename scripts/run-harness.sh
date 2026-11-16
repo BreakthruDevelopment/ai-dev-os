@@ -38,6 +38,11 @@
 #   removes the harness label and adds `hold`. With commits but no PR it keeps the branch and the label. A branch that changes
 #   foundation files isn't pushed: it stays local, `in-progress` comes off and the issue gets a comment.
 #
+# Port: each repo gets its own port for the app, the health check and `pnpm smoke` (exported as PORT, APP_URL and
+# BASE_URL), derived from the repo name (cksum, 10000-19999), so two runners on different repos never share one. A
+# PORT already set in the environment is used as it is. If the port is in use, the repo is refused before anything is
+# claimed; the runner never picks another one.
+#
 # Logs: ~/30apps/logs/<harness>-<date>.log. Stop: Ctrl-C, or `touch ~/30apps/STOP` to stop before the next issue.
 # Setup and the safety trade-offs: runbooks/harnesses-on-mac.md. Works from any folder.
 #
@@ -186,6 +191,47 @@ intake_problem() { # $1 issue body. Prints why $HARNESS mustn't start it and ret
   return 1
 }
 
+# ---------------------------------------------------------------------------------------------------------------
+# Per-repo port. Two runners on different repos can run at once (the lock is per repo), so each repo gets its own
+# port for the app, the health check and `pnpm smoke`: a hash of the repo name mapped into PORT_MIN..PORT_MIN+PORT_SPAN-1.
+# Same repo, same port, every run: no state file, no scanning for a free one. cksum is POSIX, so macOS and Linux agree.
+# The range sits above the usual dev ports (3000, 5173, 5432, 8080) and below the OS's ephemeral ports (32768+ on
+# Linux, 49152+ on macOS), so nothing else on the Mac picks one of these by itself. A PORT set in the environment
+# wins, so a person can pin one.
+# ---------------------------------------------------------------------------------------------------------------
+PINNED_PORT="${PORT:-}"  # read once, before anything exports PORT for a harness run
+PORT_MIN=10000
+PORT_SPAN=10000
+port_for_repo() { # $1 repo name. Prints its derived port
+  local sum
+  sum=$(printf '%s' "$1" | cksum | awk '{print $1}')
+  printf '%s\n' $((PORT_MIN + sum % PORT_SPAN))
+}
+valid_port() { # $1 value: a plain decimal port from 1024 to 65535 (no sign, no leading zero)
+  case "$1" in ''|*[!0-9]*|0*) return 1 ;; esac
+  [ "$1" -ge 1024 ] && [ "$1" -le 65535 ]
+}
+port_busy() { # $1 port: true if something already listens on it (checks loopback v4/v6, plus lsof when there is one)
+  local host
+  for host in 127.0.0.1 ::1; do
+    (exec 3<>"/dev/tcp/$host/$1") 2>/dev/null && return 0
+  done
+  if command -v lsof >/dev/null 2>&1 && [ -n "$(lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null </dev/null)" ]; then return 0; fi
+  return 1
+}
+REPO_PORT=""
+REPO_PORT_SOURCE=""
+resolve_port() { # $1 repo; sets REPO_PORT and REPO_PORT_SOURCE; returns 1 if PORT in the environment isn't a valid port
+  if [ -n "$PINNED_PORT" ]; then
+    valid_port "$PINNED_PORT" || return 1
+    REPO_PORT=$PINNED_PORT
+    REPO_PORT_SOURCE="pinned by PORT in the environment"
+  else
+    REPO_PORT=$(port_for_repo "$1")
+    REPO_PORT_SOURCE="derived from the repo name"
+  fi
+}
+
 # Test entry points, used by `python3 scripts/issuelib.py --self-test` (CI): no gh, no harness, no log.
 case "${1:-}" in
   --check-body) # stdin: an issue body. Prints "ok" or "skip: <reason>", then its dependency URLs
@@ -200,6 +246,9 @@ case "${1:-}" in
   --guard) guard_reason "$2" "$3" "$4"; exit 0 ;;          # $2 dir, $3 branch, $4 base: prints why it holds, or nothing
   --check-clone) clone_config_problem "$2" "$3"; exit 0 ;; # $2 dir, $3 repo: prints why the clone isn't trusted
   --git) shift; git "$@"; exit $? ;;                        # git as this script runs it (hooks and fsmonitor off)
+  --port-for) port_for_repo "${2:-}"; exit 0 ;;            # $2 repo: the port derived from its name
+  --resolve-port) resolve_port "${2:-}" || exit 1; echo "$REPO_PORT"; exit 0 ;;  # $2 repo: the port a run would use (honours PORT)
+  --port-busy) port_busy "${2:-}"; exit $? ;;              # $2 port: 0 if something listens on it, 1 if it's free
   --dep-state) jq -r "$DEP_STATE_JQ"; exit $? ;;  # stdin: one issue's JSON (needs jq; gh --jq in real runs)
 esac
 
@@ -722,7 +771,7 @@ prepare_clone() { # $1 repo; prints nothing, returns non-zero (with a log line) 
 build_prompt() { # $1 repo, $2 number, $3 role, $4 branch
   local db_note
   if [ -n "${REPO_DB_URL:-}" ]; then
-    db_note="TEST_DATABASE_URL and DATABASE_URL point at a local Postgres database for this repo, and PORT=3000 is set. The integration tests (test/*.integration.test.ts) must run and pass locally before you finish: check that the pnpm test summary shows no skipped tests; if any are skipped or fail, fix the cause rather than skipping them. Then smoke, as .github/workflows/ci.yml does: after pnpm build, run \`pnpm db:migrate\`, \`cp -r public .next/standalone/\` and \`cp -r .next/static .next/standalone/.next/\`, start the app with \`nohup node .next/standalone/server.js > .harness/app.log 2>&1 & echo \$! > .harness/app.pid\`, wait until \`curl -fsS localhost:3000/api/health\` answers, run \`pnpm smoke\`, then stop the app with \`kill \"\$(cat .harness/app.pid)\"\` (never \`pkill\` or any kill that matches on a name: other work runs on this Mac). Don't install or start a database."
+    db_note="TEST_DATABASE_URL and DATABASE_URL point at a local Postgres database for this repo, and this repo's port is $REPO_PORT: PORT=$REPO_PORT, APP_URL=http://localhost:$REPO_PORT and BASE_URL=http://localhost:$REPO_PORT are set for you (another app may be running on this Mac at the same time on a different port, so use \$PORT and never 3000 or any other port you pick yourself). The integration tests (test/*.integration.test.ts) must run and pass locally before you finish: check that the pnpm test summary shows no skipped tests; if any are skipped or fail, fix the cause rather than skipping them. Then smoke, as .github/workflows/ci.yml does: after pnpm build, run \`pnpm db:migrate\`, \`cp -r public .next/standalone/\` and \`cp -r .next/static .next/standalone/.next/\`, start the app with \`nohup node .next/standalone/server.js > .harness/app.log 2>&1 & echo \$! > .harness/app.pid\`, wait until \`curl -fsS localhost:$REPO_PORT/api/health\` answers, run \`pnpm smoke\`, then stop the app with \`kill \"\$(cat .harness/app.pid)\"\` (never \`pkill\` or any kill that matches on a name: other work runs on this Mac). Don't install or start a database."
   else
     db_note="This run has no local database (--no-db-ok), so the integration tests (test/*.integration.test.ts) skip themselves and \`pnpm smoke\` can't run. Don't install or start a database. In the PR description, say plainly that the integration tests and smoke were skipped locally and that CI runs them."
   fi
@@ -749,12 +798,20 @@ commits_on() { # $1 dir, $2 branch, $3 base (default origin/main): commits on th
 }
 
 run_harness_once() { # $1 prompt, $2 dir, $3 output file; returns the harness's exit status
-  local rc
+  local rc busy_msg
+  # A retry (or a leftover app from the first attempt) could find the port taken; never start against that.
+  if port_busy "$REPO_PORT"; then
+    busy_msg="port $REPO_PORT for ${2##*/} is already in use, so $HARNESS wasn't started (another app, or a leftover server from an earlier attempt)"
+    log "REFUSE: $busy_msg"
+    printf '%s\n' "$busy_msg" > "$3"
+    return 97
+  fi
   PUSH_GUARD_DIR="$2"
   git -C "$2" config remote.origin.pushurl "DISABLED-by-run-harness-while-the-harness-runs"
   (
     cd "$2" || exit 1
-    export AI_PROVIDER=demo NEXT_TELEMETRY_DISABLED=1 APP_URL=http://localhost:3000 PORT=3000
+    # shellcheck disable=SC2030  # deliberately only for the harness's subshell
+    export AI_PROVIDER=demo NEXT_TELEMETRY_DISABLED=1 APP_URL="http://localhost:$REPO_PORT" BASE_URL="http://localhost:$REPO_PORT" PORT="$REPO_PORT"
     export BETTER_AUTH_SECRET="local-only-secret-not-used-anywhere-else-0123456789"  # same idea as CI's dummy
     # shellcheck disable=SC2030  # deliberately only for the harness's subshell
     if [ -n "${REPO_DB_URL:-}" ]; then export TEST_DATABASE_URL="$REPO_DB_URL" DATABASE_URL="$REPO_DB_URL"
@@ -854,7 +911,7 @@ $FAIL_MARK" >/dev/null 2>&1 || log "warning: couldn't comment on $repo#$n"
   waits=$RETRY_BACKOFF
   while :; do
     out="$dir/.harness/output-$attempt.log"
-    log "running $HARNESS on $repo#$n ($role) in $dir, attempt $attempt of $max_attempts, limit ${TIMEOUT_MIN} min"
+    log "running $HARNESS on $repo#$n ($role) in $dir, attempt $attempt of $max_attempts, limit ${TIMEOUT_MIN} min, port $REPO_PORT ($REPO_PORT_SOURCE)"
     run_harness_once "$prompt" "$dir" "$out"
     rc=$?
     log "$HARNESS exited with status $rc"
@@ -904,7 +961,8 @@ $blocked
     return 1
   fi
   if [ "$ahead" -eq 0 ]; then
-    if is_transient "$out"; then fail "no commits on $branch after $attempt attempt(s); the output ends with a network error (exit status $rc)"
+    if [ "$rc" -eq 97 ]; then fail "port $REPO_PORT ($REPO_PORT_SOURCE) was already in use when the harness was about to start, so it wasn't started; free the port (\`lsof -nP -iTCP:$REPO_PORT -sTCP:LISTEN\` shows what holds it) or pin another with PORT=<n>"
+    elif is_transient "$out"; then fail "no commits on $branch after $attempt attempt(s); the output ends with a network error (exit status $rc)"
     else fail "no commits on $branch (exit status $rc)"
     fi
     return 1
@@ -1004,6 +1062,8 @@ if [ "$DRY" -eq 0 ]; then
   fi
 fi
 [ -f "$STOP_FILE" ] && die "$STOP_FILE exists; remove it to run"
+resolve_port "port-check" || die "PORT is set to '$PINNED_PORT' in the environment, which isn't a port from 1024 to 65535; unset it (each repo then gets its own port) or pin a valid one"
+if [ -n "$PINNED_PORT" ]; then log "note: PORT=$PINNED_PORT is set in the environment, so every repo uses port $PINNED_PORT; unset it to give each repo its own"; fi
 
 repos=$(list_repos) || die "couldn't list $OWNER repos"
 [ -n "$repos" ] || die "no repos with the topic $TOPIC"
@@ -1048,7 +1108,8 @@ for repo in $repos; do
     branch="$HARNESS/$n-$(slug_of "$title")"
 
     if [ "$DRY" -eq 1 ]; then
-      log "would work $repo#$n as $role on $branch: $title"
+      resolve_port "$repo"
+      log "would work $repo#$n as $role on $branch (port $REPO_PORT, $REPO_PORT_SOURCE): $title"
       done_count=$((done_count + 1))
       [ "$ONCE" -eq 1 ] && break 2
       continue
@@ -1069,6 +1130,14 @@ for repo in $repos; do
         log "skip rest of $repo: can't refresh main"; release_lock; continue 2
       fi
     fi
+
+    # This repo's port must be free before anything is claimed: smoke against someone else's server proves nothing.
+    resolve_port "$repo"
+    if port_busy "$REPO_PORT"; then
+      log "REFUSE $repo: port $REPO_PORT ($REPO_PORT_SOURCE) is already in use on this Mac, so smoke would reach another server. Nothing was claimed. Stop whatever holds it (\`lsof -nP -iTCP:$REPO_PORT -sTCP:LISTEN\` shows what), or pin another port with PORT=<n>. Not scanning for a free one."
+      release_lock; continue 2
+    fi
+    log "$repo uses port $REPO_PORT ($REPO_PORT_SOURCE)"
 
     if work_issue "$repo" "$n" "$title" "$role" "$branch"; then
       done_count=$((done_count + 1))

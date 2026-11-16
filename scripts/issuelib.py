@@ -247,6 +247,7 @@ def self_test() -> None:
         if got != want or r.stdout.strip() != want:
             failures.append(f"dep_state {issue}: python={got!r} bash={r.stdout.strip()!r} {r.stderr.strip()}")
     failures += _guard_tests()
+    failures += _port_tests()
     r = subprocess.run(["bash", str(SCRIPT), "--quote"], capture_output=True, text=True, check=True,
                        input="ask @someone <!-- run-harness:claim h:1:2 --> ```\n~~~~\n" + "x" * 3000)
     q = r.stdout
@@ -255,7 +256,58 @@ def self_test() -> None:
     if failures:
         sys.exit("issuelib self-test FAILED:\n  " + "\n  ".join(failures))
     print(f"issuelib self-test ok ({len(CASES)} bodies, {len(DEP_CASES)} dependency states, the wave 1 paths, "
-          "the pre-push guard, clone checks and quoting, in Python and in run-harness.sh)")
+          "the pre-push guard, clone checks, quoting and per-repo ports, in Python and in run-harness.sh)")
+
+
+# Ports run-harness.sh derives from the repo name (cksum, 10000-19999). Pinned so a change to the derivation, or a
+# machine whose cksum disagrees, shows up here instead of as two apps sharing a port on the Mac.
+PORT_PINS = {"13-field-service": 14182, "14-real-estate": 16142, "15-event-ticketing": 15920, "31-cost-scaler": 10048}
+
+
+def _port_tests() -> list[str]:
+    """run-harness.sh's per-repo port: stable, in range, no two real repos share one, PORT overrides it, and a
+    port that something already listens on is reported busy."""
+    import os
+    import socket
+    out = []
+    env = {k: v for k, v in os.environ.items() if k != "PORT"}
+
+    def sh(*args, port=None):
+        e = dict(env, **({"PORT": port} if port is not None else {}))
+        return subprocess.run(["bash", str(SCRIPT), *args], capture_output=True, text=True, env=e)
+
+    repos = re.findall(r"^\s+repo:\s*(\S+)", (ROOT / "catalog.yaml").read_text(), re.M)
+    repos += ["30-apps-template", "ai-dev-os", "30-apps-infra"]
+    if len(repos) < 35:
+        out.append(f"port test found only {len(repos)} repo names")
+    ports = {}
+    for repo in repos:
+        a, b = sh("--port-for", repo).stdout.strip(), sh("--port-for", repo).stdout.strip()
+        if a != b or not a.isdigit() or not 10000 <= int(a) <= 19999:
+            out.append(f"port for {repo}: {a!r} then {b!r}")
+            continue
+        ports.setdefault(a, []).append(repo)
+        if sh("--resolve-port", repo).stdout.strip() != a:
+            out.append(f"--resolve-port {repo} differs from --port-for")
+    out += [f"port {p} shared by {rs}" for p, rs in ports.items() if len(rs) > 1]
+    for repo, want in PORT_PINS.items():
+        got = sh("--port-for", repo).stdout.strip()
+        if got != str(want):
+            out.append(f"port for {repo} is {got}, expected {want}")
+    if sh("--resolve-port", "15-event-ticketing", port="12345").stdout.strip() != "12345":
+        out.append("PORT in the environment wasn't respected")
+    for bad in ("abc", "80", "0123", "70000", "-1", "3000 "):
+        if sh("--resolve-port", "15-event-ticketing", port=bad).returncode == 0:
+            out.append(f"PORT={bad!r} should have been refused")
+    with socket.socket() as srv:
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+        busy = srv.getsockname()[1]
+        if sh("--port-busy", str(busy)).returncode != 0:
+            out.append(f"port {busy} has a listener but --port-busy said free")
+    if sh("--port-busy", str(busy)).returncode != 1:  # listener closed: free again (nothing else binds it that fast)
+        out.append(f"port {busy} has no listener but --port-busy said busy")
+    return out
 
 
 def _guard_tests() -> list[str]:

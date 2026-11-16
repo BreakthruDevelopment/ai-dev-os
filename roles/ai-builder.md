@@ -51,9 +51,9 @@ and don't install or start a database):
 - Do all of that *before* you end any loop or helper that keeps its permissions working, or the stop itself fails.
 
 **Give scratch files, databases and directories a prefix unique to your task**, so two agents never collide or
-delete each other's work. Ports are not yours to choose when the harness set one (`run-harness.sh` fixes
-`PORT=3000`, and only one runner works a repo at a time); when you do choose, derive it from your task prefix
-rather than picking a round number and hoping.
+delete each other's work. Ports are not yours to choose when the harness set one (`run-harness.sh` sets `PORT`, `APP_URL`
+and `BASE_URL` to a port derived from the repo name, so two runners on different repos never share one; use `$PORT`,
+never `3000`); when you do choose, derive it from your task prefix rather than picking a round number and hoping.
 
 Your scratch directory is `.harness/` when `scripts/run-harness.sh` started you, and the session scratchpad
 otherwise. Keep scratch out of the committed tree: `.harness/` is already git-ignored for you, and nothing else

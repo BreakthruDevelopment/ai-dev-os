@@ -57,15 +57,33 @@ part: your next run reaches a *stale server serving an old build*, and the tests
 did not write. Prefer `exec` in a wrapper script, or start the real binary directly, so the PID you capture is the
 one that needs stopping.
 
-When a survivor does hold the port, find it by **its working directory, not its name or its port**: read
-`/proc/<pid>/cwd` and act only on a process whose cwd is inside your own clone. Several agents run servers from
-identically-named binaries at once, so the name tells you nothing about whose it is.
+**The free detector:** a start command that exits non-zero while the port still answers means a survivor is
+serving, not that your start failed. That alone catches this.
+
+When a survivor does hold the port, find it by **its working directory, not its name or its port**: several agents
+run identically-named binaries at once, so the name tells you nothing about whose it is. Match the cwd by
+**prefix**, not equality — the wrapper usually sits at the clone root while the child that holds the port is
+somewhere under it — and strip a trailing ` (deleted)`, which is itself the tell that the directory was rebuilt
+underneath a still-running process:
+
+```bash
+for p in /proc/[0-9]*; do
+  d=$(readlink "$p/cwd" 2>/dev/null) || continue
+  case "${d% (deleted)}" in "$PWD"*) echo "${p#/proc/} $d";; esac
+done
+```
+
+If that finds nothing, the holder was started outside your clone and **is not yours**: report the port with what
+you know and stop. Do not widen the search — that is the moment the net catches someone else's work.
 
 **Then prove the build you think you are testing is the one answering**, before you measure anything or sign
-anything off. Ask the running server for something only your new code emits — a string, a field, a route — and
-check you get it. This is the half that matters: killing someone else's server is loud and you will notice,
-whereas reviewing a stale build is silent, passes every gate, and ends with a verdict on code that was never
-running. It has happened twice here.
+anything off. Start the server with `APP_VERSION=$(git rev-parse --short HEAD)` and check `/api/health` returns
+that `version`. Do not settle for "something only my new code emits": that works only when your change is visible
+over HTTP, and fails exactly where a stale build is most dangerous — an idempotency fix, a lock ordering, anything
+observable only by killing a request mid-flight.
+
+This is the half that matters. Killing someone else's server is loud and you will notice; reviewing a stale build
+is silent, passes every gate, and ends in a verdict on code that was never running.
 
 **Reading a port is allowed; killing by one is not.** Check a port at two moments, for opposite reasons: it must
 be **free before you start** a server there (if it isn't, someone else's is running and your run would test their

@@ -24,15 +24,28 @@ Requirements:
   on `main` and regenerate it if another merged first; never two `drizzle/NNNN_*` files with the same number.
 - Work on a `<harness>/<task>` branch (for example `claude/items-api` or `antigravity/items-api`) and open a PR.
 
-## Sandbox rules (every harness, every role)
+## Sandbox rules (every role that can run commands)
 
-Several agents share one container. A command that matches on a process name reaches into their work.
+You usually share a machine with other agents: other roles in the same container, other runners on Michael's Mac.
 
-- **Never `pkill`, `killall`, `killall5`, or any kill that matches on a name or pattern.** Stop only processes you
-  started, by the PID you captured when you started them. `pkill -f "next"` has killed another agent's dev server
-  here more than once; it finds nothing far more often than it finds your own process.
-- **Run your own Postgres**, in a directory unique to your task under the scratch dir. Stop it with `pg_ctl stop`
-  and confirm that it succeeded *before* you end any permission-fixing loop and *before* you delete its data
-  directory. Deleting the data directory under a running postmaster corrupts it for whoever runs next.
-- **Pick a port nobody else is on** and prefix every scratch file and database name with your task's own prefix.
-- If a process you started won't stop, say so in your report with its PID. Do not escalate to a pattern kill.
+**Stop only processes you started, by a PID you captured yourself.** Start background processes as
+`cmd & echo $! > <something>.pid`, and stop them with `kill "$(cat <something>.pid)"`. Never stop a process by
+matching its name or command line. That rules out `pkill`, `killall`, `skill`, `kill $(pgrep -f ...)`,
+`ps ... | grep ... | xargs kill`, `fuser -k`, and killing a process group you did not create (`kill -- -<pgid>`,
+`kill 0`). `kill $(pgrep -f next)` is a pattern kill wearing a PID costume; it is still forbidden.
+If something you started will not stop, say so in your report with its PID instead of widening the net.
+
+**If you start your own Postgres** (not when the harness already gave you `TEST_DATABASE_URL` — then just use it,
+and don't install or start a database):
+
+- Put its data directory under your own scratch directory, in a path unique to your task.
+- Shut it down with `pg_ctl -D <dir> -m fast -w stop`, then confirm: `pg_ctl -D <dir> status` reports no server and
+  `<dir>/postmaster.pid` is gone. Only then delete the directory, and only if your task created it. Deleting a data
+  directory under a running postmaster corrupts it for whoever runs next.
+- Do that shutdown *before* you end any loop or helper that keeps its permissions working, or the stop itself fails.
+
+**Derive your port from your task's prefix** rather than picking one and hoping, and give scratch files, databases
+and directories that same prefix, so two agents never collide or delete each other's work.
+
+Your scratch directory is `.harness/` when `scripts/run-harness.sh` started you, and the session scratchpad
+otherwise. Never write scratch files into the repo.

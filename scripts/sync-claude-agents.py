@@ -40,6 +40,30 @@ def render(meta: dict[str, str], body: str) -> str:
     )
 
 
+SANDBOX_HEADING = "## Sandbox rules"
+
+
+def sandbox_drift() -> list[str]:
+    """Every role that carries the sandbox section must carry the identical text.
+
+    The section is hand-copied into each role because scripts/run-harness.sh fetches one role file and nothing
+    else, so an include would have to be expanded before it reaches a Mac harness. Copies rot; this catches it.
+    """
+    blocks = {}
+    for path in sorted(ROLES.glob("*.md")):
+        text = path.read_text()
+        if SANDBOX_HEADING in text:
+            blocks[path.name] = text[text.index(SANDBOX_HEADING):].rstrip("\n")
+    if len(set(blocks.values())) <= 1:
+        return []
+    first = sorted(blocks)[0]
+    return [
+        f"sandbox section differs: roles/{name} does not match roles/{first}"
+        for name, block in sorted(blocks.items())
+        if block != blocks[first]
+    ]
+
+
 def main() -> None:
     check = "--check" in sys.argv
     expected = {}
@@ -50,10 +74,19 @@ def main() -> None:
     stale = [p for p, text in expected.items() if not p.exists() or p.read_text() != text]
     extra = [p for p in OUT.glob("*.md") if p not in expected] if OUT.exists() else []
 
+    drift = sandbox_drift()
+
     if check:
         for p in stale + extra:
             print(f"out of date: {p.relative_to(ROOT)}")
-        sys.exit(1 if stale or extra else 0)
+        for line in drift:
+            print(line)
+        sys.exit(1 if stale or extra or drift else 0)
+
+    for line in drift:
+        print(line)
+    if drift:
+        sys.exit(1)
 
     OUT.mkdir(parents=True, exist_ok=True)
     for p in extra:

@@ -7,6 +7,9 @@ approving every release.
 Built by [Breakthru Ventures](https://breakthruventures.ai) as a forward deployed engineering portfolio: common
 client problems, an AI feature in each, deployed on whichever cloud the client runs.
 
+[`ROADMAP.md`](ROADMAP.md) maps the portfolio onto the AI Engineer Roadmap's sixteen topics and scores each one
+honestly — **live** only when it runs in a deployed app, **built** when merged but not deployed, never conflated.
+
 ## How it works
 
 ```

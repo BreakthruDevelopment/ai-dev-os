@@ -6,8 +6,9 @@ state of every decision; the rules themselves are in [`AGENTS.md`](AGENTS.md).
 The process that builds the apps is called the **BreakthruSoftwareFactory**: this playbook, its eight roles, the five
 daily gates (spec, build, review, release, close-out) and the definition of done, all in [`FACTORY.md`](FACTORY.md).
 
-_Last updated: 2026-11-14 (waves, `Planned harness:` lines, label release and a fail-closed Mac runner, after the
-app 13 incident below). Since 2026-11-12, agents may squash-merge app-repo PRs once CI and review are green; Claude
+_Last updated: 2026-11-15 (apps 16-32 re-aimed at the AI Engineer Roadmap, app 33 added, models served from the
+Mac mini: [`ROADMAP.md`](ROADMAP.md). Before that: waves, `Planned harness:` lines, label release and a fail-closed
+Mac runner, after the app 13 incident below). Since 2026-11-12, agents may squash-merge app-repo PRs once CI and review are green; Claude
 Code also merges green deploy and playbook PRs; spec PRs stay with Michael._
 
 ## What we're building and why
@@ -22,15 +23,18 @@ The agent setup that builds them (this repo) is itself a portfolio piece: an AI 
 | Area | Decision |
 | --- | --- |
 | Apps | Responsive web apps only (must work at 375px). No native mobile apps. |
-| Stack | Next.js + TypeScript, Postgres via Drizzle, Better Auth with `user`/`admin` roles, Tailwind. One container image per app. |
+| Stack | Next.js + TypeScript, Postgres via Drizzle, Better Auth with `user`/`admin` roles, Tailwind. One container image per app. **One exception:** app 33 is Python (FastAPI + Streamlit), deliberately, to cover the roadmap's Python half. |
 | Starting point | Every app is created from [`30-apps-template`](https://github.com/BreakthruDevelopment/30-apps-template), which already has auth, roles, the AI gateway, tests, CI and a Dockerfile. |
-| AI in the apps | Every model call goes through the template's `generate()` gateway. Default model: Gemini on the free tier (key in a no-billing AI Studio project; set `ai: gemini` in `apps.yaml`). A missing key falls back to demo answers. Recorded demo answers when the quota runs out. Claude is an optional config switch. |
-| Clouds | Free tiers only. Each app is live on one cloud, rotating AWS → Azure → Google Cloud → Oracle by app number; listing more clouds for it in `apps.yaml` deploys it there too. The Oracle Always Free VM is the permanent demo host. Details below. |
+| AI in the apps | Every model call goes through the template's `generate()` gateway. Default model: Gemini on the free tier (key in a no-billing AI Studio project; set `ai: gemini` in `apps.yaml`). A missing key falls back to demo answers. Recorded demo answers when the quota runs out. Claude is an optional config switch. Open-weights models are to run on **Michael's Mac mini** behind a free Cloudflare Tunnel, health-checked with a Gemini fallback so a sleeping mini never breaks a live demo - **not built yet**: `generate()` picks one provider, allows only gemini/anthropic/demo and falls back to fixtures, so this needs a template change (app 33's second slice). Until then the apps use Gemini. |
+| Clouds | Free tiers only. Each app is live on one cloud, rotating AWS → Azure → Google Cloud → Oracle by app number (an app may opt out with a `rotation_reason` in `catalog.yaml`: app 33 is pinned to the Oracle Always Free VM because a Python service needs a long-running host); listing more clouds for it in `apps.yaml` deploys it there too. The Oracle Always Free VM is the permanent demo host. Details below. |
 | Deploys | [`30-apps-infra`](https://github.com/BreakthruDevelopment/30-apps-infra): `apps.yaml` lists each app, its clouds and its exact image tag; changing it is how you deploy. Merging to `main` applies Azure, Google Cloud and Oracle from GitHub Actions. AWS deploys itself: a deployer Lambda inside the account pulls `main` every 10 minutes and applies it (`30-apps-infra` #52, #53); one command in AWS CloudShell is the fallback. Apps migrate their own database on startup. |
 | Domains | `appN.breakthruventures.ai` for app N. DNS is hosted at Cloudflare (free plan); each app's records are created automatically by Terraform on deploy when the app has a `domain` in `apps.yaml` (`30-apps-infra` README, "Custom domains and DNS"). Other records stay hand-managed. |
 | GitHub | Org `BreakthruDevelopment`. It also holds unrelated apps that must never be touched: only repos tagged `30-apps-30-days` are in scope. |
 | Budget | Nothing beyond the existing subscriptions (Claude, X/Grok, ChatGPT Plus, Google AI Pro) and cloud free tiers. No extra credits, no paid services. |
 | Order | App 1 is the **Build Tracker**, built first so it serves as mission control for the month. Full list in [`catalog.yaml`](catalog.yaml). |
+| Pace | 30-35 days total for the whole portfolio; the roadmap's W01-W16 are topic labels, not a schedule. Twenty-one apps remain against roughly 17-22 days, so it fits only if repeated work is built once and reused: retrieval/rerank/evals in app 33; HITL approvals, webhooks and agent tracing as optional template modules (new files only, so live apps are untouched). Parallelism is **across harnesses**, never many agents inside one Claude Code session (still on the dropped list): Claude Code runs foundations, reviews, merges, app 33 and template modules sequentially; Grok takes UI; Antigravity and Codex take non-security slices and docs. Claude Code is the constraint, so moving work out of it buys more than making it faster. If it still doesn't fit, the answer is fewer apps or more days, not a thinner definition of done. |
+| Roadmap coverage | Apps 16-33 are aimed so that together they prove every week of the **AI Engineer Roadmap** (W01-W16). Scored honestly in [`ROADMAP.md`](ROADMAP.md): **live** only when running in a deployed app, **built** when merged but not deployed, and the two are never conflated. Today: 0 live, 3 built, 10 partial, 3 gaps (a week is live only when every topic in it is; W02 is held back by OOP alone). Deploying app 31 flips all three **built** weeks to **live**, the largest single coverage gain available. |
+| Local compute | The Mac mini is a component host, not a dependency: tunnelled, token-protected endpoints with a cloud fallback. In version 2 it also takes batch embeddings, eval sweeps, reranker inference and scheduled ingestion - work that is wasteful to rent. Nothing on a live URL may require it to be awake. |
 | Waves | Every spec groups its issues into waves. Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and `security-sensitive`, and the only slice that may change the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`). Builders who find the data layer missing stop and comment; they never invent schema or auth ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)). |
 | Start signal | Issue bodies carry a `Planned harness:` line and full-URL `## Dependencies`. The harness label appears only when every dependency is done (closed as completed, or a merged PR): `scripts/open-issues.py` labels only dependency-free issues, and `scripts/release-labels.py` (Claude after each merge, the ops monitor nightly) releases the rest. The Mac runner skips any issue it can't check. |
 
@@ -49,7 +53,8 @@ guardrails. The Google Cloud trial ended, so it's a paid account kept inside alw
 The org uses immutable OIDC subject claims (`repo:BreakthruDevelopment@<id>/<repo>@<id>:…`); the bootstrap scripts
 trust both forms.
 
-**Dropped, don't bring back:** native mobile (Expo/React Native), app-store publishing, the Kylon platform,
+**Dropped, don't bring back:** fine-tuning (no free tier covers it; we show prompting, decoding controls and evals
+instead, and say so), native mobile (Expo/React Native), app-store publishing, the Kylon platform,
 calling the Claude API from the apps, paid DNS, and running many agents in parallel inside one Claude session.
 
 ## How the AI team is organized
@@ -118,7 +123,7 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
   - Azure: https://app-template.salmonpebble-b870873b.eastus.azurecontainerapps.io
   - Google Cloud: https://template-189497094271.us-central1.run.app
   - Oracle: https://template.141-148-159-122.sslip.io
-- **Apps 1–12 are live** (12 of 30), each at `appN.breakthruventures.ai` with the tag `apps.yaml` pins. For apps
+- **Apps 1–12 are live** (12 of 33), each at `appN.breakthruventures.ai` with the tag `apps.yaml` pins. For apps
   5–12 the latest live-smoke run's `/api/health` reported exactly that tag. App 4 also answered with its tag on
   2026-11-12 (logged inside app 8's live-smoke run). Apps 1–3 have no health check recorded on GitHub since
   2026-11-10.

@@ -13,8 +13,8 @@ show it.
 | URL | https://app4.breakthruventures.ai |
 | `apps.yaml` PR | 30-apps-infra #45, merged 2026-11-08 9:35 PM |
 | Image tag | `sha-c91ffc1` (30-apps-infra #47, merged 2026-11-08 10:56 PM (reminders fix)) |
-| Live smoke | Unknown: no `scripts/smoke.sh` result is recorded. `/api/health` answered `ok` with `sha-c91ffc1` on 2026-11-10 at about 2:29 PM |
-| Catalog status | `deployed` (not `done`: this log and a recorded live smoke were missing) |
+| Live smoke | **Pass, 2026-11-16** ([run](https://github.com/BreakthruDevelopment/04-habit-tracker/actions/runs/43926464116)): full `scripts/smoke.sh` against the live site. The tag was not re-read on this run — the smoke never compares it (30-apps-template#37) — but this log's `sha-c91ffc1` health check still matches what `apps.yaml` pins, unchanged since 2026-11-08 |
+| Catalog status | **`done`** (ai-dev-os #44) |
 
 ## Gates
 
@@ -23,8 +23,8 @@ show it.
 | 1 Spec | Spec merged (ai-dev-os #8, 2026-11-08) |
 | 2 Build | 10 merged PRs; CI and Publish image green on `main` at the deployed commit |
 | 3 Review | 0 of 10 merged PRs carry a GitHub PR review or PR comment. Any review done only inside a harness session left no trace in GitHub |
-| 4 Release | Deployed by 30-apps-infra #45, merged 2026-11-08 9:35 PM; health check passes; smoke result not recorded |
-| 5 Close-out | This reconstructed log (2026-11-10). Launch drafts: unknown |
+| 4 Release | Deployed by 30-apps-infra #45, merged 2026-11-08 9:35 PM; health check passes; no smoke result was recorded at the time (one was run 2026-11-16, below) |
+| 5 Close-out | Log reconstructed 2026-11-10; close-out completed 2026-11-16 (ai-dev-os #44). Launch drafts: unknown |
 
 ## Who did what
 
@@ -33,9 +33,9 @@ Merged PRs by branch prefix (harness): claude 10. Per-role timing is unknown.
 ## Definition of done
 
 - [x] README filled
-- [ ] Live smoke recorded after the latest deploy (health check only, 2026-11-10)
+- [x] Live smoke recorded after the latest deploy ([2026-11-16](https://github.com/BreakthruDevelopment/04-habit-tracker/actions/runs/43926464116))
 - [x] Run log (this file, reconstructed)
-- [ ] `catalog.yaml` `status: done`
+- [x] `catalog.yaml` `status: done`
 
 ## What slipped or surprised us
 

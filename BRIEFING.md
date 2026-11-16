@@ -123,17 +123,22 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
   - Azure: https://app-template.salmonpebble-b870873b.eastus.azurecontainerapps.io
   - Google Cloud: https://template-189497094271.us-central1.run.app
   - Oracle: https://template.141-148-159-122.sslip.io
-- **Apps 1–12 are live** (12 of 33), each at `appN.breakthruventures.ai` with the tag `apps.yaml` pins. For apps
-  5–12 the latest live-smoke run's `/api/health` reported exactly that tag. App 4 also answered with its tag on
-  2026-11-12 (logged inside app 8's live-smoke run). Apps 1–3 have no health check recorded on GitHub since
-  2026-11-10.
+- **Apps 1–12 are live** (12 of 33), each at `appN.breakthruventures.ai` with the tag `apps.yaml` pins. Apps 1–4 each
+  passed a full live smoke on 2026-11-16, run from the Actions tab against the deployed site, and all four are
+  serving the tag `apps.yaml` pins. **The smoke itself does not establish that second half:** `scripts/smoke.sh`
+  asserts only that `/api/health` returns `status: ok`, never compares the tag, and the run log does not keep the
+  body. Apps 2–4 were confirmed by the tag already recorded in their run logs, which `apps.yaml` has not changed
+  since 2026-11-08; app 1 had been redeployed since its last tag check, so its tag was read back deliberately
+  (`sha-de78c18`). For apps 5–12 the tag was likewise read by hand at the time and nothing re-checks it.
+  [`30-apps-template#37`](https://github.com/BreakthruDevelopment/30-apps-template/issues/37) tracks making the
+  smoke assert the deployed tag so "pass after the latest deploy" means what it says without a manual step.
 
   | # | App | Cloud | Tag | Deploy PR (`30-apps-infra`) | Live smoke after latest deploy | Status |
   | --- | --- | --- | --- | --- | --- | --- |
-  | 1 | Portfolio Build Tracker | AWS | `sha-de78c18` | #71 | not recorded | deployed |
-  | 2 | Notes and Knowledge Base | Azure | `sha-6675f0b` | #42 | not recorded | deployed |
-  | 3 | Expense Tracker | Google Cloud | `sha-811aac4` | #42, domain #41 | not recorded | deployed |
-  | 4 | Habit and Goal Tracker | Oracle | `sha-c91ffc1` | #45, #47 | health only | deployed |
+  | 1 | Portfolio Build Tracker | AWS | `sha-de78c18` | #71 | pass, 2026-11-16 | **done** |
+  | 2 | Notes and Knowledge Base | Azure | `sha-6675f0b` | #42 | pass, 2026-11-16 | **done** |
+  | 3 | Expense Tracker | Google Cloud | `sha-811aac4` | #42, domain #41 | pass, 2026-11-16 | **done** |
+  | 4 | Habit and Goal Tracker | Oracle | `sha-c91ffc1` | #45, #47 | pass, 2026-11-16 | **done** |
   | 5 | Personal Budget Planner | AWS | `sha-50aa60b` | #65, #75 | pass, 2026-11-12 | **done** |
   | 6 | Bookmark and Read-Later | Azure | `sha-51175dd` | #66 | pass, 2026-11-10 | deployed (README) |
   | 7 | Appointment Booking | Google Cloud | `sha-0f8cdf3` | #69, domain #70, #75 | pass, 2026-11-12 | **done** |

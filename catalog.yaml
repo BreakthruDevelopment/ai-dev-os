@@ -23,7 +23,7 @@ apps:
     client_need: "Engineering ops and release management"
     ai_feature: "Daily health summary per app; flags stalled builds, failing CI and free-tier limits"
     notable: "GitHub and cloud webhooks, status state machine, public read-only board"
-    status: deployed
+    status: done
   - n: 2
     repo: 02-notes-kb
     name: "Notes and Knowledge Base"
@@ -32,7 +32,7 @@ apps:
     client_need: "Internal wikis"
     ai_feature: "RAG search over notes with citations"
     notable: "pgvector, per-user document ACLs"
-    status: deployed
+    status: done
   - n: 3
     repo: 03-expense-tracker
     name: "Expense Tracker"
@@ -41,7 +41,7 @@ apps:
     client_need: "Finance tools"
     ai_feature: "Receipt photo to structured expense"
     notable: "File uploads to object storage, signed URLs"
-    status: deployed
+    status: done
   - n: 4
     repo: 04-habit-tracker
     name: "Habit and Goal Tracker"
@@ -50,7 +50,7 @@ apps:
     client_need: "Consumer wellness apps"
     ai_feature: "Weekly progress coach summary"
     notable: "Web push notifications, time-series tables"
-    status: deployed
+    status: done
   - n: 5
     repo: 05-budget-planner
     create_repo: true

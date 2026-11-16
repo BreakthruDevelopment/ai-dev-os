@@ -43,25 +43,42 @@ def render(meta: dict[str, str], body: str) -> str:
 SANDBOX_HEADING = "## Sandbox rules"
 
 
+def sandbox_section(text: str) -> str | None:
+    """The sandbox section of a role file: its heading to the next top-level heading, or to the end."""
+    if SANDBOX_HEADING not in text:
+        return None
+    rest = text[text.index(SANDBOX_HEADING) :]
+    nxt = re.search(r"\n## (?!Sandbox rules)", rest)
+    return (rest[: nxt.start()] if nxt else rest).rstrip("\n")
+
+
 def sandbox_drift() -> list[str]:
-    """Every role that carries the sandbox section must carry the identical text.
+    """Every role that can run commands must carry the sandbox section, and all copies must be identical.
 
     The section is hand-copied into each role because scripts/run-harness.sh fetches one role file and nothing
-    else, so an include would have to be expanded before it reaches a Mac harness. Copies rot; this catches it.
+    else, so an include would have to be expanded before it reaches a Mac harness. Copies rot two ways -- they
+    diverge, or one quietly loses the section altogether -- so check for both.
     """
+    problems = []
     blocks = {}
     for path in sorted(ROLES.glob("*.md")):
+        meta, _ = parse(path)
         text = path.read_text()
-        if SANDBOX_HEADING in text:
-            blocks[path.name] = text[text.index(SANDBOX_HEADING):].rstrip("\n")
-    if len(set(blocks.values())) <= 1:
-        return []
-    first = sorted(blocks)[0]
-    return [
-        f"sandbox section differs: roles/{name} does not match roles/{first}"
-        for name, block in sorted(blocks.items())
-        if block != blocks[first]
-    ]
+        block = sandbox_section(text)
+        runs_commands = "Bash" in str(meta.get("claude_tools", ""))
+        if runs_commands and block is None:
+            problems.append(f"sandbox section missing: roles/{path.name} lists Bash but has no '{SANDBOX_HEADING}'")
+        elif block is not None:
+            blocks[path.name] = block
+
+    if len(set(blocks.values())) > 1:
+        first = sorted(blocks)[0]
+        problems += [
+            f"sandbox section differs: roles/{name} does not match roles/{first}"
+            for name, block in sorted(blocks.items())
+            if block != blocks[first]
+        ]
+    return problems
 
 
 def main() -> None:

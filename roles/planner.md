@@ -43,22 +43,31 @@ You usually share a machine with other agents: other roles in the same container
 
 **Stop only processes you started, by a PID you captured yourself.** Start background processes as
 `cmd & echo $! > <something>.pid`, and stop them with `kill "$(cat <something>.pid)"`. Never stop a process by
-matching its name or command line. That rules out `pkill`, `killall`, `skill`, `kill $(pgrep -f ...)`,
-`ps ... | grep ... | xargs kill`, `fuser -k`, and killing a process group you did not create (`kill -- -<pgid>`,
-`kill 0`). `kill $(pgrep -f next)` is a pattern kill wearing a PID costume; it is still forbidden.
+matching anything *about* it — its name, its command line, or the port it holds. That rules out `pkill`, `killall`,
+`skill`, `kill $(pgrep -f ...)`, `ps ... | grep ... | xargs kill`, `fuser -k`, `lsof -ti:<port> | xargs kill`, and
+killing a process group you did not create (`kill -- -<pgid>`, `kill 0`). `kill $(pgrep -f next)` and
+`kill $(lsof -ti:3000)` are pattern kills wearing a PID costume; they are still forbidden. "The port is busy, free
+it" is the most tempting case and the one most likely to hit someone else's work: the process on that port is
+usually not yours, which is exactly why the port is busy.
 If something you started will not stop, say so in your report with its PID instead of widening the net.
 
 **If you start your own Postgres** (not when the harness already gave you `TEST_DATABASE_URL` — then just use it,
 and don't install or start a database):
 
 - Put its data directory under your own scratch directory, in a path unique to your task.
-- Shut it down with `pg_ctl -D <dir> -m fast -w stop`, then confirm: `pg_ctl -D <dir> status` reports no server and
-  `<dir>/postmaster.pid` is gone. Only then delete the directory, and only if your task created it. Deleting a data
-  directory under a running postmaster corrupts it for whoever runs next.
-- Do that shutdown *before* you end any loop or helper that keeps its permissions working, or the stop itself fails.
+- Shut it down with `pg_ctl -D <dir> -m fast -w stop`. **Expect it to fail the first time** with a permission
+  error, and retry until it prints `server stopped`: the sandbox resets directory permissions underneath you, and
+  a first-attempt failure is normal rather than a reason to reach for a kill.
+- Then confirm: `pg_ctl -D <dir> status` reports no server and `<dir>/postmaster.pid` is gone. Only then delete the
+  directory, and only if your task created it. Deleting a data directory under a running postmaster corrupts it
+  for whoever runs next.
+- Do all of that *before* you end any loop or helper that keeps its permissions working, or the stop itself fails.
 
-**Derive your port from your task's prefix** rather than picking one and hoping, and give scratch files, databases
-and directories that same prefix, so two agents never collide or delete each other's work.
+**Give scratch files, databases and directories a prefix unique to your task**, so two agents never collide or
+delete each other's work. Ports are not yours to choose when the harness set one (`run-harness.sh` fixes
+`PORT=3000`, and only one runner works a repo at a time); when you do choose, derive it from your task prefix
+rather than picking a round number and hoping.
 
 Your scratch directory is `.harness/` when `scripts/run-harness.sh` started you, and the session scratchpad
-otherwise. Never write scratch files into the repo.
+otherwise. Keep scratch out of the committed tree: `.harness/` is already git-ignored for you, and nothing else
+belongs in the repo.

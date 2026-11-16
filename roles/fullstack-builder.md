@@ -49,9 +49,11 @@ one that needs stopping.
 **Reading a port is allowed; killing by one is not.** Check a port at two moments, for opposite reasons: it must
 be **free before you start** a server there (if it isn't, someone else's is running and your run would test their
 build), and **free again after you stop** yours (if it isn't, a child outlived the PID you captured). In between,
-busy is correct — that is your own server. `scripts/run-harness.sh --port-busy <port>` does the check (exit 0
-means something is listening), or `(exec 3<>/dev/tcp/127.0.0.1/<port>)` inline. If a port you expected to free is
-still busy, report it with the PID you have; do not go hunting for the owner.
+busy is correct — that is your own server. `(exec 3<>/dev/tcp/127.0.0.1/<port>)` works in every repo: it
+succeeds when something is listening. In `ai-dev-os` only, `scripts/run-harness.sh --port-busy <port>` does the
+same (exit 0 means busy, which inverts the usual reflex); that script does not exist in an app repo, so reach for
+the inline form by default. If a port you expected to free is still busy, report it with the PID you have; do not
+go hunting for the owner.
 
 **Work in your own clone.** Never run a build, a test or a checkout in a shared working tree such as
 `/home/claude/<repo>`: another agent will switch its branch underneath you, and you will not notice until a gate

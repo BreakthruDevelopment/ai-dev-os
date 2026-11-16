@@ -92,7 +92,7 @@ don't work. `echo "$HOME/30apps/"` prints the exact value.
       "command(pwd)", "command(ls)", "command(cat)", "command(head)", "command(tail)", "command(echo)",
       "command(test)", "command(grep)", "command(rg)", "command(find)", "command(wc)", "command(sed)",
       "command(sort)", "command(jq)", "command(mkdir)", "command(touch)", "command(cp)", "command(mv)",
-      "command(sleep)", "command(curl)", "command(psql)", "command(pg_isready)",
+      "command(sleep)", "command(curl)", "command(unzip)", "command(gunzip)", "command(tar)", "command(psql)", "command(pg_isready)",
       "command(nohup node .next/standalone/server.js)", "command(pkill -f .next/standalone/server.js)",
       "command(bash scripts/smoke.sh)"
     ],

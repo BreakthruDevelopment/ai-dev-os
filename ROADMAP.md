@@ -5,7 +5,7 @@ checklist. This file maps every week of it onto something in this portfolio, and
 one is.
 
 **W01–W16 are topic labels, not our schedule.** Theirs is a 16-week syllabus for one person learning in sequence.
-Ours is 30–35 days for the whole portfolio, because the work runs in parallel streams across four harnesses. We
+Ours is 30–35 days for the whole portfolio, because the work runs in parallel streams across five harnesses. We
 keep their numbering so a reader can match this file to the graphic they saw; we do not inherit their calendar.
 Pace is at the end.
 
@@ -15,11 +15,12 @@ Pace is at the end.
 | --- | --- |
 | **live** | Running in an app that is deployed and answering at its domain. The only state that proves anything to a stranger. |
 | **built** | Merged to `main` and tested, but not deployed yet. Real code, no live URL. |
-| **partial** | Some of the week's topics are live, others are not. The row says which. |
+| **partial** | Some of the week's topics are live or built, others are not. The row says which. |
 | **gap** | Not built. |
 
-Nothing is scored on a plan, a slide or a README. **Today: 1 live, 3 built, 6 partial, 6 gaps.** Twelve apps are
-deployed (`30-apps-infra/apps.yaml`); apps 13, 14, 15 and 31 are in build.
+Nothing is scored on a plan, a slide or a README. **Today: 1 live, 3 built, 9 partial, 3 gaps.** Twelve apps are
+deployed (`30-apps-infra/apps.yaml`). Apps 13, 14, 15 and 31 have merged work in flight; their catalog status is
+still `planned`, and none is deployed.
 
 ## The 16 weeks
 
@@ -27,16 +28,16 @@ deployed (`30-apps-infra/apps.yaml`); apps 13, 14, 15 and 31 are in build.
 | --- | --- | --- | --- |
 | W01 | Python basics | Nothing in the portfolio is Python yet. **33-ai-service** is the answer. | gap |
 | W02 | Dev tools — OOP, Git & GitHub, tests, type hints | Twelve deployed apps, each TypeScript strict with lint, typecheck, unit and integration tests, build and smoke in CI; the BreakthruSoftwareFactory itself (8 roles, 5 gates, PR-only, required review) | **live** |
-| W03 | APIs & data — REST, FastAPI, SQL, async | REST handlers, Postgres/Drizzle and async jobs are live across twelve apps. **FastAPI** is the missing half → app 33. | partial |
-| W04 | LLM basics — tokens, attention, prompts, decoding | Prompting is live in every app's AI feature. Tokens, decoding controls and logprobs → **16-lms** (on hold for the Oracle reboot). | partial |
-| W05 | LLM apps — context, tool calls, LangChain, caching | Tool calls are built in app 31. Context budget, prompt cache and cost-per-draft → **27-donor-crm**. | gap |
-| W06 | RAG — embeddings, vector DB, rerank, RAG evals | pgvector search is built in **14-real-estate** (not deployed). Rerank and a labelled eval set → **29-knowledge-assistant** and **17-job-board-ats**. | gap |
+| W03 | APIs & data — REST, FastAPI, SQL, async | REST handlers and Postgres/Drizzle are live across twelve apps; the async job runner is live in four of them (apps 9–12). **FastAPI** is the missing half → app 33. | partial |
+| W04 | LLM basics — tokens, attention, prompts, decoding | Prompting is live in every app's AI feature. Tokens, decoding controls and logprobs → **16-lms**, not started (held until the Oracle VM reboot). | partial |
+| W05 | LLM apps — context, tool calls, LangChain, caching | Tool calls are **built** in app 31 (merged, not deployed). Context budget, prompt cache and cost-per-draft → **27-donor-crm**: not started. | partial |
+| W06 | RAG — embeddings, vector DB, rerank, RAG evals | **14-real-estate** has the pgvector extension, an `embedding` column, an embedding cache and `embed.ts` merged — but **no search path yet** (no distance query anywhere). Rerank and a labelled eval set → **29-knowledge-assistant** and **17-job-board-ats**. | partial |
 | W07 | AI agents — agent loop, tools, Agents SDK, tracing | **31-cost-scaler**: Google ADK `runAgent()` with four tools, merged and tested. Not deployed. | **built** |
 | W08 | MCP & A2A — MCP servers, tools, A2A protocol | Nothing yet → **30-ai-ops-console** (MCP server + A2A broker), consumed by **28-support-agent**. | gap |
 | W09 | LangGraph — state, routing, checkpoints, HITL | Nothing yet → **20-task-manager**; HITL approval chains also in **32-purchase-orders**. | gap |
 | W10 | Multi-agent — supervisor, handoffs, parallel tasks | **31-cost-scaler**: coordinator plus pricing and migration agents via `AgentTool`, merged and tested. Not deployed. | **built** |
-| W11 | Agent memory — long-term memory, queues, webhooks | Job queues with retries are live in several apps. Long-term memory → **18-employee-onboarding**; webhooks → **21** and **23**. | partial |
-| W12 | Evals & safety — evals, tracing, guardrails, LLMOps | Guardrails and grounded-output checks are live (app 15's FAQ check survived seven adversarial rounds). Evals, tracing and LLMOps → **30**, **19**, **25**. | partial |
+| W11 | Agent memory — long-term memory, queues, webhooks | Job queues with retries are live in four apps (9–12). Long-term memory → **18-employee-onboarding**; webhooks → **21** and **23**. | partial |
+| W12 | Evals & safety — evals, tracing, guardrails, LLMOps | Input caps, zod-validated model output and demo fallbacks are live in twelve apps. The grounded-output check that survived seven adversarial review rounds is in **open PR** `15-event-ticketing#16` — neither live nor built. Evals, tracing and LLMOps → **30**, **19**, **25**. | partial |
 | W13 | Deploy — Docker, CI/CD, cloud, vLLM | One container image per app, GitHub Actions, four clouds: live. **vLLM** → the Mac mini (below). | partial |
 | W14 | Full-stack AI — Streamlit, auth, scaling, load tests | Better Auth with roles is live in twelve apps. **Streamlit** → app 33; load tests → **22-analytics-dashboard**. | partial |
 | W15 | Capstone — architecture, build, interview prep | **31-cost-scaler** is the capstone: four-cloud price ingestion, a BigInt-micros scenario engine, a multi-agent advisor. Merged, not deployed. | **built** |
@@ -106,14 +107,22 @@ reviewed as a template change.)
 
 Hardware notes that belong in app 33's README rather than a slide:
 
-- **vLLM on Apple silicon** is the CPU backend, built from source, and does not use the GPU. There is now a
-  `vllm-metal` plugin from the vLLM project doing Apple-silicon GPU inference with MLX underneath — try that
-  first; if it works, one server replaces the two-server plan.
-- Otherwise **MLX** (`mlx_lm.server`) is the fast path and vLLM-CPU is the roadmap proof. Both speak an
-  OpenAI-compatible API, so `generate()` sees one provider, and the README says which served which number.
-- **`mlx_lm.server` has no authentication** — no `--api-key` — and its own docs say it implements only basic
-  security checks and is not recommended for production. The bearer token must therefore be enforced by
-  Cloudflare Access in front of the tunnel, never by the model server.
+- **Run real vLLM, on the GPU.** `vllm-metal` is a vLLM-project plugin (repo under `vllm-project`, first release
+  v0.28.0, versioned with upstream) that runs on Apple-silicon GPUs: MLX provides the model implementations, Metal
+  executes them, and it adds a paged-attention kernel written for Metal. It speaks the OpenAI API at
+  `http://localhost:8000/v1` and needs macOS 15+. That collapses the earlier two-server plan — vLLM-on-CPU for the
+  roadmap box-tick plus MLX for speed — into one server that is both. Verified from the vLLM blog's
+  [announcement](https://vllm.ai/blog/2026-09-22-vllm-metal-v0-28-0) and
+  [its docs](https://docs.vllm.ai/projects/vllm-metal/en/latest/), 2026-11-16.
+- **What is experimental in it**, so we don't promise it: vision-language models, text embeddings and reranking,
+  and speech-to-text are all labelled experimental; hybrid-model prefix caching is experimental and can't combine
+  with speculative decoding; requests that don't fit the KV pool queue until pages free. Plain text generation,
+  which is all we need, is the mature path. If embeddings there turn out to be experimental in practice, app 33
+  computes embeddings itself rather than depending on the plugin.
+- **Fall back to `mlx_lm.server`** only if `vllm-metal` won't run. It is OpenAI-compatible too, but its own docs
+  say the HTTP API is **not recommended for production**, and it has **no authentication flag** of any kind.
+- **Either way, the model server never enforces the token.** Cloudflare Access in front of the tunnel does. Both
+  servers bind a local port with no auth; the tunnel is the only thing between them and the internet.
 - **The mini is not always on.** Nothing on a live URL may require it to be awake.
 - **Version 2:** the mini takes work that is wasteful to rent — batch embeddings, eval sweeps, reranker inference,
   scheduled ingestion. Same pattern each time: tunnelled, token-protected, with a cloud fallback.
@@ -157,11 +166,15 @@ session is on the "don't bring back" list, and roles inside Claude Code still ru
 Stream A is the constraint. Anything that moves work out of it — a slice Grok can take, a review Codex can do —
 buys more than anything that makes Stream A faster.
 
-### Measuring it
+### Measuring it — to be added, not in place
 
-Each run log records **hours from spec merge to live smoke**, split into working and waiting time, naming what the
-waiting was on (label release, review, a harness at its usage limit, something only Michael can do). The nightly
-ops monitor reports the split. Optimize the largest waiting bucket.
+None of this exists yet, so it is written as work, not as practice: `templates/run-log.md` has no timing fields,
+no log in `runs/` carries them, and `roles/ops-monitor.md` does not report them.
+
+What to add: a **hours from spec merge to live smoke** field in the run-log template, split into working and
+waiting time, naming what the waiting was on (label release, review, a harness at its usage limit, something only
+Michael can do); and a line in the ops-monitor role to total the split across the week. Then optimize the largest
+waiting bucket. Until app 30 exists, those numbers come from the run logs and nowhere else.
 
 ## Demos, infographic and training material
 
@@ -171,6 +184,14 @@ ops monitor reports the split. Optimize the largest waiting bucket.
 2. **Sixteen 90-second demo beats**, one per week, each recorded against a live URL.
 3. **A 16-part training series** written from the run logs in `runs/`: what the roadmap says, what we built, what
    broke, and the review finding that changed how we build. Written after the app ships, from what happened.
+
+## "30 apps in 30 days" and 33 apps
+
+The name is the commitment that started this: thirty client-shaped apps, one a day. Apps 31–33 are additions that
+earn their place — 31 is the capstone, 32 fills a procurement gap, 33 covers the roadmap's Python half — and they
+push the calendar to 30–35 days. The name stays; the count and the dates in `catalog.yaml` are what's true. Say
+"33 apps in about a month" to anyone who asks, not "30 in 30", and never quietly restate the goal to match
+whatever we happened to ship.
 
 ## Honesty rules for all three
 

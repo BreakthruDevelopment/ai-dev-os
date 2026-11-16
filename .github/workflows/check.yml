@@ -41,10 +41,15 @@ jobs:
               assert a["n"] == i, f"app {i} out of order"
               assert a["repo"].startswith(f"{i:02d}-"), a["repo"]
               assert a["subdomain"] == f"app{i}.breakthruventures.ai", a["subdomain"]
-              # The cloud rotates by app number. An app may opt out with rotation_reason, which says why
-              # its cloud is fixed (app 33 needs the Oracle Always Free VM: a long-running Python host).
-              if not a.get("rotation_reason"):
+              # The cloud rotates by app number. An app may opt out of the rotation with rotation_reason,
+              # a non-empty string saying why its cloud is fixed -- but its cloud is still validated.
+              assert a["live_cloud"] in clouds, f"app {i} cloud {a['live_cloud']!r} is not one of {clouds}"
+              why = a.get("rotation_reason")
+              if why is None:
                   assert a["live_cloud"] == clouds[(i - 1) % 4], f"app {i} cloud"
+              else:
+                  assert isinstance(why, str) and why.strip(), f"app {i} rotation_reason must be a non-empty string"
+                  print(f"app {i} ({a['repo']}) opts out of the cloud rotation on {a['live_cloud']}: {why}")
               # BreakthruSoftwareFactory statuses (FACTORY.md); done needs its run log
               assert a.get("status") in ("planned", "building", "deployed", "done"), f"app {i} status {a.get('status')!r}"
               if a["status"] == "done":

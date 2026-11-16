@@ -4,6 +4,11 @@ The widely-shared **AI Engineer Roadmap** (16 weeks, W01–W16, Python → agent
 checklist. This file maps every week of it onto something in this portfolio that *runs in production and can be
 demoed in under two minutes*, and names the gaps we are closing in apps 16–33.
 
+**W01–W16 are topic labels, not our schedule.** Theirs is a 16-week syllabus for one person learning in sequence.
+Ours is 30–35 days for the whole portfolio, because the work runs in parallel streams across four harnesses and the
+learning already happened. We keep their numbering so a reader can match this file to the graphic they saw; we do
+not inherit their calendar. Pace and streams are at the end of this file.
+
 It exists so that a reviewer, a client or an interviewer can go from "do you know RAG evals / MCP / LangGraph /
 multi-agent handoffs?" to a live URL, a file in a repo and a 90-second demo, without taking anyone's word for it.
 
@@ -108,6 +113,53 @@ Three artifacts, in this order:
 3. **A 16-part training series** written from the run logs in `runs/`: for each week, what the roadmap says, what we
    actually built, what broke, and the review finding that changed how we build. Written after the app ships, from
    what happened, not before it from what we hoped.
+
+## Pace and parallel streams
+
+Eighteen apps remain (16–33) inside a 30–35 day total. That is roughly one app a day, and the apps in this plan are
+heavier than apps 1–12 were. One app a day only works if the expensive parts stop being rebuilt per app.
+
+### The two levers
+
+**1. Build each capability once, use it three or four times.** The re-aimed apps repeat five capabilities:
+
+| Capability | Built once in | Reused by |
+| --- | --- | --- |
+| Retrieval + rerank + a RAG eval harness | **33-ai-service** | 17, 29 |
+| Eval runner (refusal, text-to-SQL, red-team fixtures) | **33-ai-service** | 19, 22, 25 |
+| HITL approval chain (a write blocked until a human signs) | **30-apps-template** (optional module) | 20, 32, 28 |
+| Outbound webhooks (signed, replayable, with a job state machine) | **30-apps-template** (optional module) | 21, 23 |
+| Agent loop with tracing, reporting to app 30 | **30-apps-template** (optional module) | 26, 28, 31 |
+
+Template modules are **new files only**, never edits to existing ones, so the fifteen apps already live are
+untouched until they choose to cherry-pick. This is the whole speed argument: if these five land early, the apps
+that use them are thin app-specific layers. If they land late, we build each one four times and miss the window.
+
+**2. Foundations run ahead of the stream, not inside it.** Wave 1 (schema, migrations, roles, access) is Claude-only
+and security-sensitive, so every app funnels through one agent — it is the critical path, and when it is late every
+other harness idles (the app 13 incident). So foundations are written **two or three apps ahead** of where the
+builders are working, in a batch, while the current apps finish.
+
+### The four streams
+
+They never touch the same repo at the same time, which is what makes them safe to run at once:
+
+| Stream | Harness | Carries |
+| --- | --- | --- |
+| **A — Foundation & review** | Claude Code | Wave-1 slices two or three apps ahead; every PR review; merges |
+| **B — UI** | Grok Build / Grok Bot | Pages and components, once the app's data layer is on `main` |
+| **C — Fullstack & docs** | Antigravity / Codex | Non-security slices, demo workspaces, READMEs |
+| **D — Python** | Claude Code | 33-ai-service: shares no files with the Next.js apps, so it runs the whole time without ever colliding |
+
+### Measuring it
+
+Each run log records **hours from spec merge to live smoke**, split into working time and waiting time, and names
+what the waiting was on (label release, review, a harness at its usage limit, something only Michael can do). The
+nightly ops monitor reports the split. Optimize the largest waiting bucket, not the feeling of being busy.
+
+The parallelism is itself portfolio material: app 30 shows concurrent runs across four harnesses, and app 1 shows
+the streams. "Can you run several workstreams at once" is a question clients ask, and this answers it with a
+dashboard instead of an anecdote.
 
 ## Honesty rules for all three
 

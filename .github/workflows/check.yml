@@ -35,13 +35,16 @@ jobs:
           import os
           import yaml
           apps = yaml.safe_load(open("catalog.yaml"))["apps"]
-          assert len(apps) == 32, f"expected 32 apps, got {len(apps)}"
+          assert len(apps) == 33, f"expected 33 apps, got {len(apps)}"
           clouds = ["aws", "azure", "gcp", "oci"]
           for i, a in enumerate(apps, start=1):
               assert a["n"] == i, f"app {i} out of order"
               assert a["repo"].startswith(f"{i:02d}-"), a["repo"]
               assert a["subdomain"] == f"app{i}.breakthruventures.ai", a["subdomain"]
-              assert a["live_cloud"] == clouds[(i - 1) % 4], f"app {i} cloud"
+              # The cloud rotates by app number. An app may opt out with rotation_reason, which says why
+              # its cloud is fixed (app 33 needs the Oracle Always Free VM: a long-running Python host).
+              if not a.get("rotation_reason"):
+                  assert a["live_cloud"] == clouds[(i - 1) % 4], f"app {i} cloud"
               # BreakthruSoftwareFactory statuses (FACTORY.md); done needs its run log
               assert a.get("status") in ("planned", "building", "deployed", "done"), f"app {i} status {a.get('status')!r}"
               if a["status"] == "done":

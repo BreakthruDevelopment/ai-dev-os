@@ -4,6 +4,8 @@
 #
 # status (BreakthruSoftwareFactory, see FACTORY.md "Catalog status values"):
 #   planned   in the catalog only
+#
+# live_cloud rotates aws -> azure -> gcp -> oci by app number. rotation_reason opts an app out and says why.
 #   building  repo exists, issues or PRs in flight, not in apps.yaml yet
 #   deployed  in 30-apps-infra apps.yaml and answering /api/health at its domain; close-out not finished
 #   done      meets the definition of done: filled README, live smoke, run log in runs/, this status
@@ -316,10 +318,10 @@ apps:
     status: planned
   - n: 33
     repo: 33-ai-service
-    create_repo: true
     name: "AI Service (Python)"
     subdomain: app33.breakthruventures.ai
     live_cloud: oci
+    rotation_reason: "Python service needs a long-running host, not a request-scoped runtime: the Oracle Always Free A1 VM. Its repo is created by hand, not by create-app-repos.py, because that builds from the Next.js template and the required 'Lint, test, build, smoke' check has no Python equivalent yet."
     client_need: "AI platform engineering: the Python half of the stack"
     ai_feature: "The portfolio's embeddings, rerank and eval service: RAG evals, refusal evals and text-to-SQL evals run here and publish to app 30; it also fronts the open-weights model served by vLLM and MLX on the Mac mini (roadmap W01, W02, W03, W13, W14)"
     notable: "FastAPI with full type hints, pytest and mypy in CI; SQLAlchemy on the same Postgres; a Streamlit console for eval runs and traces; the one non-Next.js app, which is the point; model endpoint is health-checked with a Gemini fallback so a sleeping Mac mini never breaks a demo"

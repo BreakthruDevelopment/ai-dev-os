@@ -1,4 +1,4 @@
-# The portfolio apps (32). Source of truth for repo names, subdomains and the cloud each app is live on.
+# The portfolio apps (33). Source of truth for repo names, subdomains and the cloud each app is live on.
 # Cloud rotates by day: AWS, Azure, Google Cloud, Oracle Cloud. Deploys happen by adding the app to apps.yaml in
 # 30-apps-infra; listing more clouds there runs it on those too.
 #
@@ -166,8 +166,8 @@ apps:
     subdomain: app16.breakthruventures.ai
     live_cloud: oci
     client_need: "Training and edtech"
-    ai_feature: "Quiz generation from course material"
-    notable: "Instructor vs learner roles"
+    ai_feature: "Quiz generation from course material, with a decoding lab: tokens, temperature and top-p, logprob-ranked alternates and cost per item (roadmap W04)"
+    notable: "Instructor vs learner roles; the one app that shows what the model is actually doing"
     status: planned
   - n: 17
     repo: 17-job-board-ats
@@ -175,8 +175,8 @@ apps:
     subdomain: app17.breakthruventures.ai
     live_cloud: aws
     client_need: "Recruiting"
-    ai_feature: "Resume parsing and candidate-job matching"
-    notable: "Bias guardrails, data retention rules"
+    ai_feature: "Resume-to-job matching built as retrieval with a rerank stage and a labelled eval set; match quality is measured, not asserted (roadmap W06, W12)"
+    notable: "Bias guardrails with red-team fixtures and a published eval score; data retention rules"
     status: planned
   - n: 18
     repo: 18-employee-onboarding
@@ -184,8 +184,8 @@ apps:
     subdomain: app18.breakthruventures.ai
     live_cloud: azure
     client_need: "HR"
-    ai_feature: "Policy Q&A assistant over handbook"
-    notable: "SSO-ready (OIDC), approvals workflow"
+    ai_feature: "Policy Q&A over the handbook, with long-term agent memory: it remembers where each new hire is across weeks (roadmap W11)"
+    notable: "SSO-ready (OIDC), approvals workflow, memory a user can read and delete"
     status: planned
   - n: 19
     repo: 19-patient-intake
@@ -193,8 +193,8 @@ apps:
     subdomain: app19.breakthruventures.ai
     live_cloud: gcp
     client_need: "Clinics"
-    ai_feature: "Intake form to structured summary"
-    notable: "HIPAA-style controls: audit, encryption, consent"
+    ai_feature: "Intake form to structured summary, with a refusal and redaction eval suite that runs in CI (roadmap W12)"
+    notable: "HIPAA-style controls: audit, encryption, consent; evals gate the deploy"
     status: planned
   - n: 20
     repo: 20-task-manager
@@ -202,8 +202,8 @@ apps:
     subdomain: app20.breakthruventures.ai
     live_cloud: oci
     client_need: "Team productivity tools"
-    ai_feature: "Natural-language task entry and auto-prioritizing"
-    notable: "Multi-tenant workspaces, RBAC"
+    ai_feature: "Natural-language task entry and bulk edits on a LangGraph.js graph: routing, checkpointed state and human approval before anything destructive (roadmap W09)"
+    notable: "Multi-tenant workspaces, RBAC; the HITL and checkpoint reference"
     status: planned
   - n: 21
     repo: 21-meeting-notes
@@ -211,8 +211,8 @@ apps:
     subdomain: app21.breakthruventures.ai
     live_cloud: aws
     client_need: "Productivity"
-    ai_feature: "Transcript to action items"
-    notable: "Audio upload, async processing queue"
+    ai_feature: "Transcript to action items as a queued pipeline with retries, webhooks and a visible job state machine (roadmap W11, W03)"
+    notable: "Audio upload, async processing queue, outbound webhooks"
     status: planned
   - n: 22
     repo: 22-analytics-dashboard
@@ -220,8 +220,8 @@ apps:
     subdomain: app22.breakthruventures.ai
     live_cloud: azure
     client_need: "BI and reporting"
-    ai_feature: "Ask-your-data (text to SQL, read-only)"
-    notable: "Row-level security, query sandboxing"
+    ai_feature: "Ask-your-data (text to SQL, read-only) with a text-to-SQL eval set and a load-tested query path (roadmap W03, W14)"
+    notable: "Row-level security, query sandboxing, published p95 under load"
     status: planned
   - n: 23
     repo: 23-marketplace
@@ -229,8 +229,8 @@ apps:
     subdomain: app23.breakthruventures.ai
     live_cloud: gcp
     client_need: "Two-sided platforms"
-    ai_feature: "Listing moderation"
-    notable: "Buyer/seller roles, payments test mode"
+    ai_feature: "Listing moderation, with outbound webhooks so seller systems react to a decision (roadmap W11)"
+    notable: "Buyer/seller roles, payments test mode, webhook signing and replay"
     status: planned
   - n: 24
     repo: 24-community-forum
@@ -247,8 +247,8 @@ apps:
     subdomain: app25.breakthruventures.ai
     live_cloud: aws
     client_need: "Health and fitness"
-    ai_feature: "Workout plan generator with safety limits"
-    notable: "Coach-client relationships"
+    ai_feature: "Workout plan generator built as a guardrail case study: hard safety limits, refusals and red-team fixtures (roadmap W12)"
+    notable: "Coach-client relationships; every refusal path has a test"
     status: planned
   - n: 26
     repo: 26-property-management
@@ -256,8 +256,8 @@ apps:
     subdomain: app26.breakthruventures.ai
     live_cloud: azure
     client_need: "Landlords and HOAs"
-    ai_feature: "Maintenance request triage"
-    notable: "Tenant vs manager portals"
+    ai_feature: "Maintenance request triage with an agent handoff: a triage agent hands to a scheduling agent under a supervisor (roadmap W10)"
+    notable: "Tenant vs manager portals; handoff traces visible in app 30"
     status: planned
   - n: 27
     repo: 27-donor-crm
@@ -265,8 +265,8 @@ apps:
     subdomain: app27.breakthruventures.ai
     live_cloud: gcp
     client_need: "Nonprofits"
-    ai_feature: "Donor outreach drafts and segmenting"
-    notable: "Consent and unsubscribe tracking"
+    ai_feature: "Donor outreach drafts and segmenting, as a context and caching case study: context budget, prompt cache, cost per draft (roadmap W05)"
+    notable: "Consent and unsubscribe tracking; cost per draft published"
     status: planned
   - n: 28
     repo: 28-support-agent
@@ -274,8 +274,8 @@ apps:
     subdomain: app28.breakthruventures.ai
     live_cloud: oci
     client_need: "AI support deployments"
-    ai_feature: "Agent with tools: order lookup, refunds with approval"
-    notable: "Human-in-the-loop, tool permissioning"
+    ai_feature: "Agent on an Agents-SDK loop with tracing: order lookup and refunds with approval, and it asks app 31's agent for a priced answer over A2A (roadmap W07, W08)"
+    notable: "Human-in-the-loop, tool permissioning, full trace per run"
     status: planned
   - n: 29
     repo: 29-knowledge-assistant
@@ -283,8 +283,8 @@ apps:
     subdomain: app29.breakthruventures.ai
     live_cloud: aws
     client_need: "Enterprise RAG"
-    ai_feature: "Multi-source RAG with evals and citations"
-    notable: "Connector auth, per-doc permissions"
+    ai_feature: "The reference RAG: multi-source retrieval, embeddings and vector search, cross-encoder rerank, a labelled RAG eval set and citations (roadmap W06)"
+    notable: "Connector auth, per-doc permissions; rerank and eval served by app 33"
     status: planned
   - n: 30
     repo: 30-ai-ops-console
@@ -292,8 +292,8 @@ apps:
     subdomain: app30.breakthruventures.ai
     live_cloud: azure
     client_need: "AI platform operations"
-    ai_feature: "One view of the agent team: run logs, cost, eval scores and Grok Bot routines, joined with the Build Tracker"
-    notable: "Admin-only access, scoped API keys, usage metering"
+    ai_feature: "The portfolio's LLMOps home: traces, eval scores, guardrail hits and cost per app, plus an MCP server exposing portfolio tools and the A2A broker other apps' agents call (roadmap W08, W12)"
+    notable: "Admin-only access, scoped API keys, usage metering; MCP and A2A endpoints are the integration surface"
     status: planned
   - n: 31
     repo: 31-cost-scaler
@@ -311,6 +311,16 @@ apps:
     subdomain: app32.breakthruventures.ai
     live_cloud: oci
     client_need: "Procurement and back office"
-    ai_feature: "Extract fields from uploaded quotes and invoices; three-way match explanations"
-    notable: "Spend-limit approval chains, PO to receipt to invoice matching, vendor records"
+    ai_feature: "Extract fields from uploaded quotes and invoices; three-way match explanations, with spend-limit approval chains as the human-in-the-loop reference (roadmap W09)"
+    notable: "PO to receipt to invoice matching, vendor records, approvals that block the write until a human signs"
+    status: planned
+  - n: 33
+    repo: 33-ai-service
+    create_repo: true
+    name: "AI Service (Python)"
+    subdomain: app33.breakthruventures.ai
+    live_cloud: oci
+    client_need: "AI platform engineering: the Python half of the stack"
+    ai_feature: "The portfolio's embeddings, rerank and eval service: RAG evals, refusal evals and text-to-SQL evals run here and publish to app 30; it also fronts the open-weights model served by vLLM and MLX on the Mac mini (roadmap W01, W02, W03, W13, W14)"
+    notable: "FastAPI with full type hints, pytest and mypy in CI; SQLAlchemy on the same Postgres; a Streamlit console for eval runs and traces; the one non-Next.js app, which is the point; model endpoint is health-checked with a Gemini fallback so a sleeping Mac mini never breaks a demo"
     status: planned

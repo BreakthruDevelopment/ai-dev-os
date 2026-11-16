@@ -6,8 +6,9 @@ state of every decision; the rules themselves are in [`AGENTS.md`](AGENTS.md).
 The process that builds the apps is called the **BreakthruSoftwareFactory**: this playbook, its eight roles, the five
 daily gates (spec, build, review, release, close-out) and the definition of done, all in [`FACTORY.md`](FACTORY.md).
 
-_Last updated: 2026-11-14 (waves, `Planned harness:` lines, label release and a fail-closed Mac runner, after the
-app 13 incident below). Since 2026-11-12, agents may squash-merge app-repo PRs once CI and review are green; Claude
+_Last updated: 2026-11-15 (apps 16-32 re-aimed at the AI Engineer Roadmap, app 33 added, models served from the
+Mac mini: [`ROADMAP.md`](ROADMAP.md). Before that: waves, `Planned harness:` lines, label release and a fail-closed
+Mac runner, after the app 13 incident below). Since 2026-11-12, agents may squash-merge app-repo PRs once CI and review are green; Claude
 Code also merges green deploy and playbook PRs; spec PRs stay with Michael._
 
 ## What we're building and why
@@ -22,15 +23,17 @@ The agent setup that builds them (this repo) is itself a portfolio piece: an AI 
 | Area | Decision |
 | --- | --- |
 | Apps | Responsive web apps only (must work at 375px). No native mobile apps. |
-| Stack | Next.js + TypeScript, Postgres via Drizzle, Better Auth with `user`/`admin` roles, Tailwind. One container image per app. |
+| Stack | Next.js + TypeScript, Postgres via Drizzle, Better Auth with `user`/`admin` roles, Tailwind. One container image per app. **One exception:** app 33 is Python (FastAPI + Streamlit), deliberately, to cover the roadmap's Python half. |
 | Starting point | Every app is created from [`30-apps-template`](https://github.com/BreakthruDevelopment/30-apps-template), which already has auth, roles, the AI gateway, tests, CI and a Dockerfile. |
-| AI in the apps | Every model call goes through the template's `generate()` gateway. Default model: Gemini on the free tier (key in a no-billing AI Studio project; set `ai: gemini` in `apps.yaml`). A missing key falls back to demo answers. Recorded demo answers when the quota runs out. Claude is an optional config switch. |
+| AI in the apps | Every model call goes through the template's `generate()` gateway. Default model: Gemini on the free tier (key in a no-billing AI Studio project; set `ai: gemini` in `apps.yaml`). A missing key falls back to demo answers. Recorded demo answers when the quota runs out. Claude is an optional config switch. Open-weights models run on **Michael's Mac mini** (vLLM for the roadmap proof, MLX for speed) behind a free Cloudflare Tunnel; every call is health-checked and falls back to Gemini, so a sleeping mini degrades an answer but never breaks a live demo. |
 | Clouds | Free tiers only. Each app is live on one cloud, rotating AWS → Azure → Google Cloud → Oracle by app number; listing more clouds for it in `apps.yaml` deploys it there too. The Oracle Always Free VM is the permanent demo host. Details below. |
 | Deploys | [`30-apps-infra`](https://github.com/BreakthruDevelopment/30-apps-infra): `apps.yaml` lists each app, its clouds and its exact image tag; changing it is how you deploy. Merging to `main` applies Azure, Google Cloud and Oracle from GitHub Actions. AWS deploys itself: a deployer Lambda inside the account pulls `main` every 10 minutes and applies it (`30-apps-infra` #52, #53); one command in AWS CloudShell is the fallback. Apps migrate their own database on startup. |
 | Domains | `appN.breakthruventures.ai` for app N. DNS is hosted at Cloudflare (free plan); each app's records are created automatically by Terraform on deploy when the app has a `domain` in `apps.yaml` (`30-apps-infra` README, "Custom domains and DNS"). Other records stay hand-managed. |
 | GitHub | Org `BreakthruDevelopment`. It also holds unrelated apps that must never be touched: only repos tagged `30-apps-30-days` are in scope. |
 | Budget | Nothing beyond the existing subscriptions (Claude, X/Grok, ChatGPT Plus, Google AI Pro) and cloud free tiers. No extra credits, no paid services. |
 | Order | App 1 is the **Build Tracker**, built first so it serves as mission control for the month. Full list in [`catalog.yaml`](catalog.yaml). |
+| Roadmap coverage | Apps 16-33 are aimed so that together they prove every week of the **AI Engineer Roadmap** (W01-W16): RAG with rerank and evals, MCP and A2A, LangGraph, agent memory, evals and LLMOps, Python/FastAPI/Streamlit, open-weights serving. The week-by-week map, and what changed in each app, is [`ROADMAP.md`](ROADMAP.md). A week counts as covered only when it runs in a deployed app. |
+| Local compute | The Mac mini is a component host, not a dependency: tunnelled, token-protected endpoints with a cloud fallback. In version 2 it also takes batch embeddings, eval sweeps, reranker inference and scheduled ingestion - work that is wasteful to rent. Nothing on a live URL may require it to be awake. |
 | Waves | Every spec groups its issues into waves. Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and `security-sensitive`, and the only slice that may change the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`). Builders who find the data layer missing stop and comment; they never invent schema or auth ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)). |
 | Start signal | Issue bodies carry a `Planned harness:` line and full-URL `## Dependencies`. The harness label appears only when every dependency is done (closed as completed, or a merged PR): `scripts/open-issues.py` labels only dependency-free issues, and `scripts/release-labels.py` (Claude after each merge, the ops monitor nightly) releases the rest. The Mac runner skips any issue it can't check. |
 
@@ -49,7 +52,8 @@ guardrails. The Google Cloud trial ended, so it's a paid account kept inside alw
 The org uses immutable OIDC subject claims (`repo:BreakthruDevelopment@<id>/<repo>@<id>:…`); the bootstrap scripts
 trust both forms.
 
-**Dropped, don't bring back:** native mobile (Expo/React Native), app-store publishing, the Kylon platform,
+**Dropped, don't bring back:** fine-tuning (no free tier covers it; we show prompting, decoding controls and evals
+instead, and say so), native mobile (Expo/React Native), app-store publishing, the Kylon platform,
 calling the Claude API from the apps, paid DNS, and running many agents in parallel inside one Claude session.
 
 ## How the AI team is organized

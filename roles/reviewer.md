@@ -42,7 +42,13 @@ app-repo PR per `AGENTS.md`. Claude Code also merges green `ai-dev-os` and `30-a
 You usually share a machine with other agents: other roles in the same container, other runners on Michael's Mac.
 
 **Stop only processes you started, by a PID you captured yourself.** Start background processes as
-`cmd & echo $! > <something>.pid`, and stop them with `kill "$(cat <something>.pid)"`. Never stop a process by
+`cmd & echo $! > <something>.pid`, and stop them with `kill "$(cat <something>.pid)"`.
+
+**Beware the wrapper that outlives its PID.** `pnpm start`, `next start` and friends spawn a child that does the
+real work, and killing the PID you captured can leave that child holding the port. The symptom is nasty: your next
+run reaches a *stale server serving an old build*, and the tests that pass are testing code you did not write. So
+after stopping anything, confirm the port is actually free before you trust a run against it. Prefer `exec` in a
+wrapper script, or start the real binary directly, so the PID you capture is the process you need to stop. Never stop a process by
 matching anything *about* it — its name, its command line, or the port it holds. That rules out `pkill`, `killall`,
 `skill`, `kill $(pgrep -f ...)`, `ps ... | grep ... | xargs kill`, `fuser -k`, `lsof -ti:<port> | xargs kill`, and
 killing a process group you did not create (`kill -- -<pgid>`, `kill 0`). `kill $(pgrep -f next)` and

@@ -23,8 +23,8 @@ show it.
 | 1 Spec | Spec merged (ai-dev-os #8, 2026-11-08) |
 | 2 Build | 10 merged PRs; CI and Publish image green on `main` at the deployed commit |
 | 3 Review | 0 of 10 merged PRs carry a GitHub PR review or PR comment. Any review done only inside a harness session left no trace in GitHub |
-| 4 Release | Deployed by 30-apps-infra #45, merged 2026-11-08 9:35 PM; health check passes; smoke result not recorded |
-| 5 Close-out | This reconstructed log (2026-11-10). Launch drafts: unknown |
+| 4 Release | Deployed by 30-apps-infra #45, merged 2026-11-08 9:35 PM; health check passes; no smoke result was recorded at the time (one was run 2026-11-16, below) |
+| 5 Close-out | Log reconstructed 2026-11-10; close-out completed 2026-11-16 (ai-dev-os #44). Launch drafts: unknown |
 
 ## Who did what
 

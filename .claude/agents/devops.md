@@ -65,14 +65,22 @@ somewhere under it — and strip a trailing ` (deleted)`, which is itself the te
 underneath a still-running process:
 
 ```bash
+clone=$(git rev-parse --show-toplevel) || exit   # never $PWD: see below
 for p in /proc/[0-9]*; do
   d=$(readlink "$p/cwd" 2>/dev/null) || continue
-  case "${d% (deleted)}" in "$PWD"*) echo "${p#/proc/} $d";; esac
+  case "${d% (deleted)}" in "$clone"|"$clone"/*) echo "${p#/proc/} $d";; esac
 done
 ```
 
+**Anchor on `--show-toplevel`, never `$PWD`.** A fresh shell often starts in the parent of every clone, so `$PWD`
+would match all of them and hand you another agent's live app as your survivor — and the next paragraph would
+authorise you to act on it. `$PWD` also misses your own server when you are standing in a subdirectory, and the
+unanchored prefix matches a sibling clone whose name merely starts the same (`13-field-service-codex`).
+
 If that finds nothing, the holder was started outside your clone and **is not yours**: report the port with what
-you know and stop. Do not widen the search — that is the moment the net catches someone else's work.
+you know and stop. Do not widen the search — that is the moment the net catches someone else's work. This is safe
+to terminate on only because the scan is anchored: with `$PWD`, "nothing found" can just mean you were standing in
+the wrong directory.
 
 **Then prove the build you think you are testing is the one answering**, before you measure anything or sign
 anything off. Start the server with `APP_VERSION=$(git rev-parse --short HEAD)` and check `/api/health` returns

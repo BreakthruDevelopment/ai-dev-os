@@ -13,8 +13,8 @@ show it.
 | URL | https://app2.breakthruventures.ai |
 | `apps.yaml` PR | 30-apps-infra #26, merged 2026-11-07 8:23 PM; domain #31, 11:34 PM |
 | Image tag | `sha-6675f0b` (30-apps-infra #42, merged 2026-11-08 5:08 PM (apps 1-3 admin-permissions fix)) |
-| Live smoke | Unknown: no `scripts/smoke.sh` result is recorded. `/api/health` answered `ok` with `sha-6675f0b` on 2026-11-10 at about 2:29 PM |
-| Catalog status | `deployed` (not `done`: this log and a recorded live smoke were missing) |
+| Live smoke | **Pass, 2026-11-16** ([run](https://github.com/BreakthruDevelopment/02-notes-kb/actions/runs/43926450785)): full `scripts/smoke.sh` against the live site. The tag was not re-read on this run — the smoke never compares it (30-apps-template#37) — but this log's `sha-6675f0b` health check still matches what `apps.yaml` pins, unchanged since 2026-11-08 |
+| Catalog status | **`done`** (ai-dev-os #44) |
 
 ## Gates
 
@@ -33,9 +33,9 @@ Merged PRs by branch prefix (harness): claude 10, codex 2, grok 2. Per-role timi
 ## Definition of done
 
 - [x] README filled
-- [ ] Live smoke recorded after the latest deploy (health check only, 2026-11-10)
+- [x] Live smoke recorded after the latest deploy ([2026-11-16](https://github.com/BreakthruDevelopment/02-notes-kb/actions/runs/43926450785))
 - [x] Run log (this file, reconstructed)
-- [ ] `catalog.yaml` `status: done`
+- [x] `catalog.yaml` `status: done`
 
 ## What slipped or surprised us
 

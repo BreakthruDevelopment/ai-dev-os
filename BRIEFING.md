@@ -124,11 +124,14 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
   - Google Cloud: https://template-189497094271.us-central1.run.app
   - Oracle: https://template.141-148-159-122.sslip.io
 - **Apps 1–12 are live** (12 of 33), each at `appN.breakthruventures.ai` with the tag `apps.yaml` pins. Apps 1–4 each
-  passed a full live smoke on 2026-11-16, run from the Actions tab against the deployed site. **Those runs prove the
-  site works, not which image is serving it:** `scripts/smoke.sh` asserts `/api/health` returns `status: ok` and
-  never compares the tag, and the run log does not record the body. For apps 5–12 the tag was read by hand from a
-  live-smoke run; nothing re-checks it. [`30-apps-template#37`](https://github.com/BreakthruDevelopment/30-apps-template/issues/37)
-  tracks making the smoke assert the deployed tag so "pass after the latest deploy" means what it says.
+  passed a full live smoke on 2026-11-16, run from the Actions tab against the deployed site, and all four are
+  serving the tag `apps.yaml` pins. **The smoke itself does not establish that second half:** `scripts/smoke.sh`
+  asserts only that `/api/health` returns `status: ok`, never compares the tag, and the run log does not keep the
+  body. Apps 2–4 were confirmed by the tag already recorded in their run logs, which `apps.yaml` has not changed
+  since 2026-11-08; app 1 had been redeployed since its last tag check, so its tag was read back deliberately
+  (`sha-de78c18`). For apps 5–12 the tag was likewise read by hand at the time and nothing re-checks it.
+  [`30-apps-template#37`](https://github.com/BreakthruDevelopment/30-apps-template/issues/37) tracks making the
+  smoke assert the deployed tag so "pass after the latest deploy" means what it says without a manual step.
 
   | # | App | Cloud | Tag | Deploy PR (`30-apps-infra`) | Live smoke after latest deploy | Status |
   | --- | --- | --- | --- | --- | --- | --- |

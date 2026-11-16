@@ -49,6 +49,16 @@ part: your next run reaches a *stale server serving an old build*, and the tests
 did not write. Prefer `exec` in a wrapper script, or start the real binary directly, so the PID you capture is the
 one that needs stopping.
 
+When a survivor does hold the port, find it by **its working directory, not its name or its port**: read
+`/proc/<pid>/cwd` and act only on a process whose cwd is inside your own clone. Several agents run servers from
+identically-named binaries at once, so the name tells you nothing about whose it is.
+
+**Then prove the build you think you are testing is the one answering**, before you measure anything or sign
+anything off. Ask the running server for something only your new code emits — a string, a field, a route — and
+check you get it. This is the half that matters: killing someone else's server is loud and you will notice,
+whereas reviewing a stale build is silent, passes every gate, and ends with a verdict on code that was never
+running. It has happened twice here.
+
 **Reading a port is allowed; killing by one is not.** Check a port at two moments, for opposite reasons: it must
 be **free before you start** a server there (if it isn't, someone else's is running and your run would test their
 build), and **free again after you stop** yours (if it isn't, a child outlived the PID you captured). In between,

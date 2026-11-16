@@ -18,7 +18,10 @@ Pace is at the end.
 | **partial** | Some of the week's topics are live or built, others are not. The row says which. |
 | **gap** | Not built. |
 
-Nothing is scored on a plan, a slide or a README. **Today: 1 live, 3 built, 9 partial, 3 gaps.** Twelve apps are
+Nothing is scored on a plan, a slide or a README. **Today: 0 live, 3 built, 10 partial, 3 gaps.**
+No week is fully live, because a week counts as live only when *every* topic in it does: W02 is three-quarters
+there and held back by OOP alone. That is the rule working, not a bad month — twelve apps are deployed and
+the three **built** weeks become live the day app 31 deploys. Twelve apps are
 deployed (`30-apps-infra/apps.yaml`). Apps 13, 14, 15 and 31 have merged work in flight; their catalog status is
 still `planned`, and none is deployed.
 
@@ -27,17 +30,17 @@ still `planned`, and none is deployed.
 | Wk | Roadmap topic | Where it stands | State |
 | --- | --- | --- | --- |
 | W01 | Python basics | Nothing in the portfolio is Python yet. **33-ai-service** is the answer. | gap |
-| W02 | Dev tools — OOP, Git & GitHub, tests, type hints | Twelve deployed apps, each TypeScript strict with lint, typecheck, unit and integration tests, build and smoke in CI; the BreakthruSoftwareFactory itself (8 roles, 5 gates, PR-only, required review) | **live** |
-| W03 | APIs & data — REST, FastAPI, SQL, async | REST handlers and Postgres/Drizzle are live across twelve apps; the async job runner is live in four of them (apps 9–12). **FastAPI** is the missing half → app 33. | partial |
+| W02 | Dev tools — OOP, Git & GitHub, tests, type hints | Git/GitHub, tests and type hints: twelve deployed apps, each TypeScript strict with lint, typecheck, unit and integration tests, build and smoke in CI, plus the BreakthruSoftwareFactory itself (8 roles, 5 gates, PR-only, required review). **OOP is a gap:** every `class` in the portfolio is an exception subclass — there are no non-Error classes — so the only inheritance doing real work is the error hierarchy that `errorResponse()` dispatches over. Idiomatic TypeScript, but not an OOP artifact. App 33 (Python) is where it lands honestly: ABCs for the provider and reranker interfaces, SQLAlchemy models, service classes. | partial |
+| W03 | APIs & data — REST, FastAPI, SQL, async | REST handlers and Postgres/Drizzle are live across twelve apps; the async job runner is live in five of them (apps 6, 9–12). **FastAPI** is the missing half → app 33. | partial |
 | W04 | LLM basics — tokens, attention, prompts, decoding | Prompting is live in every app's AI feature. Tokens, decoding controls and logprobs → **16-lms**, not started (held until the Oracle VM reboot). | partial |
 | W05 | LLM apps — context, tool calls, LangChain, caching | Tool calls are **built** in app 31 (merged, not deployed). Context budget, prompt cache and cost-per-draft → **27-donor-crm**: not started. | partial |
-| W06 | RAG — embeddings, vector DB, rerank, RAG evals | **14-real-estate** has the pgvector extension, an `embedding` column, an embedding cache and `embed.ts` merged — but **no search path yet** (no distance query anywhere). Rerank and a labelled eval set → **29-knowledge-assistant** and **17-job-board-ats**. | partial |
+| W06 | RAG — embeddings, vector DB, rerank, RAG evals | **14-real-estate** has the pgvector extension, an `embedding` column, an unused `query_embedding` cache table and `embed.ts` merged — but **no search path yet** (no distance query anywhere). Rerank and a labelled eval set → **29-knowledge-assistant** and **17-job-board-ats**. | partial |
 | W07 | AI agents — agent loop, tools, Agents SDK, tracing | **31-cost-scaler**: Google ADK `runAgent()` with four tools, merged and tested. Not deployed. | **built** |
 | W08 | MCP & A2A — MCP servers, tools, A2A protocol | Nothing yet → **30-ai-ops-console** (MCP server + A2A broker), consumed by **28-support-agent**. | gap |
 | W09 | LangGraph — state, routing, checkpoints, HITL | Nothing yet → **20-task-manager**; HITL approval chains also in **32-purchase-orders**. | gap |
 | W10 | Multi-agent — supervisor, handoffs, parallel tasks | **31-cost-scaler**: coordinator plus pricing and migration agents via `AgentTool`, merged and tested. Not deployed. | **built** |
-| W11 | Agent memory — long-term memory, queues, webhooks | Job queues with retries are live in four apps (9–12). Long-term memory → **18-employee-onboarding**; webhooks → **21** and **23**. | partial |
-| W12 | Evals & safety — evals, tracing, guardrails, LLMOps | Input caps, zod-validated model output and demo fallbacks are live in twelve apps. The grounded-output check that survived seven adversarial review rounds is in **open PR** `15-event-ticketing#16` — neither live nor built. Evals, tracing and LLMOps → **30**, **19**, **25**. | partial |
+| W11 | Agent memory — long-term memory, queues, webhooks | Job queues with retries are live in five apps (6, 9–12). Long-term memory → **18-employee-onboarding**; webhooks → **21** and **23**. | partial |
+| W12 | Evals & safety — evals, tracing, guardrails, LLMOps | Input caps, zod-validated model output and demo fallbacks are live in twelve apps. The grounded-output check is in **open PR** `15-event-ticketing#16`, on its eleventh review round with the last six blocking — nine real bypasses found so far, none shipped. Neither live nor built. Evals, tracing and LLMOps → **30**, **19**, **25**. | partial |
 | W13 | Deploy — Docker, CI/CD, cloud, vLLM | One container image per app, GitHub Actions, four clouds: live. **vLLM** → the Mac mini (below). | partial |
 | W14 | Full-stack AI — Streamlit, auth, scaling, load tests | Better Auth with roles is live in twelve apps. **Streamlit** → app 33; load tests → **22-analytics-dashboard**. | partial |
 | W15 | Capstone — architecture, build, interview prep | **31-cost-scaler** is the capstone: four-cloud price ingestion, a BigInt-micros scenario engine, a multi-agent advisor. Merged, not deployed. | **built** |
@@ -90,6 +93,8 @@ not by `scripts/create-app-repos.py`: that builds from the Next.js template, and
 `Lint, test, build, smoke` check has no Python equivalent yet. That CI workflow is its first slice.
 
 ## Where the models run
+
+**This table is the intended design, not today's behaviour** — see the paragraph below it.
 
 | Provider | Runs on | Used for | When it isn't there |
 | --- | --- | --- | --- |
@@ -146,7 +151,9 @@ are fewer apps or more days, not a thinner definition of done.
 
 Template modules are **new files only**, never edits to existing ones, so the twelve live apps are untouched until
 they choose to cherry-pick. Each module gets one adversarial review at the quality of app 15's FAQ check, so the
-apps that reuse it inherit a control that has already survived that, instead of each re-earning it.
+apps that reuse it inherit a control that has been through that, instead of each re-earning it. App 15's FAQ check is the
+reference for the depth meant here: eleven rounds, nine real bypasses caught before merge. It is not yet merged, and the
+bar is the scrutiny, not a claim that it passed.
 
 Wave 1 (schema, migrations, roles, access) is Claude-only and security-sensitive, so every app funnels through one
 agent: it is the critical path, and when it is late every other harness idles. Foundations are therefore written

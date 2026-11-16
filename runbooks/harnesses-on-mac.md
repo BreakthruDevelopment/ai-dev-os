@@ -167,6 +167,16 @@ Two runners at once (say `grok` in one window and `antigravity` in another) are 
 (`~/30apps/.locks/<repo>.lock`) and claims each issue on GitHub before working it, so they never take the same
 repo or issue.
 
+**Ports.** Each repo gets its own port for the app, the health check and `pnpm smoke`, so two runners on different
+repos never fight over one. The runner derives it from the repo name (`cksum` of the name, mapped into
+10000-19999): the same repo always gets the same port, and nothing is stored or scanned. It exports `PORT`,
+`APP_URL` and `BASE_URL` (the smoke scripts read `BASE_URL`) and writes the port into the prompt and the log line
+that starts each run (`port 15920 (derived from the repo name)`). `run-harness.sh --port-for <repo>` prints it; for
+example `15-event-ticketing` is 15920 and `13-field-service` is 14182. To pin one, start the runner with `PORT=<n>`
+set (every repo then uses it, so pin only when running a single repo). If the port is already in use, the runner
+refuses that repo before claiming anything, logs the port and repo, and moves on; it never picks another port. Find
+the holder with `lsof -nP -iTCP:<port> -sTCP:LISTEN` and stop it yourself, by its PID.
+
 Limit it to some repos with `REPOS="06-read-later 08-loan-portal" ~/30apps/ai-dev-os/scripts/run-harness.sh grok`.
 Change the time limit per issue with `HARNESS_TIMEOUT_MIN=120` (default 90) and the CI wait with `CI_WAIT_MIN`
 (default 20, `0` to skip).
@@ -249,8 +259,8 @@ An empty local branch left over from an older run is deleted automatically the n
   repos. Only repos with the `30-apps-30-days` topic are touched.
 - Run two issues at once in one window, or run anything on a schedule: you start it.
 - Install a database, or put a key or token anywhere. The only environment it sets for the harness is
-  `AI_PROVIDER=demo`, a dummy local `BETTER_AUTH_SECRET` (the same kind CI uses), `PORT=3000`, and the local test
-  database as `TEST_DATABASE_URL`/`DATABASE_URL`.
+  `AI_PROVIDER=demo`, a dummy local `BETTER_AUTH_SECRET` (the same kind CI uses), the repo's own `PORT`, `APP_URL` and
+  `BASE_URL` (see Ports above), and the local test database as `TEST_DATABASE_URL`/`DATABASE_URL`.
 - Post anything outside GitHub.
 
 ## The auto-approve trade-off

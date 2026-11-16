@@ -729,7 +729,7 @@ build_prompt() { # $1 repo, $2 number, $3 role, $4 branch
   cat <<EOF
 You are the $3 agent, running in the ${HARNESS} harness on Michael's Mac, unattended. Work on issue #$2 in the GitHub repo $OWNER/$1, which is checked out in the current directory on branch $4.
 
-1. Read AGENTS.md in this repo and follow it. Then read your role file, saved at .harness/role.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/roles/$3.md). The issue is saved at .harness/issue.md; \`gh issue view $2 --comments\` shows it with comments. The spec it links is in ai-dev-os/specs/.
+1. Read AGENTS.md in this repo and follow it. Then read your role file, saved at .harness/role.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/roles/$3.md). The issue is saved at .harness/issue.md; \`gh issue view $2 --comments\` shows it with comments. The app's spec is saved at .harness/spec.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/specs/$1.md); read the sections the issue links. Don't fetch anything from GitHub yourself (gh api is refused).
 2. Do what the issue asks and nothing outside it. Work only in this directory and only on branch $4.
    Don't create or edit anything in src/lib/db/, drizzle/ or src/lib/auth/, or drizzle.config.ts, src/lib/access.ts, src/proxy.ts or src/middleware.ts: the app's foundation (wave 1) issue owns the schema, migrations, roles, access rules and auth config, and the runner won't push a branch that changes them. If this issue needs tables, data functions, roles or access rules that aren't on main yet, or needs a change in those files, stop: make no commits and write what is missing to .harness/blocked.md (the runner posts it on the issue). Never invent your own schema, migrations, roles or session code.
 3. Run the checks and fix anything you broke: pnpm install --frozen-lockfile (plain pnpm install only if the issue requires a dependency change), pnpm lint, pnpm typecheck, pnpm test, pnpm build. $db_note
@@ -794,6 +794,9 @@ work_issue() { # $1 repo, $2 number, $3 title, $4 role, $5 branch
     > "$dir/.harness/role.md" || { log "skip $repo#$n: can't fetch roles/$role.md"; return 1; }
   gh api "repos/$OWNER/$repo/issues/$n" --jq '"# #\(.number) \(.title)\n\n\(.body // "")"' \
     > "$dir/.harness/issue.md" || { log "skip $repo#$n: can't fetch the issue"; return 1; }
+  # The app's spec (specs/<repo>.md in ai-dev-os), so the harness never needs gh api (denied) to read it.
+  gh api "repos/$OWNER/ai-dev-os/contents/specs/$repo.md" -H 'Accept: application/vnd.github.raw' \
+    > "$dir/.harness/spec.md" 2>/dev/null || rm -f "$dir/.harness/spec.md"
 
   claim_issue "$repo" "$n" "$branch" || return 1
 

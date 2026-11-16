@@ -123,17 +123,19 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
   - Azure: https://app-template.salmonpebble-b870873b.eastus.azurecontainerapps.io
   - Google Cloud: https://template-189497094271.us-central1.run.app
   - Oracle: https://template.141-148-159-122.sslip.io
-- **Apps 1–12 are live** (12 of 33), each at `appN.breakthruventures.ai` with the tag `apps.yaml` pins. For apps
-  5–12 the latest live-smoke run's `/api/health` reported exactly that tag. App 4 also answered with its tag on
-  2026-11-12 (logged inside app 8's live-smoke run). Apps 1–3 have no health check recorded on GitHub since
-  2026-11-10.
+- **Apps 1–12 are live** (12 of 33), each at `appN.breakthruventures.ai` with the tag `apps.yaml` pins. Apps 1–4 each
+  passed a full live smoke on 2026-11-16, run from the Actions tab against the deployed site. **Those runs prove the
+  site works, not which image is serving it:** `scripts/smoke.sh` asserts `/api/health` returns `status: ok` and
+  never compares the tag, and the run log does not record the body. For apps 5–12 the tag was read by hand from a
+  live-smoke run; nothing re-checks it. [`30-apps-template#37`](https://github.com/BreakthruDevelopment/30-apps-template/issues/37)
+  tracks making the smoke assert the deployed tag so "pass after the latest deploy" means what it says.
 
   | # | App | Cloud | Tag | Deploy PR (`30-apps-infra`) | Live smoke after latest deploy | Status |
   | --- | --- | --- | --- | --- | --- | --- |
-  | 1 | Portfolio Build Tracker | AWS | `sha-de78c18` | #71 | not recorded | deployed |
-  | 2 | Notes and Knowledge Base | Azure | `sha-6675f0b` | #42 | not recorded | deployed |
-  | 3 | Expense Tracker | Google Cloud | `sha-811aac4` | #42, domain #41 | not recorded | deployed |
-  | 4 | Habit and Goal Tracker | Oracle | `sha-c91ffc1` | #45, #47 | health only | deployed |
+  | 1 | Portfolio Build Tracker | AWS | `sha-de78c18` | #71 | pass, 2026-11-16 | **done** |
+  | 2 | Notes and Knowledge Base | Azure | `sha-6675f0b` | #42 | pass, 2026-11-16 | **done** |
+  | 3 | Expense Tracker | Google Cloud | `sha-811aac4` | #42, domain #41 | pass, 2026-11-16 | **done** |
+  | 4 | Habit and Goal Tracker | Oracle | `sha-c91ffc1` | #45, #47 | pass, 2026-11-16 | **done** |
   | 5 | Personal Budget Planner | AWS | `sha-50aa60b` | #65, #75 | pass, 2026-11-12 | **done** |
   | 6 | Bookmark and Read-Later | Azure | `sha-51175dd` | #66 | pass, 2026-11-10 | deployed (README) |
   | 7 | Appointment Booking | Google Cloud | `sha-0f8cdf3` | #69, domain #70, #75 | pass, 2026-11-12 | **done** |

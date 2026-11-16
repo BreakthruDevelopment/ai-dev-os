@@ -23,3 +23,16 @@ Requirements:
   `.harness/blocked.md` and make no commits); never invent schema or auth. If your issue does own a migration, rebase
   on `main` and regenerate it if another merged first; never two `drizzle/NNNN_*` files with the same number.
 - Work on a `<harness>/<task>` branch (for example `claude/items-api` or `antigravity/items-api`) and open a PR.
+
+## Sandbox rules (every harness, every role)
+
+Several agents share one container. A command that matches on a process name reaches into their work.
+
+- **Never `pkill`, `killall`, `killall5`, or any kill that matches on a name or pattern.** Stop only processes you
+  started, by the PID you captured when you started them. `pkill -f "next"` has killed another agent's dev server
+  here more than once; it finds nothing far more often than it finds your own process.
+- **Run your own Postgres**, in a directory unique to your task under the scratch dir. Stop it with `pg_ctl stop`
+  and confirm that it succeeded *before* you end any permission-fixing loop and *before* you delete its data
+  directory. Deleting the data directory under a running postmaster corrupts it for whoever runs next.
+- **Pick a port nobody else is on** and prefix every scratch file and database name with your task's own prefix.
+- If a process you started won't stop, say so in your report with its PID. Do not escalate to a pattern kill.

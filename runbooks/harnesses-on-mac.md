@@ -93,7 +93,7 @@ don't work. `echo "$HOME/30apps/"` prints the exact value.
       "command(test)", "command(grep)", "command(rg)", "command(find)", "command(wc)", "command(sed)",
       "command(sort)", "command(jq)", "command(mkdir)", "command(touch)", "command(cp)", "command(mv)",
       "command(sleep)", "command(curl)", "command(unzip)", "command(gunzip)", "command(tar)", "command(psql)", "command(pg_isready)",
-      "command(nohup node .next/standalone/server.js)", "command(pkill -f .next/standalone/server.js)",
+      "command(nohup node .next/standalone/server.js)", "command(kill)",
       "command(bash scripts/smoke.sh)"
     ],
     "deny": [
@@ -118,7 +118,9 @@ Rules are `action(target)`, prefix matches word by word; deny beats allow, so `w
 each clone's `.git` folder ([Antigravity permissions docs](https://antigravity.google/docs/permissions.md)). Why
 the commands: the prompt has the agent read files, run `pnpm` checks, commit, and run smoke the way CI does
 (`cp` the static files into `.next/standalone`, start `node .next/standalone/server.js`, poll `/api/health` with
-`curl`, run `scripts/smoke.sh`, then `pkill` the server). `git switch` is left out on purpose (the agent must stay
+`curl`, run `scripts/smoke.sh`, then `kill` the server by the PID it wrote to `.harness/app.pid`). `pkill` is
+deliberately **not** allow-listed: a pattern kill on a shared machine reaches other runners' servers, and the
+builder roles forbid it. `git switch` is left out on purpose (the agent must stay
 on its branch), as are push, remote, config, `gh pr` and `gh api`. The rules apply to every `agy` session on the
 Mac, not just the script's.
 

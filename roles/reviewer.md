@@ -22,13 +22,26 @@ Report as a short list: blocking issues first (with file and line), then suggest
 to merge. Run `pnpm lint && pnpm typecheck && pnpm test` yourself; don't trust the PR description.
 
 **Your review is required** (BreakthruSoftwareFactory gate 3, `FACTORY.md`). Post it as a GitHub pull request review
-of type *Comment* on the PR's current head commit (`gh pr review <n> --comment --body-file <file>`), never only in
-chat or a plain comment, and end the body with exactly these two lines:
+of type *Comment* on the PR's current head commit, never only in chat or a plain comment, and end the body with
+exactly these two lines:
 
 ```
 Reviewer: claude-code
 Verdict: ready
 ```
+
+**`gh pr review` does not work here.** It goes through GitHub's GraphQL API, which is blocked for these sessions and
+answers 403 with a message pointing at REST. Post the review with REST instead, reading the body from a file so no
+quoting mangles it:
+
+```
+gh api -X POST "repos/BreakthruDevelopment/<repo>/pulls/<n>/reviews" \
+  -f event=COMMENT -F body=@<file> -f commit_id="$(gh api repos/BreakthruDevelopment/<repo>/pulls/<n> --jq .head.sha)"
+```
+
+The same applies to everything else that reaches for GraphQL: `gh pr view --json`, `gh pr comment`, `gh pr merge`.
+Use `gh api repos/{owner}/{repo}/...` throughout, and the `ccr/` routes on `api.github.com` for review threads,
+auto-merge and draft state.
 
 Use `Reviewer: codex` when you are Codex doing the second review, and `Verdict: blocking` when anything blocking is
 left. The `Reviewer sign-off` check reads these lines; a new push needs a new review. If the PR touches auth, roles
@@ -36,6 +49,28 @@ or access, payments, tenancy, uploads, tokens or secrets, or AI tool calls that 
 `security-sensitive` label so Codex's second review is required too. You do not merge as part of the review. Once
 `Reviewer sign-off` and the other required checks are green on the current head, any harness may squash-merge an
 app-repo PR per `AGENTS.md`. Claude Code also merges green `ai-dev-os` and `30-apps-infra` PRs; leave spec PRs for Michael.
+
+## Reading Codex's review
+
+**Judge Codex by its unresolved inline threads, never by its summary prose.** Its summary is a sticky comment it
+edits in place, and it routinely reads "Didn't find any major issues" on a head where a real defect is sitting in an
+open thread. On 2026-11-17 that happened on three PRs in one morning — `13-field-service#20`, `31-cost-scaler#22`
+and `#24` — and all three threads held defects a reviewer then reproduced: a duplicated note on retry, a pricing
+option silently dropped on save, and an admin panel claiming estimates still used a price the query excludes.
+
+```
+gh api "repos/BreakthruDevelopment/<repo>/pulls/<n>/ccr/review_threads"      # resolved:false is what matters
+gh api "repos/BreakthruDevelopment/<repo>/pulls/comments/<comment_id>"       # the finding itself
+```
+
+The machine-readable truth is the `codex-review-state:v1` marker in that sticky comment: `commit_sha` must equal the
+current head and `has_unresolved_findings` must be `false`. The `Reviewer sign-off` check already reads it, so a gate
+that stays red while the prose says "no issues" is the gate being right and the prose being misleading — do not go
+looking for a formatting problem in the markers, and do not ask Codex to re-review as a way of clearing it. Fix the
+finding, or answer the thread and resolve it with a reason.
+
+**Before you merge anything, list the unresolved threads.** It costs one call and it is the cheapest defect-catch in
+this pipeline.
 
 ## Sandbox rules (every role that can run commands)
 

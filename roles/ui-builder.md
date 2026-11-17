@@ -61,20 +61,29 @@ underneath a still-running process:
 if clone=$(env -u GIT_DIR -u GIT_WORK_TREE git rev-parse --show-toplevel) && [ -n "$clone" ]; then
   if [ -d /proc ]; then                                    # Linux
     for p in /proc/[0-9]*; do
-      pid=${p#/proc/}; [ "$pid" = "$$" ] && continue
+      pid=${p#/proc/}
       d=$(readlink "$p/cwd" 2>/dev/null) || continue
       case "${d% (deleted)}" in "$clone"|"$clone"/*) echo "$pid $d";; esac
     done
   else                                                     # macOS has no /proc
-    lsof -a -d cwd -Fpn 2>/dev/null | awk -v c="$clone" -v me=$$ '
+    lsof -a -d cwd -Fpn 2>/dev/null | awk -v c="$clone" '
       /^p/ { pid = substr($0, 2) }
-      /^n/ { d = substr($0, 2)
-             if (pid != me && (d == c || index(d, c "/") == 1)) print pid, d }'
-  fi
+      /^n/ { d = substr($0, 2); sub(/ \(deleted\)$/, "", d)
+             if (d == c || index(d, c "/") == 1) print pid, d }'
+  fi | while read -r pid d; do
+    kill -0 "$pid" 2>/dev/null && echo "$pid $d"             # drop the already-dead
+  done
 else
   echo "not inside a clone: do not scan, report the port and stop" >&2
 fi
 ```
+
+`kill -0` is the load-bearing part: `lsof` and the pipeline members are listed and are already dead by the time
+you read the output, and killing a PID that has since been recycled is how you take out someone else's work.
+Shells of your own will still appear — filtering them by `$$` or `$BASHPID` does not catch them all, so do not
+trust a filter to do it. They sit at the clone **root**, while the server you are hunting is almost always under
+it (`.next/standalone`) and is the one still holding the port. Confirm with the port probe below, not by reading
+names.
 
 **Then stop what it found, by that PID** — `kill <pid>`, then check the port again. That is the one case where
 "stop only a process you started" (above) is satisfied by a process you did not capture: you started it, through

@@ -57,16 +57,33 @@ underneath a still-running process:
 
 ```bash
 if clone=$(env -u GIT_DIR -u GIT_WORK_TREE git rev-parse --show-toplevel) && [ -n "$clone" ]; then
-  for p in /proc/[0-9]*; do
-    d=$(readlink "$p/cwd" 2>/dev/null) || continue
-    case "${d% (deleted)}" in "$clone"|"$clone"/*) echo "${p#/proc/} $d";; esac
-  done
+  if [ -d /proc ]; then                                    # Linux
+    for p in /proc/[0-9]*; do
+      pid=${p#/proc/}; [ "$pid" = "$$" ] && continue
+      d=$(readlink "$p/cwd" 2>/dev/null) || continue
+      case "${d% (deleted)}" in "$clone"|"$clone"/*) echo "$pid $d";; esac
+    done
+  else                                                     # macOS has no /proc
+    lsof -a -d cwd -Fpn 2>/dev/null | awk -v c="$clone" -v me=$$ '
+      /^p/ { pid = substr($0, 2) }
+      /^n/ { d = substr($0, 2)
+             if (pid != me && (d == c || index(d, c "/") == 1)) print pid, d }'
+  fi
 else
   echo "not inside a clone: do not scan, report the port and stop" >&2
 fi
 ```
 
-Write it with the `if`, for the same reason the port probe above needs one: bare, it ends a sourced shell or a
+**Then stop what it found, by that PID** — `kill <pid>`, then check the port again. That is the one case where
+"stop only a process you started" (above) is satisfied by a process you did not capture: you started it, through
+a wrapper, and this is how you recover its real PID. If the port is still busy after that, you are out of road:
+report it with the PID and stop, as "do not go hunting for the owner" (below) says.
+
+**The macOS branch is not decoration.** `run-harness.sh` runs on the Mac and fetches these role files onto it;
+there `/proc/[0-9]*` never expands, the loop prints nothing, exits 0, and the sentence below would tell you the
+survivor "is not yours" — a confident false negative on the machine this section exists for.
+
+Write it with the `if`, for the same reason the port probe below needs one: bare, it ends a sourced shell or a
 script under `set -e` at the `fatal:`, so the cleanup you queued after it never runs and you leave behind the very
 server this paragraph is about. The `[ -n "$clone" ]` is not belt and braces — an unset `clone` turns the pattern
 into `/*`, which matches every process on the machine. `env -u GIT_DIR` is there because with `GIT_DIR` set in the
@@ -86,7 +103,9 @@ the wrong directory.
 anything off. Start the server with `APP_VERSION=$(git rev-parse --short HEAD)` and check `/api/health` returns
 that `version`. Do not settle for "something only my new code emits": that works only when your change is visible
 over HTTP, and fails exactly where a stale build is most dangerous — an idempotency fix, a lock ordering, anything
-observable only by killing a request mid-flight.
+observable only by killing a request mid-flight. On a deployed app the value is the image tag
+(`sha-<commit>`), not the bare short sha, so compare against what the environment sets rather than against
+`git rev-parse` output.
 
 This is the half that matters. Killing someone else's server is loud and you will notice; reviewing a stale build
 is silent, passes every gate, and ends in a verdict on code that was never running.

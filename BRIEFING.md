@@ -163,8 +163,9 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
   smoke (and app 1 a README fix; see the retro).
 - **App 31 (Cloud Cost Scaler) is live on Google Cloud** (2026-11-17, `30-apps-infra` #92 then domain #95), serving
   `sha-b4659b3` at https://cost-scaler-189497094271.us-central1.run.app; `app31.breakthruventures.ai` is waiting on
-  its certificate, after which the Terraform workflow needs a **manual rerun** to move `APP_URL` onto it. Fourteen
-  PRs, all `claude/`. Status is `deployed`, not `done`: **its live smoke fails on an empty footprint.** Nothing
+  its certificate, after which the Terraform workflow needs a **manual rerun** to move `APP_URL` onto it. Fifteen
+  PRs, all `claude/`. Status is `deployed`, not `done`: **its live smoke fails on an empty footprint**, and no
+  smoke has yet run against the deployed `sha-b4659b3` at all. Nothing
   populates the price and footprint tables at boot, and the only trigger is `POST /api/prices/refresh` — fired by
   the `cost-scaler-refresh` Cloud Scheduler job (next 07:05 UTC), or by an admin, and **no admin can exist on a
   Google Cloud app** (`30-apps-infra#91`). Force-running that job six times fills the tables in about a minute;

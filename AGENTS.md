@@ -24,6 +24,12 @@ The BreakthruDevelopment org holds other, unrelated applications that must never
   `security-sensitive`). Use `gh pr merge --squash --auto` to queue the merge when auto-merge is enabled on the
   repo, or `gh pr merge --squash` once the checks are already green. Never bypass branch protection, never use an
   admin merge, never merge your own red PR, and never merge with failing or pending checks.
+  **Before any merge, list the PR's unresolved review threads** and read the ones that still apply to the head.
+  Green checks do not mean nobody left a finding open — on 2026-11-17 three PRs carried a cheerful Codex receipt
+  while a real defect sat in an open thread. Use whatever your harness gives you for review threads (in Claude Code
+  sessions GraphQL is blocked, so it is the `ccr/` route on `api.github.com`);
+  [`roles/reviewer.md`](roles/reviewer.md) ("Reading Codex's review") has the calls and how to tell a live finding
+  from one a later push already fixed.
 - **Deploys and playbook changes: Claude Code merges** (Michael's standing instruction, 2026-11-12). Claude Code
   may also squash-merge PRs in `30-apps-infra` (deploys, `apps.yaml`) and in `ai-dev-os` (this playbook) once their
   required checks are green on the current head and, for `ai-dev-os`, a marked review is in; for an infra PR it

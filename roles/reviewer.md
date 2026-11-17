@@ -22,13 +22,34 @@ Report as a short list: blocking issues first (with file and line), then suggest
 to merge. Run `pnpm lint && pnpm typecheck && pnpm test` yourself; don't trust the PR description.
 
 **Your review is required** (BreakthruSoftwareFactory gate 3, `FACTORY.md`). Post it as a GitHub pull request review
-of type *Comment* on the PR's current head commit (`gh pr review <n> --comment --body-file <file>`), never only in
-chat or a plain comment, and end the body with exactly these two lines:
+of type *Comment* on the PR's current head commit, never only in chat or a plain comment, and end the body with
+exactly these two lines:
 
 ```
 Reviewer: claude-code
 Verdict: ready
 ```
+
+**`gh pr review` does not work here.** It goes through GitHub's GraphQL API, which is blocked for these sessions and
+answers 403 with a message pointing at REST. Post the review with REST instead, reading the body from a file so no
+quoting mangles it:
+
+```
+HEAD=$(gh api repos/BreakthruDevelopment/<repo>/pulls/<n> --jq .head.sha)   # capture BEFORE you review
+# ... review that commit ...
+gh api -X POST "repos/BreakthruDevelopment/<repo>/pulls/<n>/reviews" \
+  -f event=COMMENT -F body=@<file> -f commit_id="$HEAD"
+```
+
+Capture the sha **before** you start, not in the posting command: resolved at post time it names whatever the head
+is by then, so a push while you were reviewing would attribute your review to a commit you never read. Pinning it
+also means a review that has been overtaken fails loudly instead of quietly signing off the wrong code.
+
+The same applies to everything else that reaches for GraphQL: `gh pr view --json`, `gh pr comment`, `gh pr merge`.
+Use `gh api repos/{owner}/{repo}/...` throughout — to merge, `gh api -X PUT ".../pulls/<n>/merge" -f
+merge_method=squash -f sha=<head>`, where passing `sha` makes the merge fail rather than quietly merge something new
+if the head moved while you were deciding — and the `ccr/` routes on `api.github.com` for review threads, auto-merge
+and draft state.
 
 Use `Reviewer: codex` when you are Codex doing the second review, and `Verdict: blocking` when anything blocking is
 left. The `Reviewer sign-off` check reads these lines; a new push needs a new review. If the PR touches auth, roles
@@ -36,6 +57,58 @@ or access, payments, tenancy, uploads, tokens or secrets, or AI tool calls that 
 `security-sensitive` label so Codex's second review is required too. You do not merge as part of the review. Once
 `Reviewer sign-off` and the other required checks are green on the current head, any harness may squash-merge an
 app-repo PR per `AGENTS.md`. Claude Code also merges green `ai-dev-os` and `30-apps-infra` PRs; leave spec PRs for Michael.
+
+## Reading Codex's review
+
+**Never take "Didn't find any major issues" as the verdict.** Codex posts that line in a
+`codex-review-receipt:v1` comment every time it runs, and it says nothing about the findings still open from an
+earlier run on an earlier head. Three PRs carried a cheerful receipt while a real defect sat in an open thread:
+`13-field-service#20` (a note duplicated on retry, and typing erased mid-save), `31-cost-scaler#22` (the
+new-account allowance option silently dropped on save, so compare disagreed with the preview that was saved) and
+`31-cost-scaler#24` (an admin panel calling a quarantined price "still in use" when the pricing query excludes it).
+All three were real and all three were fixed.
+
+Codex leaves three different things on a PR, and they are not interchangeable:
+
+| What | Where | What it is good for |
+| --- | --- | --- |
+| `codex-review-receipt:v1` comments | one appended per run | when it last ran, and on which commit. **Not** a verdict |
+| the sticky summary comment | one comment, edited in place — `created_at` stays at the first run while the body tracks the latest head | holds the `codex-review-state:v1` marker |
+| inline threads | on the diff | the findings themselves, which is what you actually have to read |
+
+```
+gh api "repos/BreakthruDevelopment/<repo>/pulls/<n>/ccr/review_threads"   # which threads, and resolved or not
+gh api "repos/BreakthruDevelopment/<repo>/pulls/comments/<comment_id>"    # the finding itself; the list has no bodies
+```
+
+**Threads tell you what to read; the marker is what the gate reads.** Read every unresolved thread and judge whether
+it still applies to the current head — an unresolved thread with `outdated: true` is usually a finding that was
+already fixed by a later push, and it does not hold the gate. Check that against the file **at the head**, though,
+rather than trusting the flag: `outdated` only means the lines moved, which is not the same as the defect being
+gone. The `codex-review-state:v1` marker is the
+machine-readable state: `commit_sha` equal to the current head, and `has_unresolved_findings` false. It is consulted
+for `security-sensitive` PRs, and only as a fallback when no review marked `Reviewer: codex` exists.
+
+**How to clear it.** Fix the finding, push, then comment `@codex review` on the new head — that is the step, and the
+gate's own message asks for it by name when `commit_sha` is behind the head. Send it as its own short comment rather
+than buried in a long one; that is a habit for your own benefit, not a requirement.
+
+**Read the marker first, and re-request only if one of these holds.** Codex has the tightest usage limit in the
+fleet, so a re-request is not free:
+
+- you pushed a commit that addresses a named finding;
+- the marker's `commit_sha` is not the current head;
+- `status` has sat at `running` for a long time with no receipt.
+
+At most once per head. Never to re-roll a result you dislike, and never *instead of* fixing something — a fresh pass
+finds nothing new and the earlier finding stays exactly where it was.
+
+A red gate whose marker genuinely says unresolved is the gate being right, so do not go hunting for a formatting
+problem in the markers — we lost most of a night to that. A red gate whose marker is merely behind the head is a
+stale marker, and that one is cleared by asking again.
+
+**Before you merge anything, list the unresolved threads and read the ones that still apply.** It costs one call and
+on the evidence above it is the cheapest defect-catch in this pipeline.
 
 ## Sandbox rules (every role that can run commands)
 

@@ -59,12 +59,21 @@ somewhere under it — and strip a trailing ` (deleted)`, which is itself the te
 underneath a still-running process:
 
 ```bash
-clone=$(git rev-parse --show-toplevel) || exit   # never $PWD: see below
-for p in /proc/[0-9]*; do
-  d=$(readlink "$p/cwd" 2>/dev/null) || continue
-  case "${d% (deleted)}" in "$clone"|"$clone"/*) echo "${p#/proc/} $d";; esac
-done
+if clone=$(env -u GIT_DIR -u GIT_WORK_TREE git rev-parse --show-toplevel) && [ -n "$clone" ]; then
+  for p in /proc/[0-9]*; do
+    d=$(readlink "$p/cwd" 2>/dev/null) || continue
+    case "${d% (deleted)}" in "$clone"|"$clone"/*) echo "${p#/proc/} $d";; esac
+  done
+else
+  echo "not inside a clone: do not scan, report the port and stop" >&2
+fi
 ```
+
+Write it with the `if`, for the same reason the port probe above needs one: bare, it ends a sourced shell or a
+script under `set -e` at the `fatal:`, so the cleanup you queued after it never runs and you leave behind the very
+server this paragraph is about. The `[ -n "$clone" ]` is not belt and braces — an unset `clone` turns the pattern
+into `/*`, which matches every process on the machine. `env -u GIT_DIR` is there because with `GIT_DIR` set in the
+environment `--show-toplevel` exits 0 and hands back `$PWD`, silently restoring the anchor this replaces.
 
 **Anchor on `--show-toplevel`, never `$PWD`.** A fresh shell often starts in the parent of every clone, so `$PWD`
 would match all of them and hand you another agent's live app as your survivor — and the next paragraph would

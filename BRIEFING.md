@@ -168,8 +168,9 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
   smoke has yet run against the deployed `sha-b4659b3` at all. Nothing
   populates the price and footprint tables at boot, and the only trigger is `POST /api/prices/refresh` — fired by
   the `cost-scaler-refresh` Cloud Scheduler job (next 07:05 UTC), or by an admin, and **no admin can exist on a
-  Google Cloud app** (`30-apps-infra#91`). Force-running that job six times fills the tables in about a minute;
-  the scheduler path has no rate limit. Then dispatch the app's new `Live smoke` workflow (31 #34). Detail in
+  Google Cloud app** (`30-apps-infra#91`). Force-running that job six times should fill the tables in about a minute —
+  the scheduler path has no rate limit where the admin one does — though that is read from the code and nobody has
+  run it yet. Then dispatch the app's new `Live smoke` workflow (31 #34). Detail in
   [`runs/31-cost-scaler.md`](runs/31-cost-scaler.md); blockers in `30-apps-infra#89`–`#91`.
 - **Catalog:** app 32 (Purchase Orders and Vendor Management, Oracle) is `planned` (ai-dev-os #23). Apps 13–30 are
   `planned` too; 13, 14 and 15 have repos and merged work in progress.

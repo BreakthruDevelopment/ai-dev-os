@@ -1,6 +1,6 @@
 # Run log — 31-cost-scaler
 
-BreakthruSoftwareFactory run log ([`FACTORY.md`](../FACTORY.md)), **written on 2026-11-17** from GitHub only: merged PRs and their reviews, `30-apps-infra` `apps.yaml` and its Terraform runs, and the app's own `Live smoke` workflow. Times are US Central. "Unknown" means GitHub doesn't show it.
+BreakthruSoftwareFactory run log ([`FACTORY.md`](../FACTORY.md)), **written on 2026-11-17**, mostly from GitHub: merged PRs and their reviews, `30-apps-infra` `apps.yaml` and its Terraform runs, and the app's own `Live smoke` workflow. Where a detail is not visible on GitHub it comes from the Terraform in `30-apps-infra/stacks/gcp/` (the private-network Postgres, the e2-micro, the 60-second database timer) or from a reviewer's measurement, and says so. Times are US Central. "Unknown" means GitHub doesn't show it.
 
 | Field | Value |
 | --- | --- |

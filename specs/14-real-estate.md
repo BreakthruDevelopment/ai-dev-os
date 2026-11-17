@@ -82,12 +82,17 @@ Originals are never stored. Each photo becomes three WebP variants: `lg` 1280 px
    (2048 × 2048, the browser's output size, so a client that skips the resize can't make the server decode a 24 MP
    image: ≈16 MB RGBA at most), `sharp.concurrency(1)`, `sharp.cache(false)`; `.rotate()` (EXIF orientation) then
    resize and encode each variant **without `withMetadata()`** so EXIF, GPS, XMP and ICC profiles are dropped (sRGB
-   output). One image at a time per replica (in-process semaphore); more than 2 waiting → 429 `busy` with
-   `Retry-After: 3`. 10 s deadline. An `lg` variant over 400 KB is re-encoded at q65, then q55; still over → 422
+   output). One image at a time per replica (in-process semaphore); **one may wait, a third concurrent request →
+   429 `busy`** with `Retry-After: 3`. 10 s deadline. (Built and measured at a queue depth of 1 in 14.2. The
+   earlier "more than 2 waiting" read as a depth of 2, which the deadline rules out: it covers the queue wait as
+   well as the processing, and a queued 2048 × 2048 image already takes up to 8.1 s of the 10 s budget at
+   0.25 vCPU, so a second waiter could only ever produce a 504.) An `lg` variant over 400 KB is re-encoded at q65, then q55; still over → 422
    `too_large_after_encode` and nothing is stored. **Memory gate (14.2):** peak RSS of the Node process inside a
    `--memory=512m --cpus=0.25` container while processing the **worst allowed inputs** back to back: a 2048 × 2048
    noisy RGBA PNG just under 4 MB, a 2048 × 2048 q100 JPEG, and a 4 MB WebP, with a second request waiting. **Over
-   400 MB → stop and ask** (Decisions Q2).
+   400 MB → stop and ask** (Decisions Q2). **Cleared:** 210.2 MB measured inside the Alpine image at those limits
+   (122.3 MB of image delta on top of a 112 MB server at rest), so no Q2 decision was needed. It is now a
+   permanent CI check (`scripts/bench-images.cjs`) that budgets the delta and fails over it.
 4. **Store:** one transaction writes `listing_photo` and three `photo_blob` rows (`sha256`, width, height, bytes).
 5. **Serve (`GET /img/[photoId]/[variant]`, URL carries `?v=<sha8>`):** a photo of an **active, not hidden**
    listing: `Cache-Control: public, max-age=31536000, immutable`, `ETag` = sha256, 304 on `If-None-Match` from a

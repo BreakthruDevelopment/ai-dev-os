@@ -38,6 +38,89 @@ part: your next run reaches a *stale server serving an old build*, and the tests
 did not write. Prefer `exec` in a wrapper script, or start the real binary directly, so the PID you capture is the
 one that needs stopping.
 
+**The free detector:** a start command that exits non-zero while the port still answers means a survivor is
+serving, not that your start failed. That alone catches this.
+
+When a survivor does hold the port, find it by **its working directory, not its name or its port**: several agents
+run identically-named binaries at once, so the name tells you nothing about whose it is. Match the cwd by
+**prefix**, not equality — the wrapper usually sits at the clone root while the child that holds the port is
+somewhere under it — and strip a trailing ` (deleted)`, which is itself the tell that the directory was rebuilt
+underneath a still-running process:
+
+```bash
+if clone=$(env -u GIT_DIR -u GIT_WORK_TREE git rev-parse --show-toplevel) && [ -n "$clone" ]; then
+  if [ -d /proc ]; then                                    # Linux
+    for p in /proc/[0-9]*; do
+      pid=${p#/proc/}
+      d=$(readlink "$p/cwd" 2>/dev/null) || continue
+      case "${d% (deleted)}" in "$clone"|"$clone"/*) echo "$pid $d";; esac
+    done
+  else                                                     # macOS has no /proc
+    lsof -a -d cwd -Fpn 2>/dev/null | awk -v c="$clone" '
+      /^p/ { pid = substr($0, 2) }
+      /^n/ { d = substr($0, 2); sub(/ \(deleted\)$/, "", d)
+             if (d == c || index(d, c "/") == 1) print pid, d }'
+  fi | while read -r pid d; do
+    if kill -0 "$pid" 2>/dev/null; then echo "$pid $d"; fi    # drop the already-dead
+  done
+else
+  echo "not inside a clone: do not scan, report the port and stop" >&2
+fi
+```
+
+`kill -0` is the load-bearing part: `lsof` and the pipeline members are listed and are already dead by the time
+you read the output, and killing a PID that has since been recycled is how you take out someone else's work. Write
+it as `if … then … fi`, not `kill -0 … && echo`: a bare `&&` makes the loop's status the last iteration's, and the
+normal case is that the last line read is a dead PID, so under `set -e` the whole block aborts and your cleanup
+never runs.
+
+Shells of your own will still appear — filtering them by `$$` or `$BASHPID` does not catch them all, so do not
+trust a filter to do it. They sit at the clone **root**, while the server is under it, at `.next/standalone`: not
+a pattern that happened to hold, but because the generated `server.js` calls `process.chdir(__dirname)` on its
+sixth line, so it ends up there however it was launched. (`next start` does not chdir, so that one does sit at the
+root.) Confirm with the port probe below, not by reading names — and note that everything the scan lists is inside
+your own clone, so a wrong pick costs you your own shell, not someone else's work. Picking wrong is cheap;
+freezing with a held port is not.
+
+**Then stop what it found, by that PID** — `kill <pid>`, then check the port again. If it is still busy, work down
+the rest of the list before giving up: a rebuilt clone leaves a ` (deleted)` corpse beside the live server, so two
+hits under `.next/standalone` is the normal shape, and the first one you kill may not be the one holding the port.
+Iterating inside the already-anchored list widens nothing. That is the one case where
+"stop only a process you started" (above) is satisfied by a process you did not capture: you started it, through
+a wrapper, and this is how you recover its real PID. If the port is still busy after that, you are out of road:
+report it with the PID and stop, as "do not go hunting for the owner" (below) says.
+
+**The macOS branch is not decoration.** `run-harness.sh` runs on the Mac and fetches these role files onto it;
+there `/proc/[0-9]*` never expands, the loop prints nothing, exits 0, and the sentence below would tell you the
+survivor "is not yours" — a confident false negative on the machine this section exists for.
+
+Write it with the `if`, for the same reason the port probe below needs one: bare, it ends a sourced shell or a
+script under `set -e` at the `fatal:`, so the cleanup you queued after it never runs and you leave behind the very
+server this paragraph is about. The `[ -n "$clone" ]` is not belt and braces — an unset `clone` turns the pattern
+into `/*`, which matches every process on the machine. `env -u GIT_DIR` is there because with `GIT_DIR` set in the
+environment `--show-toplevel` exits 0 and hands back `$PWD`, silently restoring the anchor this replaces.
+
+**Anchor on `--show-toplevel`, never `$PWD`.** A fresh shell often starts in the parent of every clone, so `$PWD`
+would match all of them and hand you another agent's live app as your survivor — and the next paragraph would
+authorise you to act on it. `$PWD` also misses your own server when you are standing in a subdirectory, and the
+unanchored prefix matches a sibling clone whose name merely starts the same (`13-field-service-codex`).
+
+If that finds nothing, the holder was started outside your clone and **is not yours**: report the port with what
+you know and stop. Do not widen the search — that is the moment the net catches someone else's work. This is safe
+to terminate on only because the scan is anchored: with `$PWD`, "nothing found" can just mean you were standing in
+the wrong directory.
+
+**Then prove the build you think you are testing is the one answering**, before you measure anything or sign
+anything off. Start the server with `APP_VERSION=$(git rev-parse --short HEAD)` and check `/api/health` returns
+that `version`. Do not settle for "something only my new code emits": that works only when your change is visible
+over HTTP, and fails exactly where a stale build is most dangerous — an idempotency fix, a lock ordering, anything
+observable only by killing a request mid-flight. On a deployed app the value is the image tag
+(`sha-<commit>`), not the bare short sha, so compare against what the environment sets rather than against
+`git rev-parse` output.
+
+This is the half that matters. Killing someone else's server is loud and you will notice; reviewing a stale build
+is silent, passes every gate, and ends in a verdict on code that was never running.
+
 **Reading a port is allowed; killing by one is not.** Check a port at two moments, for opposite reasons: it must
 be **free before you start** a server there (if it isn't, someone else's is running and your run would test their
 build), and **free again after you stop** yours (if it isn't, a child outlived the PID you captured). In between,

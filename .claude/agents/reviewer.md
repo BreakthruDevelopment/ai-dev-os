@@ -48,8 +48,9 @@ also means a review that has been overtaken fails loudly instead of quietly sign
 
 The same applies to everything else that reaches for GraphQL: `gh pr view --json`, `gh pr comment`, `gh pr merge`.
 Use `gh api repos/{owner}/{repo}/...` throughout — to merge, `gh api -X PUT ".../pulls/<n>/merge" -f
-merge_method=squash -f sha=<head>` — and the `ccr/` routes on `api.github.com` for review threads, auto-merge and
-draft state.
+merge_method=squash -f sha=<head>`, where passing `sha` makes the merge fail rather than quietly merge something new
+if the head moved while you were deciding — and the `ccr/` routes on `api.github.com` for review threads, auto-merge
+and draft state.
 
 Use `Reviewer: codex` when you are Codex doing the second review, and `Verdict: blocking` when anything blocking is
 left. The `Reviewer sign-off` check reads these lines; a new push needs a new review. If the PR touches auth, roles
@@ -83,15 +84,25 @@ gh api "repos/BreakthruDevelopment/<repo>/pulls/comments/<comment_id>"    # the 
 
 **Threads tell you what to read; the marker is what the gate reads.** Read every unresolved thread and judge whether
 it still applies to the current head — an unresolved thread with `outdated: true` is usually a finding that was
-already fixed by a later push, and it does not hold the gate. The `codex-review-state:v1` marker is the
+already fixed by a later push, and it does not hold the gate. Check that against the file **at the head**, though,
+rather than trusting the flag: `outdated` only means the lines moved, which is not the same as the defect being
+gone. The `codex-review-state:v1` marker is the
 machine-readable state: `commit_sha` equal to the current head, and `has_unresolved_findings` false. It is consulted
 for `security-sensitive` PRs, and only as a fallback when no review marked `Reviewer: codex` exists.
 
 **How to clear it.** Fix the finding, push, then comment `@codex review` on the new head — that is the step, and the
-gate's own message asks for it by name when `commit_sha` is behind the head. Put the trigger on the **first line** of
-its own comment; inside a longer body it may not fire. Re-requesting is also right when the marker is stale or stuck
-at `running`. What is never right is re-requesting *instead of* fixing something: a fresh pass finds nothing new and
-the earlier finding stays exactly where it was.
+gate's own message asks for it by name when `commit_sha` is behind the head. Send it as its own short comment rather
+than buried in a long one; that is a habit for your own benefit, not a requirement.
+
+**Read the marker first, and re-request only if one of these holds.** Codex has the tightest usage limit in the
+fleet, so a re-request is not free:
+
+- you pushed a commit that addresses a named finding;
+- the marker's `commit_sha` is not the current head;
+- `status` has sat at `running` for a long time with no receipt.
+
+At most once per head. Never to re-roll a result you dislike, and never *instead of* fixing something — a fresh pass
+finds nothing new and the earlier finding stays exactly where it was.
 
 A red gate whose marker genuinely says unresolved is the gate being right, so do not go hunting for a formatting
 problem in the markers — we lost most of a night to that. A red gate whose marker is merely behind the head is a

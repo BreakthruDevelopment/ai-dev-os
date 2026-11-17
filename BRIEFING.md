@@ -161,8 +161,17 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
   [`runs/`](runs/). Apps 6, 11 and 12 still need their README (open `[docs-writer]` issues 06 #5, 11 #6, 12 #5: no
   harness label); app 8 needs a full live smoke; app 12 also needs a passing smoke. Apps 1–4 need a recorded live
   smoke (and app 1 a README fix; see the retro).
-- **Catalog:** apps 31 (Cloud Cost Scaler, Google Cloud) and 32 (Purchase Orders and Vendor Management, Oracle)
-  were added as `planned` (ai-dev-os #23). Apps 13–30 are `planned` too: no repos yet.
+- **App 31 (Cloud Cost Scaler) is live on Google Cloud** (2026-11-17, `30-apps-infra` #92 then domain #95), serving
+  `sha-b4659b3` at https://cost-scaler-189497094271.us-central1.run.app; `app31.breakthruventures.ai` is waiting on
+  its certificate, after which the Terraform workflow needs a **manual rerun** to move `APP_URL` onto it. Fourteen
+  PRs, all `claude/`. Status is `deployed`, not `done`: **its live smoke fails on an empty footprint.** Nothing
+  populates the price and footprint tables at boot, and the only trigger is `POST /api/prices/refresh` — fired by
+  the `cost-scaler-refresh` Cloud Scheduler job (next 07:05 UTC), or by an admin, and **no admin can exist on a
+  Google Cloud app** (`30-apps-infra#91`). Force-running that job six times fills the tables in about a minute;
+  the scheduler path has no rate limit. Then dispatch the app's new `Live smoke` workflow (31 #34). Detail in
+  [`runs/31-cost-scaler.md`](runs/31-cost-scaler.md); blockers in `30-apps-infra#89`–`#91`.
+- **Catalog:** app 32 (Purchase Orders and Vendor Management, Oracle) is `planned` (ai-dev-os #23). Apps 13–30 are
+  `planned` too; 13, 14 and 15 have repos and merged work in progress.
 - **Agreed order:** BreakthruSoftwareFactory complete → app 31 → apps 13–30 → app 32 last (ai-dev-os #23).
 - **Template:** hardening for apps 13+ is merged (`30-apps-template` #32, 2026-11-13), so new repos start from it.
 - **Branch protection:** `ai-dev-os` now requires `check` and `Reviewer sign-off`; apps 05–12 require

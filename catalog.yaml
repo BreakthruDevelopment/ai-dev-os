@@ -305,7 +305,7 @@ apps:
     client_need: "Cloud cost planning and FinOps"
     ai_feature: "Plain-language scaling and migration recommendation, grounded in priced scenarios from a normalized four-cloud price table"
     notable: "Public price lists for AWS, Azure, Google Cloud and Oracle; current footprint read from 30-apps-infra apps.yaml; scenario builder for users, compute, containers, storage, identity and redundancy; break-even for moving clouds"
-    status: planned
+    status: deployed
   - n: 32
     repo: 32-purchase-orders
     name: "Purchase Orders and Vendor Management"

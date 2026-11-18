@@ -163,6 +163,7 @@ apps:
     status: planned
   - n: 16
     repo: 16-lms
+    create_repo: true
     name: "Learning Management (LMS)"
     subdomain: app16.breakthruventures.ai
     live_cloud: oci

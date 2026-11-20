@@ -40,7 +40,7 @@ still `planned`, and none is deployed.
 | W09 | LangGraph — state, routing, checkpoints, HITL | State, enforced prerequisites and human approval → **18-procure-to-pay** (AWS demo track), on the agent container rather than LangGraph; HITL approval chains also in **32-purchase-orders**. LangGraph by name is no longer aimed at any app, since app 20 became the discovery workbench on 2026-11-19. | gap |
 | W10 | Multi-agent — supervisor, handoffs, parallel tasks | **31-cost-scaler**: coordinator plus pricing and migration agents via `AgentTool`, merged and tested. Not deployed. | **built** |
 | W11 | Agent memory — long-term memory, queues, webhooks | Job queues with retries are live in five apps (6, 9–12). Webhooks → **21** and **23**. Long-term memory is no longer aimed at any app, since app 18 became the AWS demo track's procure-to-pay workflow on 2026-11-19. | partial |
-| W12 | Evals & safety — evals, tracing, guardrails, LLMOps | Input caps, zod-validated model output and demo fallbacks are live in twelve apps. The grounded-output check is in **open PR** `15-event-ticketing#16`, on its eleventh review round with the last six blocking — at least eight real bypasses found so far, none of them shipped. Neither live nor built. Evals, tracing and LLMOps → **30**, **19**, **25**. | partial |
+| W12 | Evals & safety — evals, tracing, guardrails, LLMOps | Input caps, zod-validated model output and demo fallbacks are live in twelve apps. The grounded-output check is in **open PR** `15-event-ticketing#16`, on its eleventh review round with the last six blocking — at least eight real bypasses found so far, none of them shipped. Neither live nor built. Evals, tracing and LLMOps → **30** and **25**; app 19 was re-aimed on 2026-11-19, and the demo track's own eval work sits inside `17-agent-container`'s contract suite. | partial |
 | W13 | Deploy — Docker, CI/CD, cloud, vLLM | One container image per app, GitHub Actions, four clouds: live. **vLLM** → the Mac mini (below). | partial |
 | W14 | Full-stack AI — Streamlit, auth, scaling, load tests | Better Auth with roles is live in twelve apps. **Streamlit** → app 33; load tests → **22-analytics-dashboard**. | partial |
 | W15 | Capstone — architecture, build, interview prep | **31-cost-scaler** is the capstone: four-cloud price ingestion, a BigInt-micros scenario engine, a multi-agent advisor. Merged, not deployed. | **built** |
@@ -51,17 +51,21 @@ the largest coverage change available to us right now, which is worth knowing wh
 
 ## What changes in apps 16–32
 
-Fifteen of the seventeen remaining catalog entries get a new `ai_feature`. **No app changes its client need or its
-cloud.** What changes is which AI technique each one is built to prove, so that together they cover every week
-instead of building six variations on "summarize this text".
+Fifteen of the seventeen remaining catalog entries get a new `ai_feature`. What changes is which AI technique each
+one is built to prove, so that together they cover every week instead of building six variations on "summarize this
+text".
+
+**Superseded for apps 17-20 on 2026-11-19.** Those four became the AWS demo track
+(`specs/day-0-aws-demo-track.md`): their client need, cloud and AI feature all changed, and all four are now on AWS.
+The four rows below are kept as the record of what they were going to be.
 
 | App | Becomes | Week |
 | --- | --- | --- |
 | 16 LMS | Quiz generation **plus a decoding lab**: tokens, temperature/top-p, logprob-ranked alternates, cost per item | W04 |
-| 17 Job Board & ATS | Matching as **retrieval with a rerank stage and a labelled eval set**; bias measured, not asserted | W06, W12 |
-| 18 Onboarding | Policy Q&A **plus long-term memory** across weeks | W11 |
-| 19 Patient Intake | A **refusal and redaction eval suite** that runs in CI | W12 |
-| 20 Task Manager | A **LangGraph.js graph**: routing, checkpointed state, HITL before destructive bulk edits | W09 |
+| ~~17 Job Board & ATS~~ | **Superseded**: now `17-agent-container`, the AWS demo track's shared agent library | W02, W07 |
+| ~~18 Onboarding~~ | **Superseded**: now `18-procure-to-pay`, extraction, an MCP gateway and staged approvals | W05, W08 |
+| ~~19 Patient Intake~~ | **Superseded**: now `19-enablement-kit`, Claude Code for a team plus a CI reviewer | W13 |
+| ~~20 Task Manager~~ | **Superseded**: now `20-discovery-workbench`, a coordinator with parallel subagents | W10 |
 | 21 Meeting Notes | A **queue + webhook** pipeline with retries and a visible job state machine | W11, W03 |
 | 22 Analytics | Text-to-SQL **with an eval set**, sandboxing, row-level security, a load test | W03, W14 |
 | 23 Marketplace | Moderation **with signed, replayable outbound webhooks** | W11 |

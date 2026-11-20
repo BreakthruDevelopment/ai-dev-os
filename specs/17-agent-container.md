@@ -28,26 +28,30 @@ whether the design is real.
 | --- | --- | --- | --- |
 | `AgentLoop` | Template Method | `run()` is fixed: call the model, branch on the stop reason, run tools, append results, check the budget. Subclasses override `before_model`, `after_tool` and `should_stop`, never the skeleton. | 1.1 |
 | `ModelProvider` (ABC) | Strategy | `converse(request) -> ModelResponse`. `BedrockProvider` calls the Bedrock Converse API; `ReplayProvider` returns recorded replies. | 1.1 |
-| `Tool` (ABC) | — | `name`, `description`, a typed input model, `run(args, ctx) -> ToolResult`. | 2.1 |
+| `Tool` (ABC) | — | `name`, `description`, a typed input model, `run(args, ctx) -> ToolResult`, and a required `effect` of `read` or `write`. `effect` is what makes the construction-time gate check below possible. | 2.1 |
 | `ToolResult` | — | Carries `is_error`, `error_category` (`transient`, `validation`, `permission`, `business`) and `is_retryable`, so the model can tell a retry from a dead end. | 2.2 |
-| `Retrying`, `Cached`, `Redacting`, `Metered` | Decorator | Each wraps a `Tool` and is itself a `Tool`. They stack. | 1.5 |
-| `InterceptorChain` | Chain of Responsibility | Ordered interceptors run before and after each tool call. Each handles or passes on. Normalizing formats and blocking a policy violation are interceptors, not prompt instructions. | 1.5 |
+| `Retrying`, `Cached`, `Redacting`, `Metered` | Decorator | Each wraps a `Tool` and is itself a `Tool`. They stack. Each exposes the tool it wraps and inherits its `effect`, so a gate check can see through the whole stack. | 1.5 |
+| `InterceptorChain` | Chain of Responsibility | Ordered interceptors run before and after each tool call. **An interceptor may short-circuit**: returning a `ToolResult` stops the chain and the tool never runs, which is what makes this Chain of Responsibility rather than a middleware pipeline. Normalizing formats and blocking a policy violation are interceptors, not prompt instructions. | 1.5 |
 | `PermissionGate` | Proxy | Stands in front of a tool with a policy of `read`, `staged_write` or `deny`. A staged write returns a `StagedChange` instead of acting. | 1.4 |
 | `StagedChange` | Command | A recorded write with `apply()` and a description a person reads before approving. | 1.4 |
 | `EventBus` | Observer | Publishes `ModelCalled`, `ToolCalled`, `ToolFailed`, `BudgetExceeded`. Subscribers never change the loop's behavior. | 1.5 |
 | `Budget` | — | Maximum turns, tokens and wall-clock time. An ordinary object created once per run and passed in, **not** a singleton. The loop stops with a stated reason when a limit is hit. | 1.1 |
-| `AgentFactory` | Factory | Builds a configured agent from a YAML manifest: model, system prompt, tools, limits, permissions. | 2.3 |
+| `AgentBuilder` | Builder | Assembles a configured agent from a YAML manifest step by step: model, system prompt, tools, limits, permissions. **Builder, not Factory** — it composes a complex object in stages rather than returning one of several kinds. App 19's project scaffolder is the Factory. | 2.3 |
 
 Design rules the code must hold to, and that the tests must prove:
 
-- **The loop ends on the stop reason, never on the text.** `end_turn` ends it; `tool_use` continues it;
-  `max_tokens`, `stop_sequence` and guardrail stops are handled explicitly and named in the result. Parsing the
-  reply for "done" is the anti-pattern this slice exists to avoid.
+- **The loop ends on the stop reason, never on the text.** Every Bedrock Converse `stopReason` is handled
+  explicitly and named in the result: `end_turn` ends it, `tool_use` continues it, and `max_tokens`,
+  `stop_sequence`, `guardrail_intervened` and `content_filtered` each end it with their own stated reason. An
+  unrecognized value raises rather than falling through to a default. Parsing the reply for "done" is the
+  anti-pattern this slice exists to avoid.
 - **Composition over inheritance.** One level from an abstract base is the limit; behavior is added by wrapping.
 - **Substitutability is tested.** Every `ModelProvider` and every decorator passes one shared contract test suite,
   so a provider swap is proven, not asserted.
-- **A write needs a gate.** Constructing an agent with a write-capable tool that has no `PermissionGate` raises at
-  construction time, not at run time.
+- **A write needs a gate.** `AgentBuilder` walks each tool's decorator stack to its innermost tool, reads its
+  `effect`, and raises at construction time if an `effect: write` tool is not behind a `PermissionGate`. Walking
+  the stack is the point: a gate wrapped by `Cached` must still be found, and a write hidden under three
+  decorators must still be caught.
 
 ## AI feature
 
@@ -72,7 +76,28 @@ Design rules the code must hold to, and that the tests must prove:
 | A tool failing twice with `is_retryable: true` | retry within the limit, then report the failure to the model |
 | A run exceeding the token budget | stop with `BudgetExceeded` and a stated reason, not an exception |
 | A tool result containing "ignore your instructions" | pass it to the model fenced, and call no extra tool |
-| A write-capable tool with no gate | fail at construction |
+| A reply with stop reason `max_tokens` | stop, and name truncation as the reason |
+| A reply with stop reason `guardrail_intervened` or `content_filtered` | stop, and name which one |
+| An unrecognized stop reason | raise, not silently continue |
+| An `effect: write` tool with no gate, wrapped in `Cached` and `Metered` | fail at construction |
+| An `effect: write` tool behind a gate, wrapped in `Cached` | construct successfully |
+
+## Decisions this library makes for the whole track
+
+The other three repos inherit these, so they are settled here rather than three times.
+
+- **Async throughout.** `converse`, `Tool.run` and the loop are `async`. App 20 needs parallel subagents, and a
+  synchronous core would have to be rewritten to get there.
+- **Versioning and pinning.** The library is versioned `0.x` and pinned by git tag in each consumer's
+  `pyproject.toml`. A breaking change bumps the minor version and the consumers move deliberately, so a fix in
+  app 17 on Monday cannot silently break app 18's build.
+- **Tool registration.** A consumer registers its own tools by passing instances to `AgentBuilder`; the manifest
+  names them. The library ships no business tools of its own.
+- **Structured logging.** One JSON-lines logger, fields fixed here (run id, turn, tool, outcome, tokens,
+  duration). App 25's cost work is gone from the slate, so whatever traces exist come from these lines plus the
+  event bus.
+- **Throttling.** One in-process limiter on model calls, configured per run, so a parallel fan-out in app 20
+  cannot trip Bedrock rate limits and fail a demo.
 
 ## Threat model
 
@@ -95,7 +120,8 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
    `pyproject.toml`, `uv`, `ruff`, `mypy --strict`, `pytest`, a Dockerfile, and a workflow whose required check is
    named `Lint, test, build, smoke`, plus the review-gate caller and `AGENTS.md` carrying the track's rules.
    Security-sensitive because it wires the required checks every later merge depends on. Dependencies: none.
-2. **17.2 `[fullstack-builder] Core contracts and the agent loop`** · `claude` · **2nd: Codex**
+2. **17.2 `[fullstack-builder] Core contracts and the agent loop`** · `claude`
+   Not security-sensitive: no auth, tenancy, secrets or data-writing tool. The permission gate itself is 17.4.
    `ModelProvider`, `Tool`, `ToolResult`, `Budget`, `AgentLoop`, `ReplayProvider`, and the shared contract test
    suite every provider and decorator must pass. Dependencies: 17.1.
 
@@ -116,7 +142,9 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
 
 ### Wave 4
 
-7. **17.7 `[devops] Deploy app 17`** · `claude` · repo **`30-apps-infra`**
+7. **17.7 `[devops] Deploy app 17`** · `claude` · **2nd: Codex** · repo **`30-apps-infra`**
+   Security-sensitive: it provisions IAM in a new AWS account. **First on the cut list** — a Lambda health endpoint
+   is the lowest-value item in the track, and the demo runs from the command line without it.
    A Lambda health endpoint running the replay demo, in the second AWS account, us-east-2, with access by IAM role
    through GitHub OIDC. Dependencies: 17.6.
 8. **17.8 `[docs-writer] README`** · `antigravity`

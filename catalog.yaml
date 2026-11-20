@@ -178,7 +178,7 @@ apps:
     live_cloud: aws
     client_need: "Reusable delivery IP: the agent core every demo in the track imports"
     ai_feature: "The agent loop itself: a bounded loop that branches on the model's stop reason, a swappable model provider (Bedrock Claude Sonnet 4.6, or recorded replies so a demo costs nothing), tool contracts with structured retryable errors, interceptors, a permission gate and a run budget"
-    notable: "Patterns: Template Method (the loop), Strategy (model provider), Decorator (retry, cache, redact, meter), Factory (agents from a manifest), Observer (event bus), Proxy (permission gate), Chain of Responsibility (interceptors). CCA 1.1, 1.5, 2.1, 2.2"
+    notable: "Patterns: Template Method (the loop), Strategy (model provider), Decorator (retry, cache, redact, meter), Builder (agents from a manifest), Observer (event bus), Proxy (permission gate), Chain of Responsibility (interceptors). CCA 1.1, 1.4, 1.5, 2.1, 2.2, 2.3"
     status: planned
   - n: 18
     repo: 18-procure-to-pay

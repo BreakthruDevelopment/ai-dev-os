@@ -25,17 +25,56 @@ Michael explains the designs from his own experience, not something the code imp
 Three sources, in priority order:
 
 1. **The Claude Certified Architect (Foundations) exam** — five domains, 30 task statements, six scenarios. All six
-   scenarios are built as running systems, and every task statement has a home. The map is in Michael's study
-   guide; each README will carry its own slice of it with file and line references.
+   scenarios are built as running systems, and the table below gives every task statement a home. Each README will
+   carry its own slice of it with file and line references.
 2. **Caylent's postings** for Forward Deployed Engineer and Forward Deployed AI Lead. They repeat three things:
    turn ambiguity into scoped work, ship software that runs after you leave, and leave a reusable artifact behind.
    The four repositories are those three things plus the artifact. The AI Lead posting lists "Certified Claude
    Architect" as required, and registration is currently limited to partner-network employees — so demonstrating
    the body of knowledge is the available substitute for holding the certificate.
 3. **Object-oriented design applied to agents**, from Joshua Morley's post. That mapping is one author's proposal,
-   not an industry standard; the patterns themselves (Gang of Four) are. **Twelve** patterns are used. Singleton
-   and Visitor were dropped on 2026-11-19 because neither solved a real problem here, and an interviewer would be
-   right to probe them.
+   not an industry standard; the patterns themselves (Gang of Four) are. **Thirteen** patterns are used. Singleton and Visitor were dropped on 2026-11-19 because neither solved a real
+   problem here, and an interviewer would be right to probe them.
+
+## Exam coverage: all 30 task statements
+
+Claimed homes, not yet built. A statement with two repos is owned by the first and exercised by the second.
+
+| Statement | Subject | Repo |
+| --- | --- | --- |
+| 1.1 | Agentic loops and stop reasons | 17 |
+| 1.2 | Coordinator and subagents | 20 |
+| 1.3 | Subagent invocation and context passing | 20 |
+| 1.4 | Enforced workflows and handoffs | 18 (on 17's gate) |
+| 1.5 | Hooks intercepting tool calls | 17, 18 |
+| 1.6 | Task decomposition strategy | 18 (fixed), 20 (adaptive) |
+| 1.7 | Session state, resumption, forking | 19 |
+| 2.1 | Tool interface design | 18 (on 17's contract) |
+| 2.2 | Structured MCP error responses | 17, 18 |
+| 2.3 | Tool distribution and `tool_choice` | 18, 20 |
+| 2.4 | MCP server integration | 18 (builds), 19 (connects) |
+| 2.5 | Built-in tools | 19 |
+| 3.1 | CLAUDE.md hierarchy | 19 |
+| 3.2 | Custom commands and skills | 19 |
+| 3.3 | Path-specific rules | 19 |
+| 3.4 | Plan mode versus direct execution | 19 |
+| 3.5 | Iterative refinement | 19 |
+| 3.6 | CI/CD integration | 19 |
+| 4.1 | Explicit criteria for precision | 19 |
+| 4.2 | Few-shot prompting | 18 |
+| 4.3 | Structured output via tool use | 18 |
+| 4.4 | Validation, retry and feedback loops | 18 |
+| 4.5 | Batch processing | 18 |
+| 4.6 | Multi-instance and multi-pass review | 19 |
+| 5.1 | Preserving context in long interactions | 18, 20 |
+| 5.2 | Escalation and ambiguity resolution | 18 |
+| 5.3 | Error propagation across agents | 20 |
+| 5.4 | Context in large codebase exploration | 19 |
+| 5.5 | Human review and confidence calibration | 18 |
+| 5.6 | Provenance and uncertainty in synthesis | 20 |
+
+By repo: **17** owns 4, **18** owns 12, **19** owns 12, **20** owns 6. Domain 3 is entirely app 19, which is why
+app 19 cannot be cut.
 
 ## Decisions taken
 
@@ -72,14 +111,25 @@ Five days. The order is by value: whatever is finished on Tuesday must be the pa
 | Mon 23 | App 20; deploys to AWS; live smoke |
 | Tue 24 | READMEs, exam links, recorded replays, final smoke |
 
+**Friday does not hold as written, and the review of this PR said so.** Six slices on day one with no Python
+template in the factory at all, and 17.1 to 17.2 are strictly serial. The plan stands because the week has a week
+of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesday costs nothing real.
+
 **Known risks, recorded now rather than discovered later:**
 
-- Friday is a single point of failure: everything imports app 17.
-- There is no Python template in this factory. Building one is normally its own day and is folded into Friday.
+- Friday is a single point of failure: everything imports app 17, and nothing can be parallelised around it.
+- There is no Python template in this factory. Building one — CI, container image, the four required checks, the
+  review-gate caller — is normally its own day and is folded into slice 17.1.
 - Review rounds dominate the schedule. Recent history: three rounds on one small fix (`14-real-estate#27`),
   fifteen on `15-event-ticketing#16`. At three rounds per slice across ~28 slices the week does not fit.
-- **Cut order if Monday is behind:** app 20's ROI model, then session forking, then batch processing, then app
-  19's scout. Never cut app 17, app 18 end to end, or the recorded replays.
+- **Two things are blocked on Michael with no deadline:** the four repos do not exist, and AWS access for CI is
+  not set up. Both are needed **before Friday morning** or day one cannot start.
+- **Cut order, invoked Saturday night rather than Monday if apps 17 and 18 are not both moving:** app 20's ROI
+  model, then app 17's Lambda health endpoint (slice 17.7 — the lowest-value item in the track), then session
+  forking, then batch processing, then app 19's scout. Never cut app 17, app 18 end to end, app 19's Domain 3
+  coverage, or the recorded replays.
+- **Realistic target:** apps 17 and 18 end to end by Tuesday. Four polished repos with all 30 statements mapped to
+  file and line is not.
 
 ## What only Michael can do
 

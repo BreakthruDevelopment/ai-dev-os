@@ -163,7 +163,8 @@ of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesda
   rerank service alone; app 33 as a whole lost a caller from the other row too.)
 - **App 30's A2A broker has no named caller.** Correcting the record above exposed it: app 30 is described as the
   MCP server and A2A broker, but app 28 — the app previously named as its consumer here — calls **app 31** over
-  A2A (`catalog.yaml`), and no other app is named as calling app 30's broker. Its trace-and-cost half has three
-  consumers; its A2A half has none. That is app 30's real open question, and it is older than this track.
+  A2A (`catalog.yaml`), and no other app is named as calling app 30's broker. Its trace-and-cost half has four
+  consumers — apps 26, 28 and 31 for traces, app 33 for eval scores — and its A2A half has none. That is app 30's
+  real open question, and it is older than this track.
 - **The exam guide was read from a public mirror and paraphrased**, since the official guide is marked
   confidential. Task-statement wording should be checked against Anthropic Academy before any README quotes it.

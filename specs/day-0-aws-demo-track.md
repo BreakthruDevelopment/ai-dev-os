@@ -143,8 +143,13 @@ of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesda
 ## What only Michael can do
 
 1. ~~Create the four repos~~ **Done 2026-11-20.** All four exist, public, `main`, topic `30-apps-30-days`.
-   `scripts/create-app-repos.py` builds from the Next.js template and `gh api /orgs/...` is blocked in Claude Code
-   sessions, so they were created by hand.
+   `scripts/create-app-repos.py` generates a new repo from the Next.js template, which is wrong for a Python
+   repo, so these four were created by hand. **That skipped two things the script also does:** the harness
+   labels and the `protect-main` ruleset. Both matter — without a `grok` label, `release-labels.py` cannot
+   release 17.5 or 17.6 to Grok, and without the ruleset the required checks are required by nothing. The four
+   are therefore marked `create_repo: true` from 2026-11-20: the script's existing-repo path skips creation
+   (they exist and carry the topic) and `ensure_extras` adds only what is missing, never removing or rewriting.
+   Changing a ruleset still stays with Michael; this is the script doing it the same way it did for apps 1-15.
 2. ~~Set up AWS access for CI~~ **Done 2026-11-20.** An IAM user with a least-privilege Bedrock policy
    (`bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream` on Anthropic models and inference profiles);
    its keys are repository secrets in all four repos. OIDC was the better option but the account's IAM console

@@ -173,6 +173,7 @@ apps:
     status: planned
   - n: 17
     repo: 17-agent-container
+    create_repo: true
     name: "The agent container"
     subdomain: app17.breakthruventures.ai
     live_cloud: aws
@@ -182,6 +183,7 @@ apps:
     status: planned
   - n: 18
     repo: 18-procure-to-pay
+    create_repo: true
     name: "Procure-to-pay workflow"
     subdomain: app18.breakthruventures.ai
     live_cloud: aws
@@ -192,6 +194,7 @@ apps:
     status: planned
   - n: 19
     repo: 19-enablement-kit
+    create_repo: true
     name: "Engineering enablement kit"
     subdomain: app19.breakthruventures.ai
     live_cloud: aws
@@ -202,6 +205,7 @@ apps:
     status: planned
   - n: 20
     repo: 20-discovery-workbench
+    create_repo: true
     name: "Discovery workbench"
     subdomain: app20.breakthruventures.ai
     live_cloud: aws

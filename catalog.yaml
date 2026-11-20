@@ -178,7 +178,7 @@ apps:
     live_cloud: aws
     client_need: "Reusable delivery IP: the agent core every demo in the track imports"
     ai_feature: "The agent loop itself: a bounded loop that branches on the model's stop reason, a swappable model provider (Bedrock Claude Sonnet 4.6, or recorded replies so a demo costs nothing), tool contracts with structured retryable errors, interceptors, a permission gate and a run budget"
-    notable: "Patterns: Template Method (the loop), Strategy (model provider), Decorator (retry, cache, redact, meter), Builder (agents from a manifest), Observer (event bus), Proxy (permission gate), Chain of Responsibility (interceptors). CCA 1.1, 1.4, 1.5, 2.1, 2.2, 2.3"
+    notable: "Patterns: Template Method (the loop), Strategy (model provider), Decorator (retry, cache, redact, meter), Builder (agents from a manifest), Observer (event bus), Proxy (permission gate), Chain of Responsibility (interceptors). CCA statements owned: 1.1, 1.5, 2.2. The gate, tool contract and builder are the mechanism app 18 and app 20 own 1.4, 2.1 and 2.3 on"
     status: planned
   - n: 18
     repo: 18-procure-to-pay
@@ -324,7 +324,7 @@ apps:
     name: "AI Service (Python)"
     subdomain: app33.breakthruventures.ai
     live_cloud: oci
-    rotation_reason: "Python service needs a long-running host, not a request-scoped runtime: the Oracle Always Free A1 VM. Its repo is created by hand, not by create-app-repos.py, because that builds from the Next.js template and the required 'Lint, test, build, smoke' check has no Python equivalent yet."
+    rotation_reason: "Python service needs a long-running host, not a request-scoped runtime: the Oracle Always Free A1 VM. Its repo is created by hand, not by create-app-repos.py, because that builds from the Next.js template. It had no Python 'Lint, test, build, smoke' equivalent to copy either; app 17 slice 17.1 builds one, so once that merges this repo can reuse it instead of inventing its own."
     client_need: "AI platform engineering: the Python half of the stack"
     ai_feature: "The portfolio's embeddings, rerank and eval service: RAG evals, refusal evals and text-to-SQL evals run here and publish to app 30; it also fronts the open-weights model served on the Mac mini (roadmap W01, W02, W03, W13, W14)"
     notable: "FastAPI with full type hints, pytest and mypy in CI; SQLAlchemy on the same Postgres; a Streamlit console for eval runs and traces; the one non-Next.js app, which is the point; model endpoint is health-checked with a Gemini fallback so a sleeping Mac mini never breaks a demo"

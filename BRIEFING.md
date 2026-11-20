@@ -52,7 +52,9 @@ Account notes: AWS stays on the **Free plan** (can't bill; closes after 6 months
 guardrails. The Google Cloud trial ended, so it's a paid account kept inside always-free limits, with budget alerts
 (a Cloud Run spend cap is recommended). Google Cloud is under `mparrott567@gmail.com`; the others use `dev@breakthruventures.ai`.
 The org uses immutable OIDC subject claims (`repo:BreakthruDevelopment@<id>/<repo>@<id>:…`); the bootstrap scripts
-trust both forms.
+trust both forms. That applies to the original account only: the second AWS account used by the apps 17-20 demo
+track has no identity provider available, so its CI uses an IAM user's key in repo secrets (see
+`specs/day-0-aws-demo-track.md`).
 
 **Dropped, don't bring back:** fine-tuning (no free tier covers it; we show prompting, decoding controls and evals
 instead, and say so), native mobile (Expo/React Native), app-store publishing, the Kylon platform,

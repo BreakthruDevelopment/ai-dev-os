@@ -107,7 +107,7 @@ The other three repos inherit these, so they are settled here rather than three 
 | A write nobody approved | Writes only through `PermissionGate`; `staged_write` is the default; no gate is a construction error |
 | Runaway cost | `Budget` on every run; replay is the default provider; Bedrock only with `--live` |
 | Secrets or personal data in recorded replies | The recorder redacts through `Redacting`; fixtures reviewed before commit |
-| AWS credentials in the repo | None stored. Local runs use the default credential chain; CI assumes a role through GitHub OIDC |
+| AWS credentials in the repo | None committed. Local runs use the default credential chain. CI reads an IAM user's key from repo secrets, scoped to Bedrock invoke on Anthropic models; a role through GitHub OIDC is the intended end state but the account offers no Identity providers page (see the track plan's shared rules) |
 
 ## Issues
 
@@ -134,8 +134,13 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
    `Cached` must therefore key on the acting identity from `ctx`, or one caller's gate decision is served to
    another. A test must prove two callers with different permissions do not share a cached result.
    Dependencies: 17.2.
-5. **17.5 `[fullstack-builder] Event bus, agent factory and manifest`** · `grok`
-   Dependencies: 17.2.
+5. **17.5 `[fullstack-builder] Event bus, agent builder and manifest`** · `grok`
+   `EventBus` with the four events named in the public interface, and `AgentBuilder`: the YAML manifest schema
+   (model, system prompt, tool names, limits, permissions) and the staged assembly that reads it. The gate rule is
+   enforced here — the builder walks each tool's decorator stack to the innermost tool, reads its `effect`, and
+   raises at construction if an `effect: write` tool has no `PermissionGate` anywhere in its stack. **It is Builder,
+   not Factory**, and the naming matters for the README's pattern map. Subscribers must not be able to change the
+   loop's behavior. Dependencies: 17.2.
 
 ### Wave 3
 
@@ -147,7 +152,9 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
 7. **17.7 `[devops] Deploy app 17`** · `claude` · **2nd: Codex** · repo **`30-apps-infra`**
    Security-sensitive: it provisions IAM in a new AWS account. **First on the cut list** — a Lambda health endpoint
    is the lowest-value item in the track, and the demo runs from the command line without it.
-   A Lambda health endpoint running the replay demo, in the second AWS account, us-east-2, with access by IAM role
-   through GitHub OIDC. Dependencies: 17.6.
+   A Lambda health endpoint running the replay demo, in the second AWS account, us-east-2. **Do not set up GitHub
+   OIDC in this slice**: the account's IAM console offers no Identity providers page, so the deploy uses the
+   existing IAM user key already in repo secrets, and this slice adds only the smallest policy the deploy needs.
+   Record what that policy grants on the PR. Dependencies: 17.6.
 8. **17.8 `[docs-writer] README`** · `antigravity`
    Includes the pattern map and the exam map, each with file and line. Dependencies: 17.7.

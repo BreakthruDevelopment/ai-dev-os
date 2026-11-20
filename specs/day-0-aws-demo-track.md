@@ -154,11 +154,16 @@ of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesda
 ## Open questions
 
 - **Slots 21–29 and 32** have no assignment. They remain their original business apps in the catalog.
-- **Apps 30 and 33** are unaffected by this change, and both keep consumers. This track removes **one** caller
-  from app 33 — the old app 17, which was to use its embeddings — and **none** from app 30, since app 28 is not
-  retired. App 33 still serves app 29 (retrieval and rerank) and apps 22 and 25 (eval runner), and publishes to
-  app 30; app 30 still receives traces from apps 26, 28 and 31. App 28's A2A counterparty is app 31, not app 30
-  (`catalog.yaml`). So neither app needs a new consumer, and the open question is only whether apps 30 and 33
-  still earn their slots on the old schedule.
+- **Apps 30 and 33** are unaffected by this change, and both keep consumers. This track removes **two** callers
+  from app 33, one from each of its lever rows: the old app 17, which was to use its embeddings and rerank, and
+  the old app 19, a refusal and redaction eval suite that was to use its eval runner. App 33 still serves app 29
+  (retrieval and rerank) and apps 22 and 25 (eval runner), and publishes to app 30. **None** are removed from
+  app 30: it still receives traces from apps 26, 28 and 31, none of which this track retires.
+  (`ROADMAP.md`'s "one caller, not two" is correct where it stands, because it is scoped to the embeddings and
+  rerank service alone; app 33 as a whole lost a caller from the other row too.)
+- **App 30's A2A broker has no named caller.** Correcting the record above exposed it: app 30 is described as the
+  MCP server and A2A broker, but app 28 — the app previously named as its consumer here — calls **app 31** over
+  A2A (`catalog.yaml`), and no other app is named as calling app 30's broker. Its trace-and-cost half has three
+  consumers; its A2A half has none. That is app 30's real open question, and it is older than this track.
 - **The exam guide was read from a public mirror and paraphrased**, since the official guide is marked
   confidential. Task-statement wording should be checked against Anthropic Academy before any README quotes it.

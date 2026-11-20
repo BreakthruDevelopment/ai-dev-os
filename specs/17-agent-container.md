@@ -94,8 +94,9 @@ The other three repos inherit these, so they are settled here rather than three 
 - **Tool registration.** A consumer registers its own tools by passing instances to `AgentBuilder`; the manifest
   names them. The library ships no business tools of its own.
 - **Structured logging.** One JSON-lines logger, fields fixed here (run id, turn, tool, outcome, tokens,
-  duration). App 25's cost work is gone from the slate, so whatever traces exist come from these lines plus the
-  event bus.
+  duration). **App 30** was to be the portfolio's traces-and-cost home and has lost its consumers (see the track
+  plan's open questions), so for this track whatever traces exist come from these lines plus the event bus. There
+  is no exporter and no tracing backend in the track.
 - **Throttling.** One in-process limiter on model calls, configured per run, so a parallel fan-out in app 20
   cannot trip Bedrock rate limits and fail a demo.
 

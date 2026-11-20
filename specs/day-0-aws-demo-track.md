@@ -15,8 +15,9 @@ Suite. Michael leads the engagement: discover where AI pays off, build the first
 | 19 | `19-enablement-kit` | Enable the client's engineers | 2, 4 and 5 |
 | 20 | `20-discovery-workbench` | Discover and scope | 3 |
 
-Nothing here is SOA Suite, uses SOA Suite, or imitates it. These are modern agentic systems: Python, the Claude
-Agent SDK, MCP, Claude Code and Amazon Bedrock. The client's legacy stack is backdrop — a simulated ERP behind an
+Nothing here is SOA Suite, uses SOA Suite, or imitates it. These are modern agentic systems: Python, the Bedrock
+Converse API, MCP, Claude Code and Amazon Bedrock. The Claude Agent SDK is deliberately **not** used: app 17
+hand-builds its loop so the design is the thing on show rather than a framework's. The client's legacy stack is backdrop — a simulated ERP behind an
 MCP gateway in app 18, and a sample Java EE codebase that app 19's scout reads. The WebLogic parallels are how
 Michael explains the designs from his own experience, not something the code implements.
 

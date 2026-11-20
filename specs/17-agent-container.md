@@ -151,8 +151,9 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
 ### Wave 4
 
 7. **17.7 `[devops] Deploy app 17`** · `claude` · **2nd: Codex** · repo **`30-apps-infra`**
-   Security-sensitive: it provisions IAM in a new AWS account. **First on the cut list** — a Lambda health endpoint
-   is the lowest-value item in the track, and the demo runs from the command line without it.
+   Security-sensitive: it provisions IAM in a new AWS account. **Second on the cut list**, after app 20's ROI model
+   — the track plan's cut order is the authority — because a Lambda health endpoint is the lowest-value item in
+   this repo and the demo runs from the command line without it.
    A Lambda health endpoint running the replay demo, in the second AWS account, us-east-2. **Do not set up GitHub
    OIDC in this slice**: the account's IAM console offers no Identity providers page, so the deploy uses the
    existing IAM user key already in repo secrets, and this slice adds only the smallest policy the deploy needs.

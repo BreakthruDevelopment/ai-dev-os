@@ -1,5 +1,6 @@
 # The portfolio apps (33). Source of truth for repo names, subdomains and the cloud each app is live on.
-# live_cloud rotates by app number: AWS, Azure, Google Cloud, Oracle Cloud, repeating. An app may opt out with
+# live_cloud rotates by app number: AWS, Azure, Google Cloud, Oracle Cloud, repeating. Apps 17-29 and 32 are the
+# AWS demo track (specs/day-0-apps-17-29-32.md): Python on Amazon Bedrock, all on AWS, repos created by hand. An app may opt out with
 # rotation_reason, a non-empty string saying why its cloud is fixed; CI still checks the cloud is a real one.
 # Deploys happen by adding the app to apps.yaml in 30-apps-infra; listing more clouds there runs it on those too.
 #
@@ -171,121 +172,130 @@ apps:
     notable: "Instructor vs learner roles; the one app that shows what the model is actually doing"
     status: planned
   - n: 17
-    repo: 17-job-board-ats
-    name: "Job Board and ATS"
+    repo: 17-agentkit
+    name: "agentkit: the shared agent library"
     subdomain: app17.breakthruventures.ai
     live_cloud: aws
-    client_need: "Recruiting"
-    ai_feature: "Resume-to-job matching built as retrieval with a rerank stage and a labelled eval set; match quality is measured, not asserted (roadmap W06, W12)"
-    notable: "Bias guardrails with red-team fixtures and a published eval score; data retention rules"
+    client_need: "Reusable delivery IP: one agent core every demo imports"
+    ai_feature: "The agent loop every demo runs on: a bounded loop that dispatches on the model's stop reason, a swappable model provider (Bedrock, or recorded replies for zero-cost demos), and tools behind one contract (roadmap W02, W07)"
+    notable: "OO: Template Method (the loop), Strategy (model provider), Decorator (retry, cache, redact, meter around a tool), Factory (agents from a manifest), Observer (event bus). CCA 1.1, 1.5, 2.1, 2.2"
     status: planned
   - n: 18
-    repo: 18-employee-onboarding
-    name: "Employee Onboarding"
+    repo: 18-erp-mcp-gateway
+    name: "Legacy ERP gateway (MCP server)"
     subdomain: app18.breakthruventures.ai
-    live_cloud: azure
-    client_need: "HR"
-    ai_feature: "Policy Q&A over the handbook, with long-term agent memory: it remembers where each new hire is across weeks (roadmap W11)"
-    notable: "SSO-ready (OIDC), approvals workflow, memory a user can read and delete"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
+    client_need: "Operational AI: letting Claude work an old system of record safely"
+    ai_feature: "An MCP server in front of an Oracle-style ERP: clear tool boundaries, structured errors the agent can act on, read-only by default with scoped writes (roadmap W08)"
+    notable: "OO: Adapter (legacy API to tool contract), Proxy (permission scoping). CCA 2.1-2.4"
     status: planned
   - n: 19
-    repo: 19-patient-intake
-    name: "Patient Intake"
+    repo: 19-doc-extraction
+    name: "Document extraction line"
     subdomain: app19.breakthruventures.ai
-    live_cloud: gcp
-    client_need: "Clinics"
-    ai_feature: "Intake form to structured summary, with a refusal and redaction eval suite that runs in CI (roadmap W12)"
-    notable: "HIPAA-style controls: audit, encryption, consent; evals gate the deploy"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
+    client_need: "Finance and legal back office: invoices and contracts into systems"
+    ai_feature: "Unstructured documents to schema-valid JSON through tool use, with a validate-and-repair loop, few-shot examples, batch runs and a human review queue for low-confidence fields (roadmap W12)"
+    notable: "OO: Template Method (extract, validate, repair), Strategy (one extractor per document type). CCA scenario 6; 4.2-4.5, 5.5"
     status: planned
   - n: 20
-    repo: 20-task-manager
-    name: "Task Manager"
+    repo: 20-research-team
+    name: "Multi-agent research team"
     subdomain: app20.breakthruventures.ai
-    live_cloud: oci
-    client_need: "Team productivity tools"
-    ai_feature: "Natural-language task entry and bulk edits on a LangGraph.js graph: routing, checkpointed state and human approval before anything destructive (roadmap W09)"
-    notable: "Multi-tenant workspaces, RBAC; the HITL and checkpoint reference"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
+    client_need: "Research and analysis with sources a reader can check"
+    ai_feature: "A coordinator hands scoped questions to parallel subagents and assembles a cited report; a failed subagent is reported, not hidden (roadmap W10)"
+    notable: "OO: Mediator (the coordinator; subagents never talk to each other), Composite (a team is an agent). CCA scenario 3; 1.2, 1.3, 5.3, 5.6"
     status: planned
   - n: 21
-    repo: 21-meeting-notes
-    name: "Meeting Notes"
+    repo: 21-modernization-scout
+    name: "Legacy modernization scout"
     subdomain: app21.breakthruventures.ai
     live_cloud: aws
-    client_need: "Productivity"
-    ai_feature: "Transcript to action items as a queued pipeline with retries, webhooks and a visible job state machine (roadmap W11, W03)"
-    notable: "Audio upload, async processing queue, outbound webhooks"
+    client_need: "Cloud migration discovery: understanding a codebase nobody remembers"
+    ai_feature: "An Agent SDK tool that explores an unfamiliar codebase with the built-in tools, keeps findings in scratch files instead of context, and writes a migration brief"
+    notable: "OO: Proxy (read-only sandbox), Visitor (analyses over a repo index). CCA scenario 4; 2.5, 5.4"
     status: planned
   - n: 22
-    repo: 22-analytics-dashboard
-    name: "Analytics Dashboard"
+    repo: 22-pr-reviewer
+    name: "Pull request reviewer in CI"
     subdomain: app22.breakthruventures.ai
-    live_cloud: azure
-    client_need: "BI and reporting"
-    ai_feature: "Ask-your-data (text to SQL, read-only) with a text-to-SQL eval set and a load-tested query path (roadmap W03, W14)"
-    notable: "Row-level security, query sandboxing, published p95 under load"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
+    client_need: "Engineering productivity: review that developers do not learn to ignore"
+    ai_feature: "Claude Code running headless on Bedrock in a pipeline: per-file and cross-file passes, explicit criteria to hold down false positives, structured findings posted to the PR"
+    notable: "OO: Chain of Responsibility (review passes). CCA scenario 5; 3.6, 4.1, 4.6. Built from this factory's own review gate"
     status: planned
   - n: 23
-    repo: 23-marketplace
-    name: "Marketplace"
+    repo: 23-claude-code-kit
+    name: "Claude Code team kit (plugin)"
     subdomain: app23.breakthruventures.ai
-    live_cloud: gcp
-    client_need: "Two-sided platforms"
-    ai_feature: "Listing moderation, with outbound webhooks so seller systems react to a decision (roadmap W11)"
-    notable: "Buyer/seller roles, payments test mode, webhook signing and replay"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
+    client_need: "AI-assisted development rollout for an engineering team"
+    ai_feature: "A Claude Code plugin that scaffolds an agentkit project: CLAUDE.md hierarchy, path-scoped rules, skills, slash commands and hooks, with plan mode where it earns its place"
+    notable: "OO: Factory (project scaffolds). CCA scenario 2; 3.1-3.5"
     status: planned
   - n: 24
-    repo: 24-community-forum
-    name: "Community Forum"
+    repo: 24-eval-harness
+    name: "Eval harness and model swap"
     subdomain: app24.breakthruventures.ai
-    live_cloud: oci
-    client_need: "Social and community"
-    ai_feature: "Toxicity moderation + thread summaries"
-    notable: "Abuse reporting, moderation queue"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
+    client_need: "Defending a model choice with numbers"
+    ai_feature: "One agent run against a labelled set on several Bedrock models: pass rate, cost and latency side by side, with the eval suite as the test of whether one model can stand in for another (roadmap W12)"
+    notable: "OO: Strategy (provider swap), Visitor (graders over traces); Liskov substitution made testable. CCA 4.1, 4.4, 5.5"
     status: planned
   - n: 25
-    repo: 25-fitness-coaching
-    name: "Fitness Coaching"
+    repo: 25-cost-governor
+    name: "Observability and cost governor"
     subdomain: app25.breakthruventures.ai
     live_cloud: aws
-    client_need: "Health and fitness"
-    ai_feature: "Workout plan generator built as a guardrail case study: hard safety limits, refusals and red-team fixtures (roadmap W12)"
-    notable: "Coach-client relationships; every refusal path has a test"
+    client_need: "Running agents in production without a surprise bill"
+    ai_feature: "Traces and cost per session from loop events, prompt-cache hit rate, a budget that cuts a run off, and a fallback to a cheaper model when the first one fails (roadmap W05)"
+    notable: "OO: Observer (hooks to traces), Decorator (metering), Singleton done carefully (one budget governor). CCA 1.5, 5.1, 5.3"
     status: planned
   - n: 26
-    repo: 26-property-management
-    name: "Property Management"
+    repo: 26-agent-runtimes
+    name: "One agent, three AWS runtimes"
     subdomain: app26.breakthruventures.ai
-    live_cloud: azure
-    client_need: "Landlords and HOAs"
-    ai_feature: "Maintenance request triage with an agent handoff: a triage agent hands to a scheduling agent under a supervisor (roadmap W10)"
-    notable: "Tenant vs manager portals; handoff traces visible in app 30"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
+    client_need: "Choosing where an agent runs on AWS"
+    ai_feature: "The same agent definition deployed to Lambda, Fargate and Bedrock AgentCore, with sessions that persist, resume and fork (roadmap W11, W13)"
+    notable: "OO: Strategy (runtime), dependency inversion (the agent does not know its host). CCA 1.7"
     status: planned
   - n: 27
-    repo: 27-donor-crm
-    name: "Nonprofit Donor CRM"
+    repo: 27-discovery-kit
+    name: "Engagement discovery kit"
     subdomain: app27.breakthruventures.ai
-    live_cloud: gcp
-    client_need: "Nonprofits"
-    ai_feature: "Donor outreach drafts and segmenting, as a context and caching case study: context budget, prompt cache, cost per draft (roadmap W05)"
-    notable: "Consent and unsubscribe tracking; cost per draft published"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
+    client_need: "Turning an ambiguous client problem into scoped work"
+    ai_feature: "Interview notes plus repository and delivery metrics in; an outcome map, a maturity assessment and a scoped plan with ROI assumptions out, each claim traced to its source"
+    notable: "OO: Template Method (the readout). CCA 4.3, 5.6. Sample client: this portfolio's own nineteen repos"
     status: planned
   - n: 28
-    repo: 28-support-agent
-    name: "Customer Support Agent"
+    repo: 28-support-desk
+    name: "Support resolution desk"
     subdomain: app28.breakthruventures.ai
-    live_cloud: oci
-    client_need: "AI support deployments"
-    ai_feature: "Agent on an Agents-SDK loop with tracing: order lookup and refunds with approval, and it asks app 31's agent for a priced answer over A2A (roadmap W07, W08)"
-    notable: "Human-in-the-loop, tool permissioning, full trace per run"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
+    client_need: "Customer support that resolves on first contact and knows when to stop"
+    ai_feature: "An agent that handles returns and billing disputes through tools, with prerequisites enforced in code, refunds staged for approval and a structured handoff when it escalates (roadmap W07, W09)"
+    notable: "OO: State (the case), Chain of Responsibility (escalation), Command (staged writes). CCA scenario 1; 1.4, 5.2"
     status: planned
   - n: 29
     repo: 29-knowledge-assistant
-    name: "Internal Knowledge Assistant"
+    name: "Grounded knowledge assistant"
     subdomain: app29.breakthruventures.ai
     live_cloud: aws
     client_need: "Enterprise RAG"
-    ai_feature: "The reference RAG: multi-source retrieval, embeddings and vector search, cross-encoder rerank, a labelled RAG eval set and citations (roadmap W06)"
-    notable: "Connector auth, per-doc permissions; rerank and eval served by app 33"
+    ai_feature: "Retrieval over a document set with Bedrock embeddings, cited answers, and a refusal when the sources do not say (roadmap W06)"
+    notable: "OO: Strategy (retrieval). CCA 5.6. A retrieval eval set shared with app 24"
     status: planned
   - n: 30
     repo: 30-ai-ops-console
@@ -307,13 +317,14 @@ apps:
     notable: "Public price lists for AWS, Azure, Google Cloud and Oracle; current footprint read from 30-apps-infra apps.yaml; scenario builder for users, compute, containers, storage, identity and redundancy; break-even for moving clouds"
     status: deployed
   - n: 32
-    repo: 32-purchase-orders
-    name: "Purchase Orders and Vendor Management"
+    repo: 32-p2p-exceptions
+    name: "Procure-to-pay exceptions (capstone)"
     subdomain: app32.breakthruventures.ai
-    live_cloud: oci
+    live_cloud: aws
+    rotation_reason: "AWS demo track (decided 2026-11-19): a Python demo on Amazon Bedrock in the second AWS account, not a rotation app; see specs/day-0-apps-17-29-32.md."
     client_need: "Procurement and back office"
-    ai_feature: "Extract fields from uploaded quotes and invoices; three-way match explanations, with spend-limit approval chains as the human-in-the-loop reference (roadmap W09)"
-    notable: "PO to receipt to invoice matching, vendor records, approvals that block the write until a human signs"
+    ai_feature: "Apps 19 and 18 composed into one flow: an invoice is extracted, matched against the ERP, and every posting is staged until a person approves it (roadmap W09)"
+    notable: "OO: Command (staged postings with an audit trail), Composite (the flow is built from the other demos). CCA 1.4, 1.6, 5.5"
     status: planned
   - n: 33
     repo: 33-ai-service

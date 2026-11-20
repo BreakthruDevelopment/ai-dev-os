@@ -178,7 +178,7 @@ apps:
     live_cloud: aws
     client_need: "Reusable delivery IP: the agent core every demo in the track imports"
     ai_feature: "The agent loop itself: a bounded loop that branches on the model's stop reason, a swappable model provider (Bedrock Claude Sonnet 4.6, or recorded replies so a demo costs nothing), tool contracts with structured retryable errors, interceptors, a permission gate and a run budget"
-    notable: "Patterns: Template Method (the loop), Strategy (model provider), Decorator (retry, cache, redact, meter), Builder (agents from a manifest), Observer (event bus), Proxy (permission gate), Chain of Responsibility (interceptors). CCA statements owned: 1.1, 1.5, 2.2. The gate, tool contract and builder are the mechanism app 18 and app 20 own 1.4, 2.1 and 2.3 on"
+    notable: "Patterns: Template Method (the loop), Strategy (model provider), Decorator (retry, cache, redact, meter), Builder (agents from a manifest), Observer (event bus), Proxy (permission gate), Chain of Responsibility (interceptors). CCA statements owned: 1.1, 1.5, 2.2. The gate, tool contract and builder are the mechanism app 18 owns 1.4, 2.1 and 2.3 on, and app 20 exercises 2.3 on"
     status: planned
   - n: 18
     repo: 18-procure-to-pay

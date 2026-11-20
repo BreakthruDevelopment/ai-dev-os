@@ -17,7 +17,7 @@ whether the design is real.
 
 - **In:** the agent loop; a model provider interface with Bedrock and replay implementations; the tool contract
   with structured errors; tool decorators; an interceptor chain; a permission gate with staged writes; an event
-  bus; a run budget; a factory that builds an agent from a manifest; a command-line demo; a Lambda health
+  bus; a run budget; a builder that assembles an agent from a manifest; a command-line demo; a Lambda health
   endpoint.
 - **Out:** multi-agent coordination (app 20), MCP serving (app 18), Claude Code configuration (app 19), retrieval,
   and evals beyond this library's own tests. Each is built on this library in its own repo.

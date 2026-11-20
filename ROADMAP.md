@@ -63,7 +63,7 @@ The four rows below are kept as the record of what they were going to be.
 | --- | --- | --- |
 | 16 LMS | Quiz generation **plus a decoding lab**: tokens, temperature/top-p, logprob-ranked alternates, cost per item | W04 |
 | ~~17 Job Board & ATS~~ | **Superseded**: now `17-agent-container`, the AWS demo track's shared agent library | W02, W07 |
-| ~~18 Onboarding~~ | **Superseded**: now `18-procure-to-pay`, extraction, an MCP gateway and staged approvals | W05, W08 |
+| ~~18 Onboarding~~ | **Superseded**: now `18-procure-to-pay`, extraction, an MCP gateway and staged approvals | W05, W08, W09 |
 | ~~19 Patient Intake~~ | **Superseded**: now `19-enablement-kit`, Claude Code for a team plus a CI reviewer | W13 |
 | ~~20 Task Manager~~ | **Superseded**: now `20-discovery-workbench`, a coordinator with parallel subagents | W10 |
 | 21 Meeting Notes | A **queue + webhook** pipeline with retries and a visible job state machine | W11, W03 |

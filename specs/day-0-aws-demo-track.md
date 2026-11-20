@@ -20,8 +20,8 @@ Converse API, MCP, Claude Code and Amazon Bedrock. The Claude Agent SDK is delib
 hand-builds its loop so the design is the thing on show rather than a framework's. (`ROADMAP.md`'s W07 row is
 named "Agents SDK" after the week's topic, not after a dependency of this track.) The client's legacy stack is
 backdrop — a simulated ERP behind an MCP gateway in app 18, and a sample Java EE codebase that app 19's scout
-reads. The WebLogic parallels are how
-Michael explains the designs from his own experience, not something the code implements.
+reads. The WebLogic parallels are how Michael explains the designs from his own experience, not something the
+code implements.
 
 ## Why this shape
 
@@ -134,7 +134,7 @@ of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesda
 - ~~Two things are blocked on Michael~~ **Both cleared on 2026-11-20:** the four repos exist with the topic set,
   and AWS credentials are in each repo's secrets. Day one is unblocked.
 - **Cut order, invoked Saturday night rather than Monday if apps 17 and 18 are not both moving:** app 20's ROI
-  model, then app 17's Lambda health endpoint (slice 17.7 — the lowest-value item in the track), then session
+  model, then app 17's Lambda health endpoint (slice 17.7 — the lowest-value item in app 17), then session
   forking, then batch processing, then app 19's scout. Never cut app 17, app 18 end to end, app 19's Domain 3
   coverage, or the recorded replays.
 - **Realistic target:** apps 17 and 18 end to end by Tuesday. Four polished repos with all 30 statements mapped to
@@ -154,8 +154,11 @@ of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesda
 ## Open questions
 
 - **Slots 21–29 and 32** have no assignment. They remain their original business apps in the catalog.
-- **Apps 30 and 33** are unaffected by this change but were aimed at the old slate: app 30's MCP and A2A broker
-  was to be consumed by the old app 28, and app 33's embeddings service by the old apps 17 and 29. Neither has a
-  consumer now.
+- **Apps 30 and 33** are unaffected by this change, and both keep consumers. This track removes **one** caller
+  from app 33 — the old app 17, which was to use its embeddings — and **none** from app 30, since app 28 is not
+  retired. App 33 still serves app 29 (retrieval and rerank) and apps 22 and 25 (eval runner), and publishes to
+  app 30; app 30 still receives traces from apps 26, 28 and 31. App 28's A2A counterparty is app 31, not app 30
+  (`catalog.yaml`). So neither app needs a new consumer, and the open question is only whether apps 30 and 33
+  still earn their slots on the old schedule.
 - **The exam guide was read from a public mirror and paraphrased**, since the official guide is marked
   confidential. Task-statement wording should be checked against Anthropic Academy before any README quotes it.

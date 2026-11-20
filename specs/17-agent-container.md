@@ -94,9 +94,9 @@ The other three repos inherit these, so they are settled here rather than three 
 - **Tool registration.** A consumer registers its own tools by passing instances to `AgentBuilder`; the manifest
   names them. The library ships no business tools of its own.
 - **Structured logging.** One JSON-lines logger, fields fixed here (run id, turn, tool, outcome, tokens,
-  duration). **App 30** was to be the portfolio's traces-and-cost home and has lost its consumers (see the track
-  plan's open questions), so for this track whatever traces exist come from these lines plus the event bus. There
-  is no exporter and no tracing backend in the track.
+  duration). **App 30** is the portfolio's traces-and-cost home, but it is `planned` and outside this track, so
+  nothing here exports to it: whatever traces exist come from these lines plus the event bus. There is no exporter
+  and no tracing backend in the track, and adding one is not a slice.
 - **Throttling.** One in-process limiter on model calls, configured per run, so a parallel fan-out in app 20
   cannot trip Bedrock rate limits and fail a demo.
 
@@ -153,7 +153,7 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
 7. **17.7 `[devops] Deploy app 17`** · `claude` · **2nd: Codex** · repo **`30-apps-infra`**
    Security-sensitive: it provisions IAM in a new AWS account. **Second on the cut list**, after app 20's ROI model
    — the track plan's cut order is the authority — because a Lambda health endpoint is the lowest-value item in
-   this repo and the demo runs from the command line without it.
+   this repo and the demo runs from the command line without it. App 20's ROI model is cut before it.
    A Lambda health endpoint running the replay demo, in the second AWS account, us-east-2. **Do not set up GitHub
    OIDC in this slice**: the account's IAM console offers no Identity providers page, so the deploy uses the
    existing IAM user key already in repo secrets, and this slice adds only the smallest policy the deploy needs.

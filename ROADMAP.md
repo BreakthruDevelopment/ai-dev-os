@@ -30,7 +30,7 @@ still `planned`, and none is deployed.
 | Wk | Roadmap topic | Where it stands | State |
 | --- | --- | --- | --- |
 | W01 | Python basics | Nothing in the portfolio is Python yet. **33-ai-service** is the answer. | gap |
-| W02 | Dev tools — OOP, Git & GitHub, tests, type hints (**17-agent-container** is the deliberate OOP artifact: twelve Gang of Four patterns, Python, `mypy --strict`) | Git/GitHub, tests and type hints: twelve deployed apps, each TypeScript strict with lint, typecheck, unit and integration tests, build and smoke in CI, plus the BreakthruSoftwareFactory itself (8 roles, 5 gates, PR-only, required review). **OOP is the gap, and it is a gap in what is *deployed*:** across the twelve live apps every `class` is an exception subclass, so the only inheritance doing real work in production is the error hierarchy `errorResponse()` dispatches over. Real OOP exists in apps not yet deployed — `GatewayLlm extends adk.BaseLlm` in app 31 overrides `generateContentAsync` to enforce the call cap, budget, deadline and quota, and app 13 has `OfflineStore` and `TechDataEngine` with private state and their own lifecycles. So the honest statement is that no OOP artifact is live yet, not that none exists. App 33 (Python) is where it becomes idiomatic rather than incidental: ABCs for the provider and reranker interfaces, SQLAlchemy models, service classes. | partial |
+| W02 | Dev tools — OOP, Git & GitHub, tests, type hints (**17-agent-container** is the deliberate OOP artifact: thirteen Gang of Four patterns across the track, Python, `mypy --strict`) | Git/GitHub, tests and type hints: twelve deployed apps, each TypeScript strict with lint, typecheck, unit and integration tests, build and smoke in CI, plus the BreakthruSoftwareFactory itself (8 roles, 5 gates, PR-only, required review). **OOP is the gap, and it is a gap in what is *deployed*:** across the twelve live apps every `class` is an exception subclass, so the only inheritance doing real work in production is the error hierarchy `errorResponse()` dispatches over. Real OOP exists in apps not yet deployed — `GatewayLlm extends adk.BaseLlm` in app 31 overrides `generateContentAsync` to enforce the call cap, budget, deadline and quota, and app 13 has `OfflineStore` and `TechDataEngine` with private state and their own lifecycles. So the honest statement is that no OOP artifact is live yet, not that none exists. App 33 (Python) is where it becomes idiomatic rather than incidental: ABCs for the provider and reranker interfaces, SQLAlchemy models, service classes. | partial |
 | W03 | APIs & data — REST, FastAPI, SQL, async | REST handlers and Postgres/Drizzle are live across twelve apps; the async job runner is live in five of them (apps 6, 9–12). **FastAPI** is the missing half → app 33. | partial |
 | W04 | LLM basics — tokens, attention, prompts, decoding | Prompting is live in every app's AI feature. Tokens, decoding controls and logprobs → **16-lms**, not started (held until the Oracle VM reboot). | partial |
 | W05 | LLM apps — context, tool calls, LangChain, caching | Tool calls are **built** in app 31 (merged, not deployed). Context budget, prompt cache and cost-per-draft → **27-donor-crm**: not started. | partial |
@@ -147,9 +147,9 @@ are fewer apps or more days, not a thinner definition of done.
 
 | Capability | Built once in | Reused by |
 | --- | --- | --- |
-| Retrieval + rerank + a RAG eval harness | **33-ai-service** | 17, 29 |
-| Eval runner (refusal, text-to-SQL, red-team fixtures) | **33-ai-service** | 19, 22, 25 |
-| HITL approval chain (a write blocked until a human signs) | **30-apps-template** (optional module) | 20, 32, 28 |
+| Retrieval + rerank + a RAG eval harness | **33-ai-service** | 29 |
+| Eval runner (refusal, text-to-SQL, red-team fixtures) | **33-ai-service** | 22, 25 |
+| HITL approval chain (a write blocked until a human signs) | **30-apps-template** (optional module) | 32, 28 |
 | Outbound webhooks (signed, replayable, with a job state machine) | **30-apps-template** (optional module) | 21, 23 |
 | Agent loop with tracing, reporting to app 30 | **30-apps-template** (optional module) | 26, 28, 31 |
 

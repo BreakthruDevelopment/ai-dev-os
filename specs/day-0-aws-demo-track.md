@@ -73,8 +73,8 @@ Claimed homes, not yet built. A statement with two repos is owned by the first a
 | 5.5 | Human review and confidence calibration | 18 |
 | 5.6 | Provenance and uncertainty in synthesis | 20 |
 
-By repo: **17** owns 4, **18** owns 12, **19** owns 12, **20** owns 6. Domain 3 is entirely app 19, which is why
-app 19 cannot be cut.
+By repo: **17** owns 3, **18** owns 12, **19** owns 11, **20** owns 4 — thirty in total, each owned once. Domain 3
+is entirely app 19, which is why app 19 cannot be cut.
 
 ## Decisions taken
 
@@ -122,8 +122,8 @@ of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesda
   review-gate caller — is normally its own day and is folded into slice 17.1.
 - Review rounds dominate the schedule. Recent history: three rounds on one small fix (`14-real-estate#27`),
   fifteen on `15-event-ticketing#16`. At three rounds per slice across ~28 slices the week does not fit.
-- **Two things are blocked on Michael with no deadline:** the four repos do not exist, and AWS access for CI is
-  not set up. Both are needed **before Friday morning** or day one cannot start.
+- ~~Two things are blocked on Michael~~ **Both cleared on 2026-11-20:** the four repos exist with the topic set,
+  and AWS credentials are in each repo's secrets. Day one is unblocked.
 - **Cut order, invoked Saturday night rather than Monday if apps 17 and 18 are not both moving:** app 20's ROI
   model, then app 17's Lambda health endpoint (slice 17.7 — the lowest-value item in the track), then session
   forking, then batch processing, then app 19's scout. Never cut app 17, app 18 end to end, app 19's Domain 3
@@ -133,9 +133,13 @@ of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesda
 
 ## What only Michael can do
 
-1. **Create the four repos** with the topic `30-apps-30-days`. `scripts/create-app-repos.py` builds from the
-   Next.js template and `gh api /orgs/...` is blocked in Claude Code sessions, so this cannot be automated here.
-2. **Set up GitHub OIDC to the new AWS account** and add the role ARN as a repository secret or variable.
+1. ~~Create the four repos~~ **Done 2026-11-20.** All four exist, public, `main`, topic `30-apps-30-days`.
+   `scripts/create-app-repos.py` builds from the Next.js template and `gh api /orgs/...` is blocked in Claude Code
+   sessions, so they were created by hand.
+2. ~~Set up AWS access for CI~~ **Done 2026-11-20.** An IAM user with a least-privilege Bedrock policy
+   (`bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream` on Anthropic models and inference profiles);
+   its keys are repository secrets in all four repos. OIDC was the better option but the account's IAM console
+   offers no Identity providers page, so this is the fallback and should move to a role later.
 3. **Merge this PR, and each app's spec.**
 
 ## Open questions

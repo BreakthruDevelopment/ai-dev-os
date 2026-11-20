@@ -120,8 +120,7 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
    `pyproject.toml`, `uv`, `ruff`, `mypy --strict`, `pytest`, a Dockerfile, and a workflow whose required check is
    named `Lint, test, build, smoke`, plus the review-gate caller and `AGENTS.md` carrying the track's rules.
    Security-sensitive because it wires the required checks every later merge depends on. Dependencies: none.
-2. **17.2 `[fullstack-builder] Core contracts and the agent loop`** · `claude`
-   Not security-sensitive: no auth, tenancy, secrets or data-writing tool. The permission gate itself is 17.4.
+2. **17.2 `[fullstack-builder] Core contracts and the agent loop`** · `claude` · **2nd: Codex**
    `ModelProvider`, `Tool`, `ToolResult`, `Budget`, `AgentLoop`, `ReplayProvider`, and the shared contract test
    suite every provider and decorator must pass. Dependencies: 17.1.
 
@@ -131,6 +130,9 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
    `BedrockProvider` on the Converse API, stop-reason mapping, and the recorder that writes replay fixtures.
    Dependencies: 17.2.
 4. **17.4 `[fullstack-builder] Decorators, interceptor chain, permission gate and staged changes`** · `claude` · **2nd: Codex**
+   The gate rule is presence-anywhere in the stack, so `Cached(PermissionGate(write))` is valid by construction.
+   `Cached` must therefore key on the acting identity from `ctx`, or one caller's gate decision is served to
+   another. A test must prove two callers with different permissions do not share a cached result.
    Dependencies: 17.2.
 5. **17.5 `[fullstack-builder] Event bus, agent factory and manifest`** · `grok`
    Dependencies: 17.2.

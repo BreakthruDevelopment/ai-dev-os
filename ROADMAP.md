@@ -30,18 +30,18 @@ still `planned`, and none is deployed.
 | Wk | Roadmap topic | Where it stands | State |
 | --- | --- | --- | --- |
 | W01 | Python basics | Nothing in the portfolio is Python yet. **33-ai-service** is the answer. | gap |
-| W02 | Dev tools — OOP, Git & GitHub, tests, type hints | Git/GitHub, tests and type hints: twelve deployed apps, each TypeScript strict with lint, typecheck, unit and integration tests, build and smoke in CI, plus the BreakthruSoftwareFactory itself (8 roles, 5 gates, PR-only, required review). **OOP is the gap, and it is a gap in what is *deployed*:** across the twelve live apps every `class` is an exception subclass, so the only inheritance doing real work in production is the error hierarchy `errorResponse()` dispatches over. Real OOP exists in apps not yet deployed — `GatewayLlm extends adk.BaseLlm` in app 31 overrides `generateContentAsync` to enforce the call cap, budget, deadline and quota, and app 13 has `OfflineStore` and `TechDataEngine` with private state and their own lifecycles. So the honest statement is that no OOP artifact is live yet, not that none exists. App 33 (Python) is where it becomes idiomatic rather than incidental: ABCs for the provider and reranker interfaces, SQLAlchemy models, service classes. | partial |
+| W02 | Dev tools — OOP, Git & GitHub, tests, type hints (**17-agent-container** is the deliberate OOP artifact: thirteen Gang of Four patterns across the track, Python, `mypy --strict`) | Git/GitHub, tests and type hints: twelve deployed apps, each TypeScript strict with lint, typecheck, unit and integration tests, build and smoke in CI, plus the BreakthruSoftwareFactory itself (8 roles, 5 gates, PR-only, required review). **OOP is the gap, and it is a gap in what is *deployed*:** across the twelve live apps every `class` is an exception subclass, so the only inheritance doing real work in production is the error hierarchy `errorResponse()` dispatches over. Real OOP exists in apps not yet deployed — `GatewayLlm extends adk.BaseLlm` in app 31 overrides `generateContentAsync` to enforce the call cap, budget, deadline and quota, and app 13 has `OfflineStore` and `TechDataEngine` with private state and their own lifecycles. So the honest statement is that no OOP artifact is live yet, not that none exists. App 33 (Python) is where it becomes idiomatic rather than incidental: ABCs for the provider and reranker interfaces, SQLAlchemy models, service classes. | partial |
 | W03 | APIs & data — REST, FastAPI, SQL, async | REST handlers and Postgres/Drizzle are live across twelve apps; the async job runner is live in five of them (apps 6, 9–12). **FastAPI** is the missing half → app 33. | partial |
 | W04 | LLM basics — tokens, attention, prompts, decoding | Prompting is live in every app's AI feature. Tokens, decoding controls and logprobs → **16-lms**, not started (held until the Oracle VM reboot). | partial |
-| W05 | LLM apps — context, tool calls, LangChain, caching | Tool calls are **built** in app 31 (merged, not deployed). Context budget, prompt cache and cost-per-draft → **27-donor-crm**: not started. | partial |
-| W06 | RAG — embeddings, vector DB, rerank, RAG evals | **14-real-estate** has the pgvector extension, an `embedding` column, an unused `query_embedding` cache table and `embed.ts` merged — but **no search path yet** (no distance query anywhere). Rerank and a labelled eval set → **29-knowledge-assistant** and **17-job-board-ats**. | partial |
-| W07 | AI agents — agent loop, tools, Agents SDK, tracing | **31-cost-scaler**: Google ADK `runAgent()` with four tools, merged and tested. Not deployed. | **built** |
-| W08 | MCP & A2A — MCP servers, tools, A2A protocol | Nothing yet → **30-ai-ops-console** (MCP server + A2A broker), consumed by **28-support-agent**. | gap |
-| W09 | LangGraph — state, routing, checkpoints, HITL | Nothing yet → **20-task-manager**; HITL approval chains also in **32-purchase-orders**. | gap |
-| W10 | Multi-agent — supervisor, handoffs, parallel tasks | **31-cost-scaler**: coordinator plus pricing and migration agents via `AgentTool`, merged and tested. Not deployed. | **built** |
-| W11 | Agent memory — long-term memory, queues, webhooks | Job queues with retries are live in five apps (6, 9–12). Long-term memory → **18-employee-onboarding**; webhooks → **21** and **23**. | partial |
-| W12 | Evals & safety — evals, tracing, guardrails, LLMOps | Input caps, zod-validated model output and demo fallbacks are live in twelve apps. The grounded-output check is in **open PR** `15-event-ticketing#16`, on its eleventh review round with the last six blocking — at least eight real bypasses found so far, none of them shipped. Neither live nor built. Evals, tracing and LLMOps → **30**, **19**, **25**. | partial |
-| W13 | Deploy — Docker, CI/CD, cloud, vLLM | One container image per app, GitHub Actions, four clouds: live. **vLLM** → the Mac mini (below). | partial |
+| W05 | LLM apps — context, tool calls, LangChain, caching | Tool calls are **built** in app 31 (merged, not deployed). **18-procure-to-pay** adds tool-interface design on app 17's contract (the superseded table aims app 17 at W02 and W07, not here). Context budget, prompt cache and cost-per-draft → **27-donor-crm**: not started. | partial |
+| W06 | RAG — embeddings, vector DB, rerank, RAG evals | **14-real-estate** has the pgvector extension, an `embedding` column, an unused `query_embedding` cache table and `embed.ts` merged — but **no search path yet** (no distance query anywhere). Rerank and a labelled eval set → **29-knowledge-assistant**; app 17 was re-aimed to the AWS demo track's agent container on 2026-11-19, so app 29 is the only app aimed at this week (see the app-29 row and the lever table below, which agree). | partial |
+| W07 | AI agents — agent loop, tools, Agents SDK, tracing | **31-cost-scaler**: Google ADK `runAgent()` with four tools, merged and tested. Not deployed. **17-agent-container** adds a hand-built loop on Bedrock Converse, with stop-reason handling and a run budget. | **built** |
+| W08 | MCP & A2A — MCP servers, tools, A2A protocol | An MCP server → **18-procure-to-pay** (AWS demo track). A2A → **30-ai-ops-console**. | gap |
+| W09 | LangGraph — state, routing, checkpoints, HITL | State, enforced prerequisites and human approval → **18-procure-to-pay** (AWS demo track), on the agent container rather than LangGraph; HITL approval chains also in **32-purchase-orders**. LangGraph by name is no longer aimed at any app, since app 20 became the discovery workbench on 2026-11-19. | gap |
+| W10 | Multi-agent — supervisor, handoffs, parallel tasks | **31-cost-scaler**: coordinator plus pricing and migration agents via `AgentTool`, merged and tested. Not deployed. **20-discovery-workbench** adds a coordinator with parallel subagents (Mediator, Composite). | **built** |
+| W11 | Agent memory — long-term memory, queues, webhooks | Job queues with retries are live in five apps (6, 9–12). Webhooks → **21** and **23**. Long-term memory is no longer aimed at any app, since app 18 became the AWS demo track's procure-to-pay workflow on 2026-11-19. | partial |
+| W12 | Evals & safety — evals, tracing, guardrails, LLMOps | Input caps, zod-validated model output and demo fallbacks are live in twelve apps. The grounded-output check is in **open PR** `15-event-ticketing#16`, on its eleventh review round with the last six blocking — at least eight real bypasses found so far, none of them shipped. Neither live nor built. Evals, tracing and LLMOps → **30** and **25**; app 19 was re-aimed on 2026-11-19, and the demo track's own eval work sits inside `17-agent-container`'s contract suite. | partial |
+| W13 | Deploy — Docker, CI/CD, cloud, vLLM | One container image per app, GitHub Actions, four clouds: live. **vLLM** → the Mac mini (below). **19-enablement-kit** adds Claude Code in CI. | partial |
 | W14 | Full-stack AI — Streamlit, auth, scaling, load tests | Better Auth with roles is live in twelve apps. **Streamlit** → app 33; load tests → **22-analytics-dashboard**. | partial |
 | W15 | Capstone — architecture, build, interview prep | **31-cost-scaler** is the capstone: four-cloud price ingestion, a BigInt-micros scenario engine, a multi-agent advisor. Merged, not deployed. | **built** |
 | W16 | Ship & present — deploy, demo, portfolio ready | Twelve live URLs and the Build Tracker (app 1) as the index. READMEs and 2-minute demos are not complete across all twelve. | partial |
@@ -51,17 +51,21 @@ the largest coverage change available to us right now, which is worth knowing wh
 
 ## What changes in apps 16–32
 
-Fifteen of the seventeen remaining catalog entries get a new `ai_feature`. **No app changes its client need or its
-cloud.** What changes is which AI technique each one is built to prove, so that together they cover every week
-instead of building six variations on "summarize this text".
+Fifteen of the seventeen remaining catalog entries get a new `ai_feature`. What changes is which AI technique each
+one is built to prove, so that together they cover every week instead of building six variations on "summarize this
+text".
+
+**Superseded for apps 17-20 on 2026-11-19.** Those four became the AWS demo track
+(`specs/day-0-aws-demo-track.md`): their client need, cloud and AI feature all changed, and all four are now on AWS.
+The four rows below are kept as the record of what they were going to be.
 
 | App | Becomes | Week |
 | --- | --- | --- |
 | 16 LMS | Quiz generation **plus a decoding lab**: tokens, temperature/top-p, logprob-ranked alternates, cost per item | W04 |
-| 17 Job Board & ATS | Matching as **retrieval with a rerank stage and a labelled eval set**; bias measured, not asserted | W06, W12 |
-| 18 Onboarding | Policy Q&A **plus long-term memory** across weeks | W11 |
-| 19 Patient Intake | A **refusal and redaction eval suite** that runs in CI | W12 |
-| 20 Task Manager | A **LangGraph.js graph**: routing, checkpointed state, HITL before destructive bulk edits | W09 |
+| ~~17 Job Board & ATS~~ | **Superseded**: now `17-agent-container`, the AWS demo track's shared agent library | W02, W07 |
+| ~~18 Onboarding~~ | **Superseded**: now `18-procure-to-pay`, extraction, an MCP gateway and staged approvals | W05, W08, W09 |
+| ~~19 Patient Intake~~ | **Superseded**: now `19-enablement-kit`, Claude Code for a team plus a CI reviewer | W13 |
+| ~~20 Task Manager~~ | **Superseded**: now `20-discovery-workbench`, a coordinator with parallel subagents | W10 |
 | 21 Meeting Notes | A **queue + webhook** pipeline with retries and a visible job state machine | W11, W03 |
 | 22 Analytics | Text-to-SQL **with an eval set**, sandboxing, row-level security, a load test | W03, W14 |
 | 23 Marketplace | Moderation **with signed, replayable outbound webhooks** | W11 |
@@ -82,7 +86,7 @@ instead of building six variations on "summarize this text".
 The roadmap is a Python roadmap and this portfolio is TypeScript. One app closes that honestly:
 
 - **FastAPI**: REST, async, SQLAlchemy on the same Postgres, full type hints, `pytest` and `mypy` in CI.
-- **The embeddings and rerank service** apps 17 and 29 call, so the Python is load-bearing, not a demo.
+- **The embeddings and rerank service.** App 29 calls it; app 17 was re-aimed on 2026-11-19, so it has one caller, not two.
 - **The eval harness**: RAG, refusal and text-to-SQL evals run here and publish to app 30.
 - **Streamlit console** for eval runs and traces — the one non-Next.js UI, which is the point.
 - **The model provider** for the Mac mini endpoint below, including its health check and fallback.
@@ -143,9 +147,9 @@ are fewer apps or more days, not a thinner definition of done.
 
 | Capability | Built once in | Reused by |
 | --- | --- | --- |
-| Retrieval + rerank + a RAG eval harness | **33-ai-service** | 17, 29 |
-| Eval runner (refusal, text-to-SQL, red-team fixtures) | **33-ai-service** | 19, 22, 25 |
-| HITL approval chain (a write blocked until a human signs) | **30-apps-template** (optional module) | 20, 32, 28 |
+| Retrieval + rerank + a RAG eval harness | **33-ai-service** | 29 |
+| Eval runner (refusal, text-to-SQL, red-team fixtures) | **33-ai-service** | 22, 25 |
+| HITL approval chain (a write blocked until a human signs) | **30-apps-template** (optional module) | 32, 28 |
 | Outbound webhooks (signed, replayable, with a job state machine) | **30-apps-template** (optional module) | 21, 23 |
 | Agent loop with tracing, reporting to app 30 | **30-apps-template** (optional module) | 26, 28, 31 |
 

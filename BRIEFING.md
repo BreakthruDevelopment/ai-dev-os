@@ -31,6 +31,7 @@ The agent setup that builds them (this repo) is itself a portfolio piece: an AI 
 | Domains | `appN.breakthruventures.ai` for app N. DNS is hosted at Cloudflare (free plan); each app's records are created automatically by Terraform on deploy when the app has a `domain` in `apps.yaml` (`30-apps-infra` README, "Custom domains and DNS"). Other records stay hand-managed. |
 | GitHub | Org `BreakthruDevelopment`. It also holds unrelated apps that must never be touched: only repos tagged `30-apps-30-days` are in scope. |
 | Budget | Nothing beyond the existing subscriptions (Claude, X/Grok, ChatGPT Plus, Google AI Pro) and cloud free tiers. No extra credits, no paid services. |
+| AWS demo track | **Apps 17-20 are an exception to the Stack, AI, Clouds and Budget rows** (Michael, 2026-11-19). Four Python repositories on Amazon Bedrock (Claude Sonnet 4.6, us-east-2) in a second AWS account, built for a Caylent interview on 2026-12-01: one shared agent container and three demos that cover the Claude Certified Architect exam's six scenarios. Build target 2026-11-24. Plan: [`specs/day-0-aws-demo-track.md`](specs/day-0-aws-demo-track.md). |
 | Order | App 1 is the **Build Tracker**, built first so it serves as mission control for the month. Full list in [`catalog.yaml`](catalog.yaml). |
 | Pace | 30-35 days total for the whole portfolio; the roadmap's W01-W16 are topic labels, not a schedule. Twenty-one apps remain against roughly 17-22 days, so it fits only if repeated work is built once and reused: retrieval/rerank/evals in app 33; HITL approvals, webhooks and agent tracing as optional template modules (new files only, so live apps are untouched). Parallelism is **across harnesses**, never many agents inside one Claude Code session (still on the dropped list): Claude Code runs foundations, reviews, merges, app 33 and template modules sequentially; Grok takes UI; Antigravity and Codex take non-security slices and docs. Claude Code is the constraint, so moving work out of it buys more than making it faster. If it still doesn't fit, the answer is fewer apps or more days, not a thinner definition of done. |
 | Roadmap coverage | Apps 16-33 are aimed so that together they prove every week of the **AI Engineer Roadmap** (W01-W16). Scored honestly in [`ROADMAP.md`](ROADMAP.md): **live** only when running in a deployed app, **built** when merged but not deployed, and the two are never conflated. Today: 0 live, 3 built, 10 partial, 3 gaps (a week is live only when every topic in it is; W02 is held back by OOP alone). Deploying app 31 flips all three **built** weeks to **live**, the largest single coverage gain available. |
@@ -51,7 +52,9 @@ Account notes: AWS stays on the **Free plan** (can't bill; closes after 6 months
 guardrails. The Google Cloud trial ended, so it's a paid account kept inside always-free limits, with budget alerts
 (a Cloud Run spend cap is recommended). Google Cloud is under `mparrott567@gmail.com`; the others use `dev@breakthruventures.ai`.
 The org uses immutable OIDC subject claims (`repo:BreakthruDevelopment@<id>/<repo>@<id>:…`); the bootstrap scripts
-trust both forms.
+trust both forms. That applies to the original account only: the second AWS account used by the apps 17-20 demo
+track has no identity provider available, so its CI uses an IAM user's key in repo secrets (see
+`specs/day-0-aws-demo-track.md`).
 
 **Dropped, don't bring back:** fine-tuning (no free tier covers it; we show prompting, decoding controls and evals
 instead, and say so), native mobile (Expo/React Native), app-store publishing, the Kylon platform,
@@ -175,6 +178,8 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
 - **Catalog:** app 32 (Purchase Orders and Vendor Management, Oracle) is `planned` (ai-dev-os #23). Apps 13–30 are
   `planned` too; 13, 14 and 15 have repos and merged work in progress.
 - **Agreed order:** BreakthruSoftwareFactory complete → app 31 → apps 13–30 → app 32 last (ai-dev-os #23).
+  **Superseded for apps 17-20 on 2026-11-19:** those four are the AWS demo track, built first, by 2026-11-24.
+  The build of apps 13-16 is paused for two weeks from 2026-11-19.
 - **Template:** hardening for apps 13+ is merged (`30-apps-template` #32, 2026-11-13), so new repos start from it.
 - **Branch protection:** `ai-dev-os` now requires `check` and `Reviewer sign-off`; apps 05–12 require
   `Lint, test, build, smoke` and `review / Reviewer sign-off`, and since 2026-11-14 so do `30-apps-template` and

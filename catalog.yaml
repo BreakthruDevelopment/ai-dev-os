@@ -1,5 +1,6 @@
 # The portfolio apps (33). Source of truth for repo names, subdomains and the cloud each app is live on.
-# live_cloud rotates by app number: AWS, Azure, Google Cloud, Oracle Cloud, repeating. An app may opt out with
+# live_cloud rotates by app number: AWS, Azure, Google Cloud, Oracle Cloud, repeating. Apps 17-20 are the AWS
+# demo track (specs/day-0-aws-demo-track.md): Python on Amazon Bedrock, all on AWS, repos created by hand. An app may opt out with
 # rotation_reason, a non-empty string saying why its cloud is fixed; CI still checks the cloud is a real one.
 # Deploys happen by adding the app to apps.yaml in 30-apps-infra; listing more clouds there runs it on those too.
 #
@@ -171,40 +172,43 @@ apps:
     notable: "Instructor vs learner roles; the one app that shows what the model is actually doing"
     status: planned
   - n: 17
-    repo: 17-job-board-ats
-    name: "Job Board and ATS"
+    repo: 17-agent-container
+    name: "The agent container"
     subdomain: app17.breakthruventures.ai
     live_cloud: aws
-    client_need: "Recruiting"
-    ai_feature: "Resume-to-job matching built as retrieval with a rerank stage and a labelled eval set; match quality is measured, not asserted (roadmap W06, W12)"
-    notable: "Bias guardrails with red-team fixtures and a published eval score; data retention rules"
+    client_need: "Reusable delivery IP: the agent core every demo in the track imports"
+    ai_feature: "The agent loop itself: a bounded loop that branches on the model's stop reason, a swappable model provider (Bedrock Claude Sonnet 4.6, or recorded replies so a demo costs nothing), tool contracts with structured retryable errors, interceptors, a permission gate and a run budget"
+    notable: "Patterns: Template Method (the loop), Strategy (model provider), Decorator (retry, cache, redact, meter), Builder (agents from a manifest), Observer (event bus), Proxy (permission gate), Chain of Responsibility (interceptors). CCA statements owned: 1.1, 1.5, 2.2. The gate, tool contract and builder are the mechanism app 18 owns 1.4, 2.1 and 2.3 on, and app 20 exercises 2.3 on"
     status: planned
   - n: 18
-    repo: 18-employee-onboarding
-    name: "Employee Onboarding"
+    repo: 18-procure-to-pay
+    name: "Procure-to-pay workflow"
     subdomain: app18.breakthruventures.ai
-    live_cloud: azure
-    client_need: "HR"
-    ai_feature: "Policy Q&A over the handbook, with long-term agent memory: it remembers where each new hire is across weeks (roadmap W11)"
-    notable: "SSO-ready (OIDC), approvals workflow, memory a user can read and delete"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (Michael, 2026-11-19): a Python demo on Amazon Bedrock in a second AWS account, built for a Caylent interview on 2026-12-01, not a rotation app. See specs/day-0-aws-demo-track.md."
+    client_need: "Finance back office: invoices matched and posted, with a person in the loop"
+    ai_feature: "Invoices extracted to schema-valid data with a validate-and-repair loop, matched through an MCP gateway to a simulated ERP, every posting staged until a person approves it, and a supplier disputes desk that escalates on explicit criteria"
+    notable: "Patterns: Adapter (ERP to tool contracts), Command (staged postings), State (the dispute case), Proxy, Chain of Responsibility (escalation), Template Method, Strategy. CCA scenarios 1 and 6"
     status: planned
   - n: 19
-    repo: 19-patient-intake
-    name: "Patient Intake"
+    repo: 19-enablement-kit
+    name: "Engineering enablement kit"
     subdomain: app19.breakthruventures.ai
-    live_cloud: gcp
-    client_need: "Clinics"
-    ai_feature: "Intake form to structured summary, with a refusal and redaction eval suite that runs in CI (roadmap W12)"
-    notable: "HIPAA-style controls: audit, encryption, consent; evals gate the deploy"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (Michael, 2026-11-19): a Python demo on Amazon Bedrock in a second AWS account, built for a Caylent interview on 2026-12-01, not a rotation app. See specs/day-0-aws-demo-track.md."
+    client_need: "AI-assisted development rollout for a client's engineering team"
+    ai_feature: "Claude Code configured for a team (CLAUDE.md hierarchy, path-scoped rules, skills, slash commands), a pull request reviewer running headless in CI with explicit criteria, and a scout that explores a legacy Java EE codebase and writes a migration brief"
+    notable: "Patterns: Chain of Responsibility (review passes), Factory (project scaffolds), Proxy (read-only sandbox). CCA scenarios 2, 4 and 5"
     status: planned
   - n: 20
-    repo: 20-task-manager
-    name: "Task Manager"
+    repo: 20-discovery-workbench
+    name: "Discovery workbench"
     subdomain: app20.breakthruventures.ai
-    live_cloud: oci
-    client_need: "Team productivity tools"
-    ai_feature: "Natural-language task entry and bulk edits on a LangGraph.js graph: routing, checkpointed state and human approval before anything destructive (roadmap W09)"
-    notable: "Multi-tenant workspaces, RBAC; the HITL and checkpoint reference"
+    live_cloud: aws
+    rotation_reason: "AWS demo track (Michael, 2026-11-19): a Python demo on Amazon Bedrock in a second AWS account, built for a Caylent interview on 2026-12-01, not a rotation app. See specs/day-0-aws-demo-track.md."
+    client_need: "Engagement discovery: turning an ambiguous client problem into scoped work"
+    ai_feature: "A coordinator delegates scoped questions to parallel subagents and assembles a maturity assessment, outcome map, ROI model and roadmap, with every claim traced to its source and coverage gaps named rather than hidden"
+    notable: "Patterns: Mediator (the coordinator), Composite (a team presents as one agent), Template Method (the readout). CCA scenario 3"
     status: planned
   - n: 21
     repo: 21-meeting-notes
@@ -320,7 +324,7 @@ apps:
     name: "AI Service (Python)"
     subdomain: app33.breakthruventures.ai
     live_cloud: oci
-    rotation_reason: "Python service needs a long-running host, not a request-scoped runtime: the Oracle Always Free A1 VM. Its repo is created by hand, not by create-app-repos.py, because that builds from the Next.js template and the required 'Lint, test, build, smoke' check has no Python equivalent yet."
+    rotation_reason: "Python service needs a long-running host, not a request-scoped runtime: the Oracle Always Free A1 VM. Its repo is created by hand, not by create-app-repos.py, because that builds from the Next.js template. It had no Python 'Lint, test, build, smoke' equivalent to copy either; app 17 slice 17.1 builds one, so once that merges this repo can reuse it instead of inventing its own."
     client_need: "AI platform engineering: the Python half of the stack"
     ai_feature: "The portfolio's embeddings, rerank and eval service: RAG evals, refusal evals and text-to-SQL evals run here and publish to app 30; it also fronts the open-weights model served on the Mac mini (roadmap W01, W02, W03, W13, W14)"
     notable: "FastAPI with full type hints, pytest and mypy in CI; SQLAlchemy on the same Postgres; a Streamlit console for eval runs and traces; the one non-Next.js app, which is the point; model endpoint is health-checked with a Gemini fallback so a sleeping Mac mini never breaks a demo"

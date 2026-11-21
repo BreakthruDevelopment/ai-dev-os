@@ -76,7 +76,7 @@ Proxy over the filesystem, not a convenience wrapper. Every read goes through it
 | Rule | Behaviour |
 | --- | --- |
 | Root allowlist | the roots are **resolved once, when the principal is constructed**, and a read's resolved path is compared against those resolved roots — resolved-to-resolved. Outside them is a `permission` error. Comparing a resolved path against a raw root would refuse everything on macOS, where `/tmp` resolves to `/private/tmp`, and the Mac is where `run-harness.sh` runs; a symlinked home does the same on Linux |
-| Deny list | `.git`, `.env*`, `*.pem`, `id_*`, `secrets` and the repo's own `.claude` refuse before the open. Each pattern is matched against **every path segment** of the resolved real path, relative to its root — not against the path as asked for, and not against the whole path as one string, which would make `id_*` match nothing. So a symlink inside an allowed root pointing at `<root>/.env` is refused like the file itself, and a denied directory name denies everything beneath it |
+| Deny list | `.git`, `.env*`, `*.pem`, `id_*`, `secrets` and the repo's own `.claude` refuse before the open, and every refusal is reported in the brief's `coverage.unread_reason`. Each pattern is matched against **every path segment** of the resolved real path, relative to its root — not against the path as asked for, and not against the whole path as one string, which would make `id_*` match nothing. So a symlink inside an allowed root pointing at `<root>/.env` is refused like the file itself, and a denied directory name denies everything beneath it |
 | Writes | refused entirely for `engineer` and `ci`; `lead` writes only through the scaffold Factory, only under the target root |
 | Caps | per-file byte cap, per-run total byte cap and a file-count cap; exceeding one is a `business` error naming the cap, never a truncated read that looks complete |
 | Errors | structured, mapped to an app-17 `error_category` (`transient`, `validation`, `permission`, `business`, `internal`) with `is_retryable`, exactly as app 18's gateway does |
@@ -134,30 +134,50 @@ Three tasks, all through app 17's `ModelProvider`; none calls Bedrock directly.
 
 - **Input:** a unified diff, capped at 200 KB and 400 changed files, plus the review criteria file. The diff is
   untrusted contributor content.
-- **Output schema:** `findings[]` of `{path, line, category, severity, claim, evidence_quote, criterion_id}`,
+- **Output schema:** `findings[]` of `{path, line, category, claim, evidence_quote, criterion_id}` — **no
+  `severity`**: code sets it from the criterion, as below,
   plus `passes_run[]` and the model's own `verdict` of `ready | blocking`, which is recorded and compared but
   never used — the verdict that counts is computed in code. Bounded: at most 40 findings, `category` and
   `severity` closed sets, `criterion_id` must match a criterion that exists.
-- **Passes** (Chain of Responsibility): correctness → security → the project's own written rules → tests and
-  coverage → a final consolidation pass that de-duplicates and ranks. Each pass sees the diff and the previous
-  passes' findings. Statement 4.6 — and multi-instance, because the correctness and security passes run as two
-  instances concurrently.
+- **Passes:** correctness → security → the project's own written rules → tests and coverage → a final
+  consolidation pass that de-duplicates and ranks. The correctness and security passes run as two concurrent
+  instances, so the order is a small DAG rather than a line: those two see only the diff, the later passes see the
+  diff plus everything recorded before them. Statement 4.6 is covered by this — multi-pass and multi-instance both.
+  **On the pattern:** `catalog.yaml` calls these review passes a Chain of Responsibility, and since no pass may
+  stop the chain or suppress a finding, this is honestly a pipeline with a fan-out, not the Gang of Four pattern.
+  The security property is worth more than the label, and `catalog.yaml` should be corrected rather than the
+  design bent to fit it. The kit's genuine Chain of Responsibility is elsewhere — the sandbox's ordered checks.
 - **No pass may suppress a finding.** Each pass's findings are recorded as it produces them. That **recorded set**
   — every pass's findings, after the quote and criterion checks below and before consolidation — is what the
   verdict is computed from. Consolidation produces a separate **presented set** that merges duplicates and ranks;
   it cannot remove anything from the recorded set. This is the one control that closes injection-to-silence:
   without it, "the verdict is computed in code" is hollow, because the set it computes over would itself be a
   model's output, and text in the diff that persuades a later pass to drop a real finding would reach `ready`.
-- **`severity` is immutable once recorded.** A pass that could re-grade another pass's finding to the lowest
-  severity would satisfy "no pass may suppress" to the letter while defeating it in substance, because the verdict
-  reads severity. Only the pass that raised a finding sets its severity.
-- **The verdict is this function, in code:** `blocking` if the recorded set contains any finding of severity
-  `major` or above, otherwise `ready`. Nothing else feeds it — not the count, not the model's own `verdict`, not
-  consolidation's output.
-- **Caps are per pass and overflow is an error, not a truncation.** Each pass may return at most 40 findings; a
-  pass that returns more is recorded as a failed pass, and a failed pass makes the verdict `blocking`. Truncating
-  instead would hand injection-to-silence a second door: forty nits would push a real finding past the cut and
-  the run would still report `ready`. The presented set is what gets trimmed for display, after the verdict.
+- **A model never sets `severity`. Each criterion declares its own**, in its `criteria/*.md` entry, and code
+  assigns a finding's severity by looking up its `criterion_id`; any `severity` a model returns is discarded.
+  This is what actually closes the hole, rather than moving it. Forbidding a later pass from re-grading a finding
+  still left the *raising* pass free to grade a real defect `minor` at birth — at which point the recorded set,
+  immutability and overflow-as-failure all work perfectly and the run still says `ready`. Severity is a property
+  of the rule that was broken, not a judgement about the instance, so the criterion is where it belongs. It also
+  makes immutability automatic: there is no model-supplied value left to protect.
+- **`severity` is one of `critical`, `major`, `minor`, in that order.** Declared here because nothing else in this
+  project defines the set, and the verdict depends on its ordering.
+- **The verdict is this function, in code:** `blocking` if the recorded set contains any finding whose criterion
+  declares `major` or `critical`, otherwise `ready`. Nothing a model returns feeds it — not the count, not its own
+  `verdict` field, not consolidation's output.
+- **Per-pass caps, and overflow is an error.** Each pass may return at most 40 findings. The output schema's bound
+  is 50, deliberately above the cap, so a 41st finding arrives as a schema-valid response that code then rejects
+  as overflow — were the schema bound also 40, the same event would be a parse failure and could not be told
+  apart. An overflowing pass is a **rejected pass**, which forces `blocking`; truncating instead would be another
+  door, forty nits pushing a real finding past the cut while the run reported `ready`. The presented set is
+  trimmed for display, after the verdict.
+- **A rejected pass and a failed pass are different things.** A pass is *rejected* when its output is adversarial
+  or malformed — overflow, a quote that is not in the diff, a `criterion_id` that does not exist — and that forces
+  `blocking`, because fail-closed is the only safe reading. A pass *fails* when the run could not complete it: a
+  transient provider error, or the budget running out, both of which `is_retryable` already distinguishes. A
+  failed pass does **not** post `blocking`; the run reports that it could not complete, 19.10's workflow step
+  errors, and no verdict is posted at all. Otherwise every Bedrock throttle would post a blocking review on a
+  clean diff, and the team would stop believing the reviewer inside a week.
 - **Explicit criteria:** `criteria/*.md`, one file per pass, written as numbered testable criteria. A finding whose
   `criterion_id` names no existing criterion is dropped **in code**, not by a pass. This is statement 4.1, and it
   is also the control that keeps the reviewer from inventing house style.
@@ -234,7 +254,8 @@ Statement 2.4 is **exercised** here (19.6) and owned by app 18.
 The track assigns exam **scenarios 2, 4 and 5** to this repo: `day-0-aws-demo-track.md` line 15 says so, and
 `catalog.yaml` repeats it. What no source this project holds records is **what those scenarios are** — their
 subjects — and therefore which of the three sub-systems answers which. The one scenario whose subject is written
-down anywhere here is scenario 1, named in app 18's spec as the supplier disputes desk. So this spec states the
+down anywhere here is scenario 1: `day-0-aws-demo-track.md` line 85, on `main`, names it as the supplier disputes
+desk. So this spec states the
 assignment, which is known, and does not guess the mapping, which is not. Resolving it is a README task, listed as
 an open item below.
 
@@ -242,7 +263,7 @@ an open item below.
 
 | Risk | Control |
 | --- | --- |
-| Prompt injection from contributor content in a diff | Diff framed as data in the system prompt; `evidence_quote` verified verbatim; verdict computed in code from surviving findings; an injection eval |
+| Prompt injection from contributor content in a diff | Diff framed as data in the system prompt; `evidence_quote` verified verbatim; severity set in code from the criterion, never by a model; verdict computed in code from the recorded set; no pass may suppress a finding; two injection evals — persuade-to-approve and persuade-to-stay-silent |
 | Prompt injection from a legacy source file | Same framing; quotes verified against the sandbox; a finding citing an unserved file is dropped |
 | The scout or reviewer reads outside its roots | Sandbox Proxy: symlinks resolved before the allowlist test, deny list, per-run caps; a test per rule |
 | Secrets reaching a model or a brief | Deny list refuses before the open; a test asserts no secret-shaped string in any fixture or brief |
@@ -300,7 +321,10 @@ issues to the project board.
 3. **19.3 `[fullstack-builder] The sample Java EE codebase`** · `grok`
    `sample/legacy-oms/`, its committed generator and manifest, and the four planted problems. Written for this
    repo: no third-party, decompiled or vendor source. A test asserts the generator reproduces the committed tree
-   byte for byte. Imports nothing from app 17 and adds nothing under `kit/core/`; the rule that the manifest is
+   byte for byte. The tree contains **no symlinks**: the sandbox's escape fixtures are 19.8's, built at test time
+   in a temporary copy, because byte-for-byte is the wrong comparison for a link, a checkout on a filesystem
+   without links would make the test platform-dependent, and a committed link to `/etc/passwd` is not something to
+   put in a public repo. Imports nothing from app 17 and adds nothing under `kit/core/`; the rule that the manifest is
    unreachable through the sandbox's roots is 19.8's test, since the sandbox does not exist yet here.
    Dependencies: 19.1.
 4. **19.4 `[fullstack-builder] The scaffold Factory and kit new`** · `grok`
@@ -329,9 +353,13 @@ issues to the project board.
 
 7. **19.7 `[ai-builder] The pull-request reviewer: review passes and written criteria`** · `claude` · **2nd: Codex**
    `kit/review/`: the five passes as a Chain of Responsibility, the two concurrent instances and the consolidation
-   pass, `criteria/*.md` as numbered testable criteria, the `pr-review` schema, verbatim-quote verification, the
-   verdict computed in code, `kit review`, the recorded fixture and the evals in the table above — including the
-   injection case. Statements 4.1, 4.6. Security-sensitive: it runs on untrusted contributor content and is the
+   pass, `criteria/*.md` as numbered testable criteria **each declaring its own severity**, and the `pr-review`
+   schema. The four controls that make this safe are this slice's work and are specified above in full, so read
+   that section before starting: **code assigns severity from the criterion and discards any the model returns**;
+   **no pass may suppress a finding** — the recorded set is every pass's output and the presented set is
+   consolidation's, which cannot remove from it; **the verdict is computed in code** from the recorded set, never
+   taken from a model; and **a rejected pass forces `blocking` while a merely failed pass posts no verdict**.
+   Then `kit review`, the recorded fixture and the evals in the table above — including both injection cases. Statements 4.1, 4.6. Security-sensitive: it runs on untrusted contributor content and is the
    task the `ci` principal executes. Owns `criteria/`. Dependencies: 19.2.
 ### Wave 3
 
@@ -339,7 +367,10 @@ issues to the project board.
    `kit/scout/`: the exploration strategy over the sandbox's built-in tools, the rolling summary, the per-step
    record of what it read and why, the `scout-brief` schema with mandatory `coverage`, quote verification, the
    recorded brief over `sample/legacy-oms/`, and the evals including the capped-budget and symlink cases, plus the
-   test that the sample's manifest is unreachable through the sandbox's roots. Statements 2.5, 5.4.
+   test that the sample's manifest is unreachable through the sandbox's roots. **It owns the symlink fixtures**,
+   created at test time in a temporary copy of the sample rather than committed, the same way 19.2 builds its own
+   escape fixtures. A deny-list or allowlist refusal during exploration is reported in `coverage.unread_reason`,
+   so a refused directory cannot leave a brief looking complete. Statements 2.5, 5.4.
    Security-sensitive: it reads untrusted source through the sandbox and must not leak a denied path.
    Dependencies: 19.2, 19.3.
 

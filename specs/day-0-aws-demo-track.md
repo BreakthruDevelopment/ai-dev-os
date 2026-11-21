@@ -144,15 +144,17 @@ of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesda
 
 1. ~~Create the four repos~~ **Done 2026-11-20.** All four exist, public, `main`, topic `30-apps-30-days`.
    `scripts/create-app-repos.py` generates a new repo from the Next.js template, which is wrong for a Python
-   repo, so these four were created by hand. **That skipped two things the script also does:** the harness
-   labels and the `protect-main` ruleset. The ruleset is the one that matters: without it the required checks
-   are required by nothing and a red PR is mergeable. The labels matter less than first recorded here — GitHub
-   auto-creates a label on first use, so `release-labels.py` can release 17.5 to Grok either way; pre-creating
-   them only means `grok` lands as `d93f0b` rather than grey. The four are therefore marked `create_repo: true`
-   from 2026-11-20: the script's existing-repo path skips creation (they exist and carry the topic) and
-   `ensure_extras` adds only what is missing, never removing or rewriting. Changing a ruleset still stays with
-   Michael; this is the script doing it the same way it did for apps 5-15. Apps 1-4 are not marked and never
-   were: Michael added their rulesets by hand on 2026-11-14 (`FACTORY.md`).
+   repo, so these four were created by hand. That skipped two things the script also does: the harness labels
+   and the `protect-main` ruleset. **Both were put right on 2026-11-20 at 12:51**, by marking the four
+   `create_repo: true` so the script's existing-repo path ran `ensure_extras` against them — it skips creation
+   (they exist and carry the topic) and adds only what is missing. All four now carry an active `protect-main`
+   with the same four rule types and both required checks as apps 5-15, and repo 17 carries the full harness
+   label set. Nothing here is outstanding.
+   Two notes kept because they were got wrong first time: a missing label would not have blocked anything,
+   since GitHub auto-creates one on first use, so pre-creating only fixes the colour; and the script's
+   precedent is apps 5-15 **and app 31**, not apps 1-4, whose rulesets Michael added by hand on 2026-11-14
+   (`FACTORY.md`). Changing a ruleset still stays with Michael; the script doing it on his merge is the
+   established route, not an exception.
 2. ~~Set up AWS access for CI~~ **Done 2026-11-20.** An IAM user with a least-privilege Bedrock policy
    (`bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream` on Anthropic models and inference profiles);
    its keys are repository secrets in all four repos. OIDC was the better option but the account's IAM console

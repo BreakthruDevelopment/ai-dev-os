@@ -14,7 +14,7 @@ Work rules:
   calls `assertCan()`. Roles, `src/lib/access.ts` and auth config are part of it. Generate a migration for every
   schema change (`pnpm db:generate --name <change>`).
 - **Any later slice:** build on the foundation's schema and access rules. Never create or edit
-  the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) unless a security-sensitive `claude` slice is named as the owner
+  the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts` on the Next.js template, or `p2p/core/`, `kit/core/`, `erp/` and `contracts/` on the Python track — `WAVE1_PATHS` in `scripts/issuelib.py` is the one list, and the spec's Issues section names the paths that apply to the repo you are in) unless a security-sensitive `claude` slice is named as the owner
   (that's then your issue). If the issue
   needs a change there, or the data layer it needs isn't on `main`, stop and comment on the issue with what's missing
   (under `scripts/run-harness.sh`, write it to `.harness/blocked.md` and make no commits; the runner posts it).

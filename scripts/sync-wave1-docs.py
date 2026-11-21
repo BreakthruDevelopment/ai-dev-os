@@ -22,8 +22,10 @@ additions are allowed and edits are not.
 
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -71,6 +73,10 @@ DOCS = ("AGENTS.md", "FACTORY.md", "templates/spec.md", "runbooks/harnesses-on-m
 
 def rendered() -> str:
     """The guarded set with each path's note, then what the guard cannot cover."""
+    if missing := [p for p in WAVE1_PATHS if p not in NOTES]:
+        # Named, not a KeyError traceback from inside the join: round 9 found the commit message
+        # claiming this said which path was missing when it did not.
+        raise SystemExit(f"no note in NOTES for: {', '.join(missing)} (scripts/sync-wave1-docs.py)")
     paths = "; ".join(f"`{p}` ({NOTES[p]})" for p in WAVE1_PATHS)
     return (
         f"The paths the pre-push guard enforces, and what each is: {paths}. One list, `WAVE1_PATHS` in "
@@ -122,7 +128,8 @@ def tracked_markdown() -> list[str]:
                                  for part in p.relative_to(ROOT).parts[:-1]))
 
 
-def stray_markers(sources: dict[str, str] | None = None) -> list[str]:
+def stray_markers(listed: list[str] | None = None,
+                  read: Callable[[str], str] | None = None) -> list[str]:
     """Markdown outside DOCS that carries a region nothing renders.
 
     `templates/spec.md` is in DOCS and carries a region, so every spec copied from it inherits one — and
@@ -130,14 +137,36 @@ def stray_markers(sources: dict[str, str] | None = None) -> list[str]:
     each new spec. Fail instead, and let whoever adds it decide: delete the region from that file, or add the
     file to DOCS.
     """
-    if sources is not None:
-        return sorted(rel for rel, text in sources.items() if is_stray(rel, text))
+    reader = read if read is not None else (lambda rel: (ROOT / rel).read_text())
     out = []
-    for rel in tracked_markdown():
-        f = ROOT / rel
-        if f.is_file() and is_stray(rel, f.read_text()):
+    # One loop, used in production and under test. Round 8 injected a {path: text} mapping with an
+    # early `return`, which meant `return []` placed just below that seam never ran the real loop and
+    # stayed green -- round 7's gap, one line further down. Injecting the reader instead leaves the
+    # loop body on the only path there is.
+    for rel in listed if listed is not None else tracked_markdown():
+        try:
+            text = reader(rel)
+        except (OSError, UnicodeDecodeError):
+            continue
+        if is_stray(rel, text):
             out.append(rel)
     return out
+
+
+def classify(texts: dict[str, str] | None = None) -> tuple[list[str], list[str]]:
+    """Which of DOCS carry no region, and which carry a stale one.
+
+    `main` made this comparison inline, where `self_test` could not reach it: round 9 showed
+    `stale.append(name)` -> `pass` passing every check while AGENTS.md kept a stale list.
+    """
+    missing, stale = [], []
+    for name in DOCS:
+        text = texts[name] if texts is not None else (ROOT / name).read_text()
+        if BEGIN not in text:
+            missing.append(name)
+        elif apply(text) != text:
+            stale.append(name)
+    return missing, stale
 
 
 def self_test() -> int:
@@ -158,14 +187,19 @@ def self_test() -> int:
         if required not in listed:
             failures.append(f"tracked_markdown() missed {required}")
     marked = f"a\n{BEGIN}\nb\n{END}"
-    if stray_markers(sources={DOCS[0]: marked}) != []:
+    if stray_markers(listed=[DOCS[0]], read=lambda _: marked) != []:
         failures.append("stray_markers() flagged a document DOCS renders")
-    # A positive case too: the negative one alone leaves `return []` in this loop passing, the same hole the
+    # A positive case too: the negative one alone leaves `return []` passing, the same hole the
     # predicate and the walk each had, one function further in.
-    if stray_markers(sources={"runs/01-x.md": marked}) != ["runs/01-x.md"]:
+    if stray_markers(listed=["runs/01-x.md"], read=lambda _: marked) != ["runs/01-x.md"]:
         failures.append("stray_markers() missed a marked file outside DOCS")
-    if stray_markers(sources={"runs/01-x.md": "nothing marked here"}) != []:
+    if stray_markers(listed=["runs/01-x.md"], read=lambda _: "nothing marked") != []:
         failures.append("stray_markers() flagged an unmarked file")
+    # An unreadable file is skipped, not fatal: the walk may list a path that has since gone.
+    def boom(_: str) -> str:
+        raise OSError("gone")
+    if stray_markers(listed=["runs/01-x.md"], read=boom) != []:
+        failures.append("stray_markers() did not skip an unreadable file")
     # Notes and paths must correspond exactly, in both directions.
     for path in WAVE1_PATHS:
         if path not in NOTES:
@@ -175,6 +209,66 @@ def self_test() -> int:
             failures.append(f"NOTES describes {path!r}, which is not in WAVE1_PATHS")
     if not regions(f"{BEGIN}\nx\n{END}"):
         failures.append("regions() found none in a document that has one")
+    # Two regions, so truncating to the first is not green. No document has two today; that is what
+    # makes it worth pinning rather than what makes it safe.
+    if len(regions(f"{BEGIN}\na\n{END}\nmid\n{BEGIN}\nb\n{END}")) != 2:
+        failures.append("regions() did not find both regions in a document that has two")
+    # rendered() itself -- the one function that writes all four documents, and the one round 9 found
+    # with no assertion at all. `WAVE1_PATHS[:8]` was green while the documents claimed eight paths.
+    text = rendered()
+    for path in WAVE1_PATHS:
+        if f"`{path}` ({NOTES[path]})" not in text:
+            failures.append(f"rendered() omits {path!r} or its note")
+    if UNGUARDED not in text:
+        failures.append("rendered() omits the set the guard cannot express")
+    # classify(), driven with text rather than the repo, so the comparison main() makes is exercised.
+    fresh = f"before\n{BEGIN}\n{text}\n{END}\nafter"
+    base = {name: fresh for name in DOCS}
+    if classify(texts=base) != ([], []):
+        failures.append("classify() flagged up-to-date documents")
+    if classify(texts={**base, DOCS[0]: f"a\n{BEGIN}\nstale\n{END}"}) != ([], [DOCS[0]]):
+        failures.append("classify() missed a stale region")
+    if classify(texts={**base, DOCS[1]: "no region at all"}) != ([DOCS[1]], []):
+        failures.append("classify() missed a document with no region")
+    # The two derivations templates/spec.md asserts. Hard-coding either was green until round 9, and
+    # open-issues.py carries a comment recording that this exact bug already happened once.
+    runner = (ROOT / "scripts" / "run-harness.sh").read_text()
+    if "$(wave1_list)" not in runner:
+        failures.append("run-harness.sh's builder prompt no longer interpolates wave1_list")
+    # By value, not by name: grepping for "WAVE1_PATHS" matched the import line while `_FOUNDATION`
+    # itself was hard-coded, which is how round 9's 4b stayed green through a round of fixes.
+    spec_mod = importlib.util.spec_from_file_location("_oi", ROOT / "scripts" / "open-issues.py")
+    if spec_mod and spec_mod.loader:
+        oi = importlib.util.module_from_spec(spec_mod)
+        try:
+            spec_mod.loader.exec_module(oi)
+        except Exception as err:  # noqa: BLE001 - a broken import is itself the failure
+            failures.append(f"could not import open-issues.py to check its foundation note: {err}")
+        else:
+            want = ", ".join(f"`{path}`" for path in WAVE1_PATHS)
+            if getattr(oi, "_FOUNDATION", None) != want:
+                failures.append("open-issues.py's _FOUNDATION is not derived from WAVE1_PATHS")
+            for name in ("WAVE1_NOTE", "LATER_NOTE"):
+                note = getattr(oi, name, "")
+                if any(path not in note for path in WAVE1_PATHS):
+                    failures.append(f"open-issues.py's {name} does not name every guarded path")
+    # The runner's own derivation, by value too.
+    try:
+        listed_out = subprocess.run(["bash", str(ROOT / "scripts" / "run-harness.sh"), "--wave1-list"],
+                                    capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as err:
+        failures.append(f"run-harness.sh --wave1-list did not run: {err}")
+    else:
+        if listed_out != ", ".join(WAVE1_PATHS):
+            failures.append(f"run-harness.sh --wave1-list disagrees with WAVE1_PATHS: {listed_out}")
+    # UNGUARDED cannot be derived, but it can be pinned: the path it names must be absent from the
+    # guard (that is the whole point of it) and present in the spec it credits.
+    if "agent_container/core/" in WAVE1_PATHS:
+        failures.append("agent_container/core/ is in WAVE1_PATHS; the guard cannot express add-not-edit")
+    spec = ROOT / "specs" / "17-agent-container.md"
+    if "agent_container/core/" not in UNGUARDED or (
+            spec.is_file() and "agent_container/core/" not in spec.read_text()):
+        failures.append("UNGUARDED no longer matches specs/17-agent-container.md")
     marked = f"a\n{BEGIN}\nstale\n{END}\nb"
     if apply(marked) == marked:
         failures.append("apply() left a stale region unchanged")
@@ -201,21 +295,13 @@ def main() -> int:
     if "--self-test" in sys.argv:
         return self_test()
     check = "--check" in sys.argv
-    stale, missing = [], []
-    for name in DOCS:
-        p = ROOT / name
-        text = p.read_text()
-        if BEGIN not in text:
-            missing.append(name)
-            continue
-        want = apply(text)
-        if want == text:
-            continue
-        if check:
-            stale.append(name)
-        else:
-            p.write_text(want)
+    missing, stale = classify()
+    if not check:
+        for name in stale:
+            p = ROOT / name
+            p.write_text(apply(p.read_text()))
             print(f"updated {name}")
+        stale = []
     if missing:
         print("no wave1 region in: " + ", ".join(missing), file=sys.stderr)
     if stray := stray_markers():

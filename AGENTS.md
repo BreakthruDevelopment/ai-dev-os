@@ -69,9 +69,12 @@ not have. The machinery still *parses* `antigravity` — it is in `issuelib.HARN
 (`jules` is different: it was never in `HARNESSES`, and two self-tests use it as the *invalid* value. Specs 01-08
 name it only as history.) Nothing is planned to Antigravity; it simply stops being chosen. **Issues already open are re-pointed, not
 left**: `release-labels.py` reads the planned harness from the issue body, not the spec, so an open issue still
-naming a retired harness gets labelled with it and then stalls, because nobody runs that runner. The five that
-existed on 2026-11-20 — `17-agent-container#7`, `14-real-estate#9` and `#11`, `15-event-ticketing#6` and `#12`
-— were patched to `grok` that day. A spec that still routes a slice to Antigravity is re-routed when it is
+naming a retired harness gets labelled with it and then stalls, because nobody runs that runner. The six that
+existed on 2026-11-20 — `17-agent-container#7`, `14-real-estate#3`, `#9` and `#11`, `15-event-ticketing#6` and
+`#12` — were patched to `grok` that day. The list came from sweeping the open issues of every repo carrying the
+`30-apps-30-days` topic, not from the specs: `14-real-estate#3` was missed by the first four passes because it
+already carried a `claude` label, which makes `decide()` short-circuit, so it could not have stalled — only its
+body line was stale. A spec that still routes a slice to Antigravity is re-routed when it is
 next touched, not retroactively.
 
 | Role (`roles/`) | Default harness | Can move to |

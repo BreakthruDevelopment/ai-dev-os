@@ -16,6 +16,13 @@ single path in passing), the runner
 interpolates `WAVE1_RE` into its prompt, and the issue note is derived in `open-issues.py`. This
 script is only for the documents people read without a Python interpreter.
 
+One gap is deliberate and worth knowing before you trust this. A single-segment guarded directory
+written WITHOUT its trailing slash -- "erp" or "contracts" rather than `erp/` -- is not detected in
+prose, because those are ordinary English words and matching them would fail the suite on any gloss
+that happened to use one. Multi-segment paths ("src/lib/db" for `src/lib/db/`) are detected. So the
+prose checks catch a guarded path written as a path, in any punctuation; they do not catch one
+written as a word.
+
 The deliberately-unguarded set is written by hand below, because no list can derive it: it is the
 paths a spec protects that the guard cannot express. Today that is app 17's `agent_container/core/`, where
 additions are allowed and edits are not.
@@ -104,12 +111,17 @@ def path_like(text: str) -> list[str]:
 # match, and deleting both left the whole self-test green. What they actually did was blind the
 # matcher to any path preceded by `/`, `.`, `@`, `-` or a word character, so `/src/lib/db/` and
 # anything inside a URL tokenised to nothing. Removed.
-PATH_IN_PROSE = re.compile(
-    r"(?:[\w.@-]+/)+[\w.@-]*"
-    r"|[\w.@-]*[\w@-]\.(?:ts|tsx|js|mjs|cjs|py|sh|md|ya?ml|json|sql|toml|tf)\b"
-)
 EXTENSIONS = (".ts", ".tsx", ".js", ".mjs", ".cjs", ".py", ".sh", ".md", ".yml", ".yaml",
               ".json", ".sql", ".toml", ".tf")
+# Derived from EXTENSIONS, not written out again. They are the same list used twice -- the regex
+# finds candidate tokens and `paths_in_prose` filters on the same extensions -- and two hand-written
+# copies coupled by nothing is the exact defect this whole script exists to prevent. Longest first,
+# so `.ts` cannot shadow `.tsx`.
+_EXT_ALT = "|".join(re.escape(e[1:]) for e in sorted(EXTENSIONS, key=len, reverse=True))
+PATH_IN_PROSE = re.compile(
+    r"(?:[\w.@-]+/)+[\w.@-]*"
+    rf"|[\w.@-]*[\w@-]\.(?:{_EXT_ALT})\b"
+)
 
 
 def paths_in_prose(text: str) -> list[str]:
@@ -132,7 +144,12 @@ def paths_in_prose(text: str) -> list[str]:
     out = []
     for token in PATH_IN_PROSE.findall(text):
         token = token.rstrip(".,;:-")
-        if token.endswith("/") or token.endswith(EXTENSIONS):
+        # The third test is not redundant. A guarded DIRECTORY written without its trailing slash --
+        # "src/lib/db" for `src/lib/db/` -- has neither a slash to end on nor an extension, so the
+        # first two dropped it, and check (a) greps the literal `src/lib/db/` and misses it too. A
+        # hand-written guarded list in the builder prompt, written without slashes, was invisible to
+        # both halves of that pin.
+        if token.endswith("/") or token.endswith(EXTENSIONS) or f"{token}/" in WAVE1_PATHS:
             out.append(token)
     return out
 
@@ -274,6 +291,19 @@ def self_test() -> int:
                 f"{path!r} is neither a directory ending in '/' nor a file with a known extension; "
                 "paths_in_prose would not see it (add its extension to EXTENSIONS)"
             )
+    # Every EXTENSIONS entry must be findable by the regex built from it. Deriving one from the other
+    # makes drift impossible rather than detectable, and this asserts the derivation still works.
+    for ext in EXTENSIONS:
+        if paths_in_prose(f"see file{ext} here") != [f"file{ext}"]:
+            failures.append(f"PATH_IN_PROSE does not find a bare {ext} file")
+    # A multi-segment guarded directory named without its trailing slash. Single-segment ones
+    # (`drizzle/`, `erp/`, `contracts/`) are deliberately NOT matched in that form: "contracts" is an
+    # ordinary English word, and flagging it in prose would reintroduce exactly the false-positive
+    # class the shape rule above exists to remove. The cost is stated in the module docstring.
+    for path in WAVE1_PATHS:
+        bare = path.rstrip("/")
+        if path.endswith("/") and "/" in bare and paths_in_prose(f"avoid {bare} entirely") != [bare]:
+            failures.append(f"paths_in_prose() misses {path!r} written without its trailing slash")
     # Ordinary prose must not read as a path, or a hand-written note fails the suite spuriously.
     for phrase in ("read/write", "and/or", "CI/CD", "N/A", "24/7"):
         if paths_in_prose(f"the {phrase} rules"):

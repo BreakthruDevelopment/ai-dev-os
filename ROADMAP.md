@@ -5,7 +5,7 @@ checklist. This file maps every week of it onto something in this portfolio, and
 one is.
 
 **W01–W16 are topic labels, not our schedule.** Theirs is a 16-week syllabus for one person learning in sequence.
-Ours is 30–35 days for the whole portfolio, because the work runs in parallel streams across five harnesses. We
+Ours is 30–35 days for the whole portfolio, because the work runs in parallel streams across four harnesses. We
 keep their numbering so a reader can match this file to the graphic they saw; we do not inherit their calendar.
 Pace is at the end.
 
@@ -172,7 +172,7 @@ session is on the "don't bring back" list, and roles inside Claude Code still ru
 | --- | --- | --- |
 | **A** | Claude Code (sequential within itself) | Wave-1 foundations ahead of the builders, every PR review, merges, app 33, template modules |
 | **B** | Grok Build / Grok Bot | Pages and components, once the app's data layer is on `main` |
-| **C** | Antigravity / Codex | Non-security slices, demo workspaces, READMEs; Codex's second review on security-sensitive PRs |
+| **C** | Codex | Non-security slices, demo workspaces, READMEs; Codex's second review on security-sensitive PRs |
 
 Stream A is the constraint. Anything that moves work out of it — a slice Grok can take, a review Codex can do —
 buys more than anything that makes Stream A faster.

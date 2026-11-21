@@ -57,8 +57,8 @@ Added 2026-11-14 after the app 13 incident below.
   roles, access rules and auth config, always `claude` and `security-sensitive`. The **foundation paths** are
   `src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/` (where role and permission code lives),
   `src/lib/access.ts`, `src/proxy.ts` and `src/middleware.ts`. No slice outside wave 1 creates or edits them
-  unless a security-sensitive `claude` slice is named as the owner (e.g. of a CSP in `src/proxy.ts`). Grok and
-  never touch them. If a later slice needs a schema change, the spec gives that change its own foundation
+  unless a security-sensitive `claude` slice is named as the owner (e.g. of a CSP in `src/proxy.ts`). Grok Build
+  and Codex never touch them. If a later slice needs a schema change, the spec gives that change its own foundation
   slice, or the builder stops and comments on the issue. Later waves list their
   dependencies as before, and every slice not planned for `claude` depends, directly or not, on wave 1.
 - **Planned harness vs start signal.** Every issue body has a `Planned harness: <name>` line (the owner) and a

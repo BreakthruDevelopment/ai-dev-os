@@ -64,9 +64,10 @@ after 2026-11-11 and shuts it down on 2026-12-31), and Antigravity, which was to
 
 **Three harnesses plan new work from 2026-11-20: Claude Code, Codex and Grok Build** (Michael's decision).
 Antigravity never came off trial, and a fourth harness to keep working is a cost the remaining schedule does
-not have. The machinery still *parses* `antigravity` and `jules` — `issuelib.HARNESSES`, `run-harness.sh` and
-the specs for apps 1-16 all name them, and rewriting that history would falsify the record — so nothing
-breaks; it simply stops being planned. A spec that still routes a slice to Antigravity is re-routed when it is
+not have. The machinery still *parses* `antigravity` — it is in `issuelib.HARNESSES` and in `run-harness.sh`, specs 09-12,
+14 and 15 route slices to it, and three self-tests use it as a fixture, so removing the name would break them.
+(`jules` is different: it was never in `HARNESSES`, and two self-tests use it as the *invalid* value. Specs 01-08
+name it only as history.) Nothing is planned to Antigravity; it simply stops being chosen. A spec that still routes a slice to Antigravity is re-routed when it is
 next touched, not retroactively.
 
 | Role (`roles/`) | Default harness | Can move to |
@@ -145,6 +146,6 @@ and Grok Bot's launch drafts (Michael posts).
 
 ## 5. Usage limits
 
-All four subscriptions (Claude, ChatGPT Plus, X, Google AI Pro) have rolling limits; Codex's are the tightest, so
+All three subscriptions (Claude, ChatGPT Plus, X) have rolling limits; Codex's are the tightest, so
 it gets only selected issues. Within Claude Code, roles run one after another, not in parallel.
 Spread work by moving issues between harnesses, not by buying credits.

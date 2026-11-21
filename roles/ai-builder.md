@@ -22,7 +22,7 @@ Requirements:
   table or column that isn't on `main`, stop and comment on the issue (under `scripts/run-harness.sh`, write it to
   `.harness/blocked.md` and make no commits); never invent schema or auth. If your issue does own a migration, rebase
   on `main` and regenerate it if another merged first; never two `drizzle/NNNN_*` files with the same number.
-- Work on a `<harness>/<task>` branch (for example `claude/items-api` or `antigravity/items-api`) and open a PR.
+- Work on a `<harness>/<task>` branch (for example `claude/items-api` or `grok/items-api`) and open a PR.
 
 ## Sandbox rules (every role that can run commands)
 

@@ -67,7 +67,11 @@ Antigravity never came off trial, and a fourth harness to keep working is a cost
 not have. The machinery still *parses* `antigravity` — it is in `issuelib.HARNESSES` and in `run-harness.sh`, specs 09-12,
 14 and 15 route slices to it, and three self-tests use it as a fixture, so removing the name would break them.
 (`jules` is different: it was never in `HARNESSES`, and two self-tests use it as the *invalid* value. Specs 01-08
-name it only as history.) Nothing is planned to Antigravity; it simply stops being chosen. A spec that still routes a slice to Antigravity is re-routed when it is
+name it only as history.) Nothing is planned to Antigravity; it simply stops being chosen. **Issues already open are re-pointed, not
+left**: `release-labels.py` reads the planned harness from the issue body, not the spec, so an open issue still
+naming a retired harness gets labelled with it and then stalls, because nobody runs that runner. The five that
+existed on 2026-11-20 — `17-agent-container#7`, `14-real-estate#9` and `#11`, `15-event-ticketing#6` and `#12`
+— were patched to `grok` that day. A spec that still routes a slice to Antigravity is re-routed when it is
 next touched, not retroactively.
 
 | Role (`roles/`) | Default harness | Can move to |

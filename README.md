@@ -1,6 +1,6 @@
 # AI Dev OS
 
-The operating system behind **30 apps in 30 days**, run as the **BreakthruSoftwareFactory**: a team of AI agents running in four harnesses from four vendors that plans, builds,
+The operating system behind **30 apps in 30 days**, run as the **BreakthruSoftwareFactory**: a team of AI agents running in four harnesses from three vendors that plans, builds,
 reviews and deploys one production-shaped web app a day to AWS, Azure, Google Cloud or Oracle Cloud, with a human
 approving every release.
 

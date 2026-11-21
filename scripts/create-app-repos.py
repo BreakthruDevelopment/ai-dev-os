@@ -39,7 +39,9 @@ LABELS = {  # harness labels the playbook uses (AGENTS.md section 3)
     "claude": ("6f42c1", "Work for Claude Code"),
     "grok": ("d93f0b", "Work for Grok Build"),
     "codex": ("0e8a16", "Work for Codex"),
-    "antigravity": ("1d76db", "Work for Google Antigravity (replaced Jules)"),
+    # Antigravity retired 2026-11-20. The label stays so repos created before then keep theirs and
+    # any issue still carrying it is readable; nothing is planned to it (AGENTS.md section 2).
+    "antigravity": ("1d76db", "Retired 2026-11-20; kept so existing issues stay readable"),
     # Not a harness: marks PRs that need Codex's second review (FACTORY.md, gate 3; read by review-gate.yml)
     "security-sensitive": ("b60205", "Needs a Codex second review"),
 }

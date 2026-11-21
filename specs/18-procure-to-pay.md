@@ -107,7 +107,7 @@ pydantic field, which must agree with it.
 | Outcome | When | Carries |
 | --- | --- | --- |
 | `ok` | ingested and matched, whether or not a posting was staged | — |
-| `failed` | anything the run tried and could not do — an unreadable document, an extraction still invalid after its two repair attempts (`needs_human`), or **a document with no matching seeded `invoice` row**, which `p2p ingest` refuses rather than inserting one, since creating invoices would make `invoice` a table a later slice writes rows to and the seed owns the twelve the batch uses | `validation` for all three — an extraction that will not validate is repeated validation failure, **not** `business`: app 17's spec adds `internal` precisely because miscategorising something that is not "a rule said no" would have this app explain a policy that does not exist. `transient` only for a document the budget cut mid-extraction |
+| `failed` | anything the run tried and could not do — an unreadable document, an extraction still invalid after its one repair (`needs_human` -- two attempts in all), or **a document with no matching seeded `invoice` row**, which `p2p ingest` refuses rather than inserting one, since creating invoices would make `invoice` a table a later slice writes rows to and the seed owns the twelve the batch uses | `validation` for all three — an extraction that will not validate is repeated validation failure, **not** `business`: app 17's spec adds `internal` precisely because miscategorising something that is not "a rule said no" would have this app explain a policy that does not exist. `transient` only for a document the budget cut mid-extraction |
 | `skipped` | the run never attempted it | `skip_reason`: `already_advanced`, or `not_reached` — which covers **both** reasons a found document goes unattempted, the budget stopping the run and the 25-document cap, since a folder may hold more than the cap |
 
 `not_reached` is why a per-item outcome had to stay open to a third value: a document found and never attempted is
@@ -120,10 +120,18 @@ is what keeps a folder of 30 processable: the first run attempts 25 and reports 
 remaining five. Were the cap applied to documents found, a deterministic scan order would make documents 26 to 30
 unreachable by any number of reruns.
 
-**`p2p demo` and `scripts/smoke.sh` work on their own database file**, deleted if a previous run left one behind,
-then built from `erp/schema.sql` plus the seed and thrown away at the end. Deleting first is the part that
-matters: a crashed run would otherwise leave a file that the next run opens as an existing database and leaves
-alone, which is the round-6 symptom returning by the back door. Back-to-back smoke — which the track requires — therefore gives
+**`p2p demo` and `scripts/smoke.sh` work on their own database file**, at a **fixed path derived in code and not
+from configuration** -- `<temp dir>/p2p-demo.sqlite` -- deleted if a previous run left one behind, then built
+from `erp/schema.sql` plus the seed and thrown away at the end. Deleting first is what makes a second run
+identical: a crashed run would otherwise leave a file the next run opens as an existing database and leaves
+alone, the round-6 symptom by the back door.
+
+**The delete refuses any other path.** It is the one destructive operation in this app, and the database path is
+otherwise a parameter of `erp.py`, so a demo that honoured configuration could be aimed at a person's real
+database and would delete it. The demo therefore computes its own path, ignores the configured one, and asserts
+the path it is about to remove is that computed path before removing it; a test asserts the delete refuses a
+configured path. This is 18.8's work and 18.8 is `grok`, which is why the rule is written here rather than left
+to the builder. Back-to-back smoke — which the track requires — therefore gives
 identical output, where sharing one file would make every batch item `already advanced` on the second pass. They
 get their own file rather than rebuilding the shared one because `p2p demo` may be run by anyone: rebuilding in
 place would discard a staged change an approver was about to apply and truncate the append-only `extraction` and
@@ -175,7 +183,7 @@ and the row key for a person to type.
 | --- | --- | --- | --- |
 | `p2p ingest <file>` | CLI | clerk | extract one invoice, validate, repair, record `extraction` |
 | `p2p match <invoice>` | CLI | clerk | the fixed four-step workflow; stages a posting or stops with a stated reason |
-| `p2p staged` | CLI | approver, clerk, disputes | lists the staged changes the acting principal may decide — its own for a clerk or disputes agent, everything in the company code for an approver — with each `change_key`, what it would do and who staged it. Without it a key exists only in the output of the run that staged it, and separation of duties means the approver is never the principal who ran that command |
+| `p2p staged` | CLI | approver, clerk, disputes | lists the staged changes the acting principal may **see**, which is not the same as what it may decide: a clerk or disputes agent sees the ones **it staged**, to follow what it has handed on; an approver sees every undecided change in its company code, minus any it staged itself, which is the separation-of-duties rule applied to a list. Each row carries the `change_key`, what the change would do and who staged it. Without this command a key exists only in the output of the run that staged it, and the approver is never the principal who ran that run |
 | `p2p review <change>` | CLI | approver | shows the staged change and what to check; a posting also shows its confidence band, which the other two kinds do not have |
 | `p2p approve <change> --yes` / `--reject <reason>` | CLI | approver | applies or rejects **any** staged change — a posting, a credit memo or a payment hold; refuses self-approval |
 | `p2p batch <dir>` | CLI | clerk | ingest + match every file, isolate failures, print one summary |
@@ -205,7 +213,9 @@ any value is used, and every id in a model answer is re-checked against the ERP 
   `tool_choice` forcing it; a free-text answer is treated as a failed attempt, not parsed with a regex.
 - **Validate and repair (4.4).** A draft that fails pydantic validation, or whose totals do not reconcile with its
   lines, is sent back once with the specific failures named and nothing else changed; two failures end the attempt
-  with `needs_human`. Attempts are capped at 3 and recorded in `extraction`.
+  with `needs_human`. **That is one initial attempt plus one repair: at most two attempts**, and the cap is 2.
+  A cap of 3 would permit a second repair the rest of this rule forbids, and each reading was self-consistent,
+  which is how both survived several rounds. Attempts are recorded in `extraction`.
 - **Few-shot (4.2).** Three committed examples — a clean invoice, one with a missing PO reference, one with a
   credit line — chosen to cover the field shapes the model gets wrong without them. They are files, not inline
   strings, so the README can cite them by line.
@@ -230,7 +240,7 @@ any value is used, and every id in a model answer is re-checked against the ERP 
 | Input | A good answer must… |
 | --- | --- |
 | A clean invoice matching its PO and receipt | return `verdict: match`, confidence ≥0.9, and stage a posting nobody has applied yet |
-| `p2p batch` over the same folder twice, on a persistent database | every item `skipped` with `skip_reason: already_advanced` on the second run; no invoice state written; `ok + failed + skipped == items` both times |
+| `p2p batch` over the **twelve-document** folder twice, on a persistent database | every item `skipped` with `skip_reason: already_advanced` on the second run, `stopped_early` unset; no invoice state written; `ok + failed + skipped == items` both times. Twelve on purpose: over a thirty-document folder the second run attempts the five the cap left, so an all-advanced assertion is false there |
 | An invoice 12 units over the goods receipt | return `variance` with kind `quantity`, expected and actual, and `needs_human` |
 | An invoice whose lines do not sum to its stated total | fail validation, be repaired once with the mismatch named, and record `repaired: true` |
 | An invoice with no PO reference | not stage anything, and escalate citing the "no PO" criterion |
@@ -271,7 +281,7 @@ exercised here (the day-0 table lists 17 first for both).
 | A payment or credit nobody approved | Every write is a `StagedChange` through `PermissionGate`; `staged_write` is the default; app 17 fails construction if a write tool has no gate; applying needs a second principal |
 | A clerk approving their own work | Separation of duties in `assert_can`, tested |
 | Double-applying a staged change on a retry | Unique-index guard on apply, not a caller check; a second apply is a no-op with a stated reason |
-| Abuse or runaway cost on the model path | `Budget` per run, replay is the default provider, `--live` is explicit, input caps per task, attempts capped at 3 |
+| Abuse or runaway cost on the model path | `Budget` per run, replay is the default provider, `--live` is explicit, input caps per task, at most two extraction attempts |
 | Secrets or supplier data in recorded replies or logs | Fixtures are synthetic and reviewed before commit; recording goes through app 17's `Redacting`; the JSON-lines logger never carries document text |
 | AWS credentials in the repo | None committed; CI uses the IAM user key already in repo secrets, scoped to Bedrock invoke (track plan, shared rules) |
 
@@ -309,7 +319,10 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    written after this slice, derived from the data model and the slice list: `extraction` (18.4), `invoice.state`
    (18.4, 18.5 and 18.6 — see the transition table), `posting` (18.5), `dispute_case` and `case_event` and
    `credit_memo` and `payment_hold` (18.6), and `batch_run` (18.7). Each accessor takes the acting principal and
-   calls `assert_can`. The `invoice.state` accessor takes the target state and accepts only a row of the transition
+   calls `assert_can`. **A ninth accessor is a read, not a write**: `list_staged(principal)` returns the undecided
+   rows of all three staged-change tables that this principal may see, which is what `p2p staged` renders. It is
+   named here because the eight above are writes, and a builder reading only that enumeration would not build it.
+   The `invoice.state` accessor takes the target state and accepts only a row of the transition
    table, so no later slice can invent a lifecycle; a repeated apply is the table's stated no-op, and a re-ingest
    of an already-advanced invoice does not reach the accessor at all.
    **It also owns `apply_change(principal, change_key, decision)`**, taking a prefixed `pst_…` / `crd_…` / `hld_…`
@@ -337,7 +350,7 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
 4. **18.4 `[ai-builder] Invoice extraction: few-shot, forced schema, validate and repair`** · `claude`
    `p2p/extract/`: the `invoice-extract` task, the `InvoiceDraft` pydantic schema sent as a forced tool, the three
    committed few-shot examples as files, the repair loop (one retry with the specific validation failures named,
-   attempts capped at 3, `needs_human` after two failures), per-field confidence, the `extraction` audit row, and
+   at most two attempts, `needs_human` after two failures), per-field confidence, the `extraction` audit row, and
    the recorded fixtures including one repaired draft. Reads nothing it does not own and stages nothing.
    Statements 4.2, 4.3, 4.4. Dependencies: 18.2.
 
@@ -347,7 +360,10 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    `p2p/match/`: the fixed four-step workflow (extract → PO → goods receipt → decide) as code, the `MatchOutcome`
    schema, the confidence bands (≥0.9, 0.6–0.9, <0.6) computed in code from per-field confidences and the variance
    set, the forcing rules (no PO, variance over 5%, flagged supplier, duplicate number), and the
-   `p2p match` / `p2p review` / `p2p approve` commands. `p2p review` and `p2p approve` are generic over staged
+   `p2p match` / `p2p staged` / `p2p review` / `p2p approve` commands. `p2p staged` is the only way an approver
+   reaches a change it did not stage, so it is this slice's work and not a later one's; its visibility rule gets
+   its own integration test, since the rule lives in the command rather than in 18.2's enumerated access rules.
+   `p2p review` and `p2p approve` are generic over staged
    changes — a posting, a credit memo or a payment hold — and call 18.2's `apply_change`; this slice adds no second
    apply path. Applying is a separate principal's act and refuses self-approval; a second apply is a no-op with a
    stated reason. Every id in a model answer is re-checked against

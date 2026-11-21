@@ -81,4 +81,4 @@ issues to the project board.
 
 6. **NN.6 `[devops] Deploy app NN`** · `claude` · repo **`30-apps-infra`** — `apps.yaml` entry for the live cloud.
    Dependencies: NN.2, NN.3, NN.4, NN.5.
-7. **NN.7 `[docs-writer] README`** · `antigravity` — Dependencies: NN.6.
+7. **NN.7 `[docs-writer] README`** · `grok` — Dependencies: NN.6.

@@ -1,6 +1,6 @@
 # AI Dev OS
 
-The operating system behind **30 apps in 30 days**, run as the **BreakthruSoftwareFactory**: a team of AI agents running in five harnesses from four vendors that plans, builds,
+The operating system behind **30 apps in 30 days**, run as the **BreakthruSoftwareFactory**: a team of AI agents running in four harnesses from three vendors that plans, builds,
 reviews and deploys one production-shaped web app a day to AWS, Azure, Google Cloud or Oracle Cloud, with a human
 approving every release.
 
@@ -17,7 +17,7 @@ catalog.yaml ──► Planner (Claude) ──► spec + GitHub issues
                                          │
               ┌──────────────────────────┼──────────────────────────┐
               ▼                          ▼                          ▼
-  Full-stack (Grok Build, Codex, Antigravity)   AI builder (Claude)   UI builder (Grok Build)
+  Full-stack (Grok Build, Codex)   AI builder (Claude)   UI builder (Grok Build)
               └──────────────► pull requests ◄──────────────────────┘
                                          │
    Reviewer (Claude, required check) + Codex on security PRs · CI: lint, types, tests, build, smoke
@@ -34,12 +34,12 @@ catalog.yaml ──► Planner (Claude) ──► spec + GitHub issues
 ```
 
 GitHub is the only shared state. Harnesses never call each other: one Project board is the queue, each issue
-names a role and a planned harness, and gets its harness label once its dependencies are done (Grok Build and Antigravity
+names a role and a planned harness, and gets its harness label once its dependencies are done (Grok Build
 pick theirs up via `scripts/run-harness.sh` on Michael's Mac), and every change arrives as a PR. Any harness may
 squash-merge an app-repo PR once CI and the required review are green; Claude Code also
 merges green deploy and playbook PRs; spec PRs stay with Michael ([`AGENTS.md`](AGENTS.md)).
 
-**Model, harness, agent.** A model does the thinking; a harness (Claude Code, Codex, Grok Build, Antigravity, Grok Bot)
+**Model, harness, agent.** A model does the thinking; a harness (Claude Code, Codex, Grok Build, Grok Bot)
 wraps it so it can act; an agent is a role running inside a harness. Roles live in `roles/` once and run in
 whichever harness has capacity.
 
@@ -54,7 +54,7 @@ whichever harness has capacity.
 | `.claude/agents/` | Claude Code subagents generated from `roles/` (`scripts/sync-claude-agents.py`) |
 | `catalog.yaml` | The 30 apps: repo name, subdomain, cloud, AI feature |
 | `templates/` | Spec, README and run-log templates |
-| `runbooks/` | Day 0 setup, running Grok Build and Antigravity on the Mac, the daily flow (DNS is created by the deploy at Cloudflare; the old Network Solutions runbook is kept, superseded) |
+| `runbooks/` | Day 0 setup, running Grok Build on the Mac, the daily flow (DNS is created by the deploy at Cloudflare; the old Network Solutions runbook is kept, superseded) |
 | `specs/`, `runs/` | One spec and one run log per app; `runs/retro-01-12.md` is the apps 1–12 retrospective |
 
 The app template lives in [`30-apps-template`](https://github.com/BreakthruDevelopment/30-apps-template).

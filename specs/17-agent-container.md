@@ -208,5 +208,5 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
    OIDC in this slice**: the account's IAM console offers no Identity providers page, so the deploy uses the
    existing IAM user key already in repo secrets, and this slice adds only the smallest policy the deploy needs.
    Record what that policy grants on the PR. Dependencies: 17.6.
-8. **17.8 `[docs-writer] README`** · `antigravity`
+8. **17.8 `[docs-writer] README`** · `grok`
    Includes the pattern map and the exam map, each with file and line. Dependencies: 17.7.

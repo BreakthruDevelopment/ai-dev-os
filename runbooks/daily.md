@@ -8,19 +8,19 @@ review (through the day), gate 4 release (afternoon), gate 5 close-out (evening)
 | Start | Mark the app `create_repo: true` in `catalog.yaml`; the workflow creates and tags the repo (see below) | Claude Code |
 | Morning | Spec with slices in waves (wave 1 = foundation); once merged, `scripts/open-issues.py` opens the issues (only dependency-free ones labelled) and they go on the board | Claude Code (planner) |
 | Through the day | After every merge into an app repo or `30-apps-infra`, `python3 scripts/release-labels.py --repo <repo>` adds the start-signal label to issues whose dependencies are now closed | Claude Code |
-| Through the day | Run `scripts/run-harness.sh grok` (and `antigravity`) on the Mac; see `runbooks/harnesses-on-mac.md` | Michael |
-| Midday | Data/API PRs | Grok Build; Codex or Antigravity on the issues assigned to them |
+| Through the day | Run `scripts/run-harness.sh grok` on the Mac; see `runbooks/harnesses-on-mac.md` | Michael |
+| Midday | Data/API PRs | Grok Build; Codex on the issues assigned to it |
 | Midday | AI feature PR; template changes | Claude Code |
 | Midday | UI pages PR | Grok Build |
 | Afternoon | Review every PR as a marked PR review (`Reviewer: claude-code` / `Verdict: ready`); `Reviewer sign-off` and CI green before merge | Claude Code (reviewer); Codex second review on `security-sensitive` PRs |
 | Afternoon | Squash-merge app-repo PRs once CI and `Reviewer sign-off` are green on the current head (`AGENTS.md`) | Any harness |
 | Afternoon | Add the app to `apps.yaml` for the day's cloud (PR Claude Code merges once green), smoke test after deploy | Claude Code (devops) |
-| Evening | README and demo script | Grok Build (or Antigravity) |
+| Evening | README and demo script | Grok Build |
 | Evening | Launch post drafts (X, LinkedIn) and a two-minute demo script from the README and live URL | Grok Bot, from what Michael pastes in |
 | When Grok Build is out of usage | Paste a `grok`-labelled UI or fullstack issue into Grok Bot; it opens a PR from a `grok/<task>` branch that goes through the same gates (don't also run the runner on that issue) | Michael, Grok Bot |
 | Evening | Post the app (DNS records are created in Cloudflare by the deploy) | Michael |
 | Evening | Close-out: run log in `runs/NN-slug.md`, `catalog.yaml` status, `BRIEFING.md` "Where things stand"; `done` only when the definition of done holds | Claude Code (devops) |
-| Overnight | Queued issues → PRs | Codex and scheduled Claude Code tasks; Grok Build and Antigravity if the runner is left going |
+| Overnight | Queued issues → PRs | Codex and scheduled Claude Code tasks; Grok Build if the runner is left going |
 | 5:37 AM Central | CI status, stalled work, app health, free-tier usage → `Ops report (nightly)` issue in `ai-dev-os` | Scheduled Claude Code task (ops monitor) |
 
 ## Creating the day's repo
@@ -30,7 +30,7 @@ Repos are created by the **Create app repos** workflow (`scripts/create-app-repo
 1. Open a PR in this repo that sets `create_repo: true` on the app in `catalog.yaml`. The PR's check prints what it
    would create; nothing happens yet.
 2. Merge it. On `main`, the workflow creates `BreakthruDevelopment/<repo>` from `30-apps-template` (public), adds the
-   topic `30-apps-30-days`, the harness labels (`claude`, `codex`, `grok`, `antigravity`), the `security-sensitive` label and a `protect-main` ruleset
+   topic `30-apps-30-days`, the harness labels (`claude`, `codex`, `grok`), the `security-sensitive` label and a `protect-main` ruleset
    (pull request required, `Lint, test, build, smoke` from GitHub Actions must pass, no force pushes or deletion).
    At most 4 new repos per run; rerun the workflow for more.
 3. Leave `create_repo: true` in place: reruns only fill in what's missing. A repo that exists **without** the topic is

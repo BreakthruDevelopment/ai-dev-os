@@ -50,7 +50,7 @@ The **gateway** (`p2p-erp`, an MCP server over stdio, statement 2.4) is the only
 | MCP tool | Effect | Roles | Notes |
 | --- | --- | --- | --- |
 | `find_supplier`, `get_purchase_order`, `get_goods_receipt`, `get_invoice`, `list_open_invoices`, `get_payment_status` | `read` | all | company-code scoped; results capped and paged |
-| `post_invoice`, `issue_credit_memo`, `hold_payment` | `write` | `clerk` (post), `disputes` (credit, hold) | return a `StagedChange`, never act |
+| `post_invoice`, `issue_credit_memo`, `hold_payment` | `write` | `clerk` (post), `disputes` (credit, hold) | never act: each returns a `StagedChange` **and the `change_key` of the row it recorded** (`pst_…` / `crd_…` / `hld_…`), because the key is the only thing an approver can act on and `StagedChange` has no id |
 
 Every tool is also an app-17 `Tool` through one Adapter, so the loop and the gateway share one implementation and
 one `effect`. Errors are structured, not prose: each maps to an app-17 `error_category`
@@ -77,7 +77,7 @@ named below scopes a row to a person.
 | `payment_hold` | id (`hld_…`), invoice_id, case_id (nullable), reason, staged_by, decided_by, decision, applied_at | company_code, staged_by | staged write; a hold outside a dispute leaves `case_id` null; applying it is the only path to `held` |
 | `dispute_case` | id, supplier_id, state, opened_by, assigned_to, escalated_reason | company_code, assigned_to | `state`: open → investigating → credit_proposed → escalated → resolved |
 | `case_event` | case_id, seq, actor, kind, payload_json | via `dispute_case` | append-only; the case transcript (5.1) |
-| `batch_run` | id, started_by, items, ok, failed, skipped, summary_json | started_by | 4.5; `skipped` counts `already advanced` items, which are neither ok nor failed |
+| `batch_run` | id, started_by, items, ok, failed, skipped, summary_json | started_by | 4.5; `items` is documents **found** in the folder and `items = ok + failed + skipped` always, which is what makes a `stopped_early` run add up |
 
 **The `invoice.state` transitions**, stated as a set rather than a chain because two of them are not sequential.
 18.2's accessor accepts exactly these and rejects anything else, so no later slice can invent a lifecycle:
@@ -98,16 +98,29 @@ would mean `posted → extracted`, which this table rejects, so the accessor is 
 is still recorded, because the audit trail is append-only.
 
 `already advanced` is **neither a success nor a failure**: it carries no `error_category` — none of the five fits,
-and inventing a sixth is forbidden — and it is counted in `batch_run.skipped` and `BatchSummary`'s `skipped`
-total, not in `ok` or `failed`. Both counters are 18.2's, declared here so 18.7 adds no column.
+and inventing a sixth is forbidden — and it counts as `skipped`, not `ok` or `failed`. The `batch_run.skipped`
+column is 18.2's, declared with the rest of the schema so 18.7 adds none; `BatchSummary.skipped` is 18.7's
+pydantic field, which must agree with it.
 
-`p2p ingest` on a document with no matching seeded `invoice` row **refuses** with a stated reason rather than
-inserting one. Creating invoices would make `invoice` a table a later slice writes rows to, not just a state on,
-and the seed owns the twelve the batch uses.
+**Every document gets exactly one of three outcomes**, so the totals always sum to `items`:
 
-**`p2p demo` and `scripts/smoke.sh` rebuild the ERP from `erp/schema.sql` plus the seed before they run**, so a
-second run is identical to the first. Without that, smoke back-to-back — which the track requires — would make
-every batch item `already advanced` on the second pass and assert against different output.
+| Outcome | When | Carries |
+| --- | --- | --- |
+| `ok` | ingested and matched | — |
+| `failed` | anything the run tried and could not do, **including a document with no matching seeded `invoice` row** — `p2p ingest` refuses rather than inserting one, since creating invoices would make `invoice` a table a later slice writes rows to and the seed owns the twelve the batch uses | `error_category`, here `validation` |
+| `skipped` | the run did not act on it | `skip_reason`: `already_advanced`, or `not_reached` when the budget stopped the run before this document |
+
+`not_reached` is why a per-item outcome had to stay open to a third value: `stopped_early` means some documents
+were found and never attempted, and they are neither a success nor a failure either.
+
+**`p2p demo` and `scripts/smoke.sh` work on their own database file**, built from `erp/schema.sql` plus the seed
+at the start of each run and thrown away after. Back-to-back smoke — which the track requires — therefore gives
+identical output, where sharing one file would make every batch item `already advanced` on the second pass. They
+get their own file rather than rebuilding the shared one because `p2p demo` may be run by anyone: rebuilding in
+place would discard a staged change an approver was about to apply and truncate the append-only `extraction` and
+`case_event` trails, which are the 4.4 and 5.1 audit evidence. Nothing else rebuilds: a person's own database
+persists across commands, which is what makes staging and approving two separate acts, and `GET /health` neither
+rebuilds nor writes — on Lambda the filesystem is read-only outside `/tmp`.
 
 A credit memo changes **no** invoice state: it is a separate document against the supplier, which is why
 `credit_memo` has no state column. `held` is terminal in this build — releasing a hold is payment execution, which
@@ -131,6 +144,16 @@ to get wrong.
 recorded it. Nothing is asked of app 17: its `StagedChange` is `apply()` and a description, and this spec does
 not add a field to it. A staged write therefore returns both — app 17's `StagedChange` for the gateway's contract,
 and the row key for a person to type.
+
+**Where the key is carried**, so it survives every boundary between staging and approving:
+
+- **Over MCP**, each write tool's result carries `change_key` beside the staged change's description. Without it a
+  clerk receives a `StagedChange` from which the key is unrecoverable, and could never name the change again.
+  This is an addition to the *success result* shape only; app 19 freezes the tool list and the error shape, which
+  do not change, and connects as the read-only `service` principal that cannot call these tools at all.
+- **In process**, every command that stages a change prints the `change_key` as the last line of its output —
+  `p2p match`, `p2p dispute step` and each item of `p2p batch`. That is the surface `p2p review` and
+  `p2p approve` are given, and the one 18.8's demo and the smoke script read to drive match → review → approve.
 
 ## Pages and API
 
@@ -157,7 +180,7 @@ any value is used, and every id in a model answer is re-checked against the ERP 
 | --- | --- | --- | --- |
 | `invoice-extract` | one invoice document, 20,000 chars | `InvoiceDraft` — supplier name, po_ref, number, date, currency, total, lines[], per-field `confidence` 0–1, `unreadable[]` | 4.2, 4.3, 4.4 |
 | `invoice-match` | an `InvoiceDraft` plus tool results, 8,000 chars per result | `MatchOutcome` — verdict `match`/`variance`/`no_po`, variances[] with kind, expected, actual, `confidence`, `needs_human` and why | 1.4, 1.6, 5.5 |
-| `invoice-batch` | up to 25 documents, each capped as above | `BatchSummary` — per item id, outcome (`ok` / `failed` / `skipped`), `error_category` only when failed; totals for all three; `stopped_early` with a reason | 4.5 |
+| `invoice-batch` | up to 25 documents, each capped as above | `BatchSummary` — per item id and outcome (`ok` / `failed` / `skipped`), `error_category` only when failed, `skip_reason` only when skipped; totals for all three, summing to `items`; `stopped_early` with a reason | 4.5 |
 | `dispute-triage` | the case transcript (rolling summary + last 10 events, 12,000 chars) plus tool results | `DisputeStep` — next action from a closed set, `tool_choice` for it, draft reply, `escalate` with the matched criterion | 2.3, 5.1, 5.2 |
 
 - **Fixed decomposition (1.6).** `match` is always the same four steps in the same order: extract → fetch PO →
@@ -192,6 +215,7 @@ any value is used, and every id in a model answer is re-checked against the ERP 
 | Input | A good answer must… |
 | --- | --- |
 | A clean invoice matching its PO and receipt | return `verdict: match`, confidence ≥0.9, and stage a posting nobody has applied yet |
+| `p2p batch` over the same folder twice, on a persistent database | every item `skipped` with `skip_reason: already_advanced` on the second run; no invoice state written; `ok + failed + skipped == items` both times |
 | An invoice 12 units over the goods receipt | return `variance` with kind `quantity`, expected and actual, and `needs_human` |
 | An invoice whose lines do not sum to its stated total | fail validation, be repaired once with the mismatch named, and record `repaired: true` |
 | An invoice with no PO reference | not stage anything, and escalate citing the "no PO" criterion |
@@ -331,7 +355,10 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
 7. **18.7 `[fullstack-builder] Batch run over a folder`** · `codex`
    `p2p batch <dir>`: ingest and match up to 25 documents, isolate each failure with its `error_category`, carry
    one `Budget` for the run and stop early with a stated reason when it is exhausted, record a `batch_run` row and
-   print one `BatchSummary`. Reuses 18.5's staged-write path exactly and adds **no** new write path, no new tool
+   print one `BatchSummary`. Every document lands in exactly one of `ok`, `failed` or `skipped` — `skipped`
+   carrying `already_advanced` for an invoice a previous run moved and `not_reached` for one the budget stopped it
+   reaching — and the three totals must sum to `items`, with a test that re-running the same folder reports every
+   item `already_advanced` and writes no invoice state. Reuses 18.5's staged-write path exactly and adds **no** new write path, no new tool
    and no change to `p2p/core/`. Statement 4.5. Dependencies: 18.5.
 
 ### Wave 5

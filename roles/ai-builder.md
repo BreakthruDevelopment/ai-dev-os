@@ -17,12 +17,14 @@ Requirements:
   plumbing; run them against the live model locally with `AI_PROVIDER=gemini` and record results in the run log.
 - If the feature uses tools (actions the model can request), every tool call is authorized server-side with the
   same `assertCan()` rules as a normal request, and anything that changes money or data needs human approval.
-- Build on the foundation (wave 1): don't create or edit the foundation paths. Which paths those are is listed for you in the issue's own Notes section and in the runner's instructions, both generated from `WAVE1_PATHS` in `scripts/issuelib.py`; this file deliberately keeps no copy, because every hand-written copy of that list has gone stale. Your spec's Issues section may protect paths beyond the generated list — app 17's `agent_container/core/` is one — so read it too, and never assume a path is fair game because the guard is silent unless a security-sensitive `claude` slice is named as the owner
+- Build on the foundation (wave 1): don't create or edit the foundation paths unless a security-sensitive `claude` slice is named as the owner
   (the foundation slice, or the slice the spec names). If the feature needs a
   table or column that isn't on `main`, stop and comment on the issue (under `scripts/run-harness.sh`, write it to
   `.harness/blocked.md` and make no commits); never invent schema or auth. If your issue does own a migration, rebase
   on `main` and regenerate it if another merged first; never two `drizzle/NNNN_*` files with the same number.
 - Work on a `<harness>/<task>` branch (for example `claude/items-api` or `grok/items-api`) and open a PR.
+
+  Which paths those are is generated for you, never written out here: the issue's own Notes section and the runner's instructions both render `WAVE1_PATHS` from `scripts/issuelib.py`. Every hand-written copy of that list has gone stale, so this file keeps none. A spec can also protect paths the guard cannot express — app 17's `agent_container/core/`, where a later slice may add files but not edit them — so read the spec too, and never take the guard's silence for permission.
 
 ## Sandbox rules (every role that can run commands)
 

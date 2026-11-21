@@ -28,7 +28,9 @@ jobs:
           bash -n scripts/run-harness.sh
           shellcheck scripts/run-harness.sh
       - name: Foundation-path prose matches WAVE1_PATHS
-        run: python3 scripts/sync-wave1-docs.py --check
+        run: |
+          python3 scripts/sync-wave1-docs.py --self-test
+          python3 scripts/sync-wave1-docs.py --check
       - name: Repo creation marks are valid
         run: python3 scripts/create-app-repos.py --check
       - name: Catalog is valid

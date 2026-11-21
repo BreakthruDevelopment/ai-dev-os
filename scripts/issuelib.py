@@ -262,6 +262,14 @@ def self_test() -> None:
                        input="\n".join(hits + misses) + "\n", capture_output=True, text=True, check=True)
     if r.stdout.split() != hits:
         failures.append(f"run-harness.sh --wave1-files: {r.stdout.split()}")
+    # The runner prints this list into the prompt it hands a harness, derived from WAVE1_RE by stripping the
+    # regex. That stripping is a shell one-liner and silently mangles a grouped alternation such as
+    # `(p2p|kit)/core/` or an end-anchored group, so compare it with the real list rather than trusting it.
+    r = subprocess.run(["bash", str(ROOT / "scripts" / "run-harness.sh"), "--wave1-list"],
+                       capture_output=True, text=True, check=True)
+    listed = [x.strip() for x in r.stdout.strip().split(",") if x.strip()]
+    if listed != list(WAVE1_PATHS):
+        failures.append(f"run-harness.sh --wave1-list disagrees with WAVE1_PATHS: {listed}")
     for issue, want in DEP_CASES:
         got = dep_state(issue)
         r = subprocess.run(["bash", str(SCRIPT), "--dep-state"], input=json.dumps(issue),

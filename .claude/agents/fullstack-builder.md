@@ -15,7 +15,7 @@ Work rules:
   calls `assertCan()`. Roles, `src/lib/access.ts` and auth config are part of it. Generate a migration for every
   schema change (`pnpm db:generate --name <change>`).
 - **Any later slice:** build on the foundation's schema and access rules. Never create or edit
-  the foundation paths. Which paths those are is listed for you in the issue's own Notes section and in the runner's instructions, both generated from `WAVE1_PATHS` in `scripts/issuelib.py`; this file deliberately keeps no copy, because every hand-written copy of that list has gone stale. Your spec's Issues section may protect paths beyond the generated list — app 17's `agent_container/core/` is one — so read it too, and never assume a path is fair game because the guard is silent unless a security-sensitive `claude` slice is named as the owner
+  the foundation paths unless a security-sensitive `claude` slice is named as the owner
   (that's then your issue). If the issue
   needs a change there, or the data layer it needs isn't on `main`, stop and comment on the issue with what's missing
   (under `scripts/run-harness.sh`, write it to `.harness/blocked.md` and make no commits; the runner posts it).
@@ -26,6 +26,8 @@ Work rules:
 - Extend `scripts/smoke.sh` with the app's main flow.
 - Work on a `<harness>/<task>` branch (for example `claude/items-api` or `grok/items-api`) and open a PR. Never push to `main`.
 - Before opening the PR, run: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+
+  Which paths those are is generated for you, never written out here: the issue's own Notes section and the runner's instructions both render `WAVE1_PATHS` from `scripts/issuelib.py`. Every hand-written copy of that list has gone stale, so this file keeps none. A spec can also protect paths the guard cannot express — app 17's `agent_container/core/`, where a later slice may add files but not edit them — so read the spec too, and never take the guard's silence for permission.
 
 ## Sandbox rules (every role that can run commands)
 

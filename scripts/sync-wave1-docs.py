@@ -34,7 +34,12 @@ BEGIN = "<!-- wave1:begin -->"
 END = "<!-- wave1:end -->"
 
 # Paths a spec protects that the guard cannot express. Hand-written; see the module docstring.
-UNGUARDED = "app 17's `agent_container/core/`, where a later slice may add files but not edit them"
+UNGUARDED = (
+    "app 17's `agent_container/core/`, where a later slice may add files but not edit them. That distinction "
+    "is why the path is outside the guard and must stay outside it: `wave1_files` matches on path prefix and "
+    "`git diff --name-only` lists an addition exactly like an edit, so adding the path would refuse slice 17.5's "
+    "push and strand its branch"
+)
 
 # BRIEFING.md is deliberately absent: its mention is inside a Markdown table cell, where a
 # multi-line generated block would break the table, so it links to the generated copies instead.
@@ -72,7 +77,54 @@ def apply(text: str) -> str:
     return text
 
 
+def stray_markers() -> list[str]:
+    """Tracked Markdown outside DOCS that carries a region nothing renders.
+
+    `templates/spec.md` is in DOCS and carries a region, so every spec copied from it inherits one — and
+    `specs/` is not rendered or checked, which would leave a marked, generated-looking, silently stale list in
+    each new spec. Fail instead, and let whoever adds it decide: delete the region from that file, or add the
+    file to DOCS.
+    """
+    out = []
+    for p in sorted(ROOT.rglob("*.md")):
+        rel = p.relative_to(ROOT).as_posix()
+        if rel in DOCS or any(part in {".git", "node_modules"} for part in p.parts):
+            continue
+        if BEGIN in p.read_text():
+            out.append(rel)
+    return out
+
+
+def self_test() -> int:
+    """Pin the two mutations that otherwise pass vacuously."""
+    failures = []
+    if not regions(f"{BEGIN}\nx\n{END}"):
+        failures.append("regions() found none in a document that has one")
+    marked = f"a\n{BEGIN}\nstale\n{END}\nb"
+    if apply(marked) == marked:
+        failures.append("apply() left a stale region unchanged")
+    if BEGIN not in apply(marked) or "stale" in apply(marked):
+        failures.append("apply() did not replace the region body")
+    if apply(apply(marked)) != apply(marked):
+        failures.append("apply() is not idempotent")
+    try:
+        regions(f"{BEGIN}\nno end here")
+    except SystemExit:
+        pass
+    else:
+        failures.append("an unterminated region did not raise")
+    if failures:
+        print("sync-wave1-docs self-test FAILED:")
+        for f in failures:
+            print("  " + f)
+        return 1
+    print(f"sync-wave1-docs self-test ok ({len(DOCS)} docs, {len(WAVE1_PATHS)} paths)")
+    return 0
+
+
 def main() -> int:
+    if "--self-test" in sys.argv:
+        return self_test()
     check = "--check" in sys.argv
     stale, missing = [], []
     for name in DOCS:
@@ -91,6 +143,9 @@ def main() -> int:
             print(f"updated {name}")
     if missing:
         print("no wave1 region in: " + ", ".join(missing), file=sys.stderr)
+    if stray := stray_markers():
+        print("a wave1 region in a file nothing renders: " + ", ".join(stray), file=sys.stderr)
+        missing.extend(stray)
     if stale:
         print("out of date (run scripts/sync-wave1-docs.py): " + ", ".join(stale), file=sys.stderr)
     if missing or stale:

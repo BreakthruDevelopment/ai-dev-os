@@ -375,7 +375,8 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    `p2p/disputes/`: the `dispute_case` state machine (open → investigating → credit_proposed → escalated →
    resolved) as the State pattern, the escalation chain as app 17 interceptors over the five written criteria, the
    `dispute-triage` task with its closed set of next actions and per-step `tool_choice`, context preservation as a
-   rolling summary plus the last 10 `case_event` rows, one clarifying question when nothing matches, and a staged
+   rolling summary plus the last 10 `case_event` rows, the `p2p dispute open/step/show` commands, one
+   clarifying question when nothing matches, and a staged
    credit memo for amounts it proposes. It also stages the `hold_payment` change as a `payment_hold` row —
    only against an invoice already `posted`, refused with a stated reason otherwise, since applying it is the only
    path to `invoice.state = held`; both its credit and its hold are applied by an approver through 18.2's
@@ -391,7 +392,9 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    print one `BatchSummary`. Every document lands in exactly one of `ok`, `failed` or `skipped` — `skipped`
    carrying `already_advanced` for an invoice a previous run moved and `not_reached` for one it never attempted,
    when the budget stopped the run before it — and the three totals must sum to `items`. `BatchSummary` carries
-   per item its id and outcome, an `error_category` **only** when failed, a `skip_reason` **only** when skipped,
+   per item its **filename** and outcome — the filename, because a document refused for having no matching
+   `invoice` row has no invoice id, and `items` counts documents found in the folder — an `error_category`
+   **only** when failed, a `skip_reason` **only** when skipped,
    and a `change_key` whenever the item staged a posting; plus the three totals and `stopped_early` with the
    budget's reason. **It is assembled in code, not asked of a model**: there is no `invoice-batch` task, and a batch is 18.4's and 18.5's
    tasks run per document with the totals counted around them. A model could not supply these values anyway —

@@ -25,6 +25,13 @@
 # ai-dev-os runs it directly. An app repo calls it (see runbooks/daily.md, "Review gate"). A called workflow can't
 # have more token permissions than its caller grants, so the caller must grant `actions: write` too, or the run
 # fails at startup:
+#     on:
+#       pull_request:
+#         types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+#       pull_request_review:
+#         types: [submitted, edited, dismissed]
+#       issue_comment:
+#         types: [created, edited]   # Codex edits its state comment; see the issue_comment note below
 #     permissions:
 #       contents: read
 #       pull-requests: read
@@ -39,6 +46,13 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
   pull_request_review:
     types: [submitted, edited, dismissed]
+  issue_comment:
+    # Codex records a clean pass by EDITING its own state comment, which fires no pull_request or
+    # pull_request_review event. On 2026-11-21, PR 17-agent-container#9 failed the gate at 07:20:46
+    # for want of a Codex review of the head, Codex updated that comment at 07:22:38 with
+    # has_unresolved_findings: false on the head, and nothing re-ran the gate: the PR sat on a
+    # failure that was already false, with no event left to clear it. Found by hand, twice.
+    types: [created, edited]
   workflow_call:
 
 permissions:
@@ -55,25 +69,28 @@ jobs:
     # pull_request run the required check reads (or its re-run), and vice versa. A newer push still supersedes an
     # older pull_request run; review runs queue instead of cancelling, so each one gets to finish.
     concurrency:
-      group: review-gate-${{ github.event.pull_request.number }}-${{ github.event_name }}
+      group: review-gate-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event_name }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    # An issue_comment on a plain issue is not this gate's business, and nor is one on a closed PR.
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && github.event.issue.state == 'open')
     steps:
       - id: gate
         uses: actions/github-script@v7
         with:
           script: |
-            const pr = context.payload.pull_request;
-            if (!pr) {
-              core.setFailed("Review gate only runs on pull_request and pull_request_review events.");
+            // issue_comment carries an `issue`, not a `pull_request`; the number is the same either way.
+            const number = (context.payload.pull_request || context.payload.issue || {}).number;
+            if (!number) {
+              core.setFailed("Review gate only runs on pull_request, pull_request_review and issue_comment events.");
               return;
             }
             const { owner, repo } = context.repo;
-            const { data: current } = await github.rest.pulls.get({ owner, repo, pull_number: pr.number });
+            const { data: current } = await github.rest.pulls.get({ owner, repo, pull_number: number });
             const head = current.head.sha;
             core.setOutput("head", head);
             const labels = current.labels.map((l) => l.name);
             const reviews = await github.paginate(github.rest.pulls.listReviews, {
-              owner, repo, pull_number: pr.number, per_page: 100,
+              owner, repo, pull_number: number, per_page: 100,
             });
 
             const marker = (body, key) => {
@@ -89,7 +106,7 @@ jobs:
             // findings. Only bot accounts count, so a comment typed by the shared agent account can't pass for it.
             const codexState = async () => {
               const comments = await github.paginate(github.rest.issues.listComments, {
-                owner, repo, issue_number: pr.number, per_page: 100,
+                owner, repo, issue_number: number, per_page: 100,
               });
               const states = comments
                 .filter((c) => c.user && c.user.type === "Bot" && /codex/i.test(c.user.login))
@@ -138,9 +155,10 @@ jobs:
               core.info(`Review gate passed for ${required.join(" + ")}. Merge per AGENTS.md.`);
             }
 
-      # Only after a passing review run. The re-run it starts is a pull_request run, which skips this step.
+      # Only after a passing review or comment run. The re-run it starts is a pull_request run, which
+      # skips this step, so there is no loop.
       - name: Re-run the pull_request gate for this commit
-        if: success() && github.event_name == 'pull_request_review'
+        if: success() && (github.event_name == 'pull_request_review' || github.event_name == 'issue_comment')
         uses: actions/github-script@v7
         env:
           HEAD_SHA: ${{ steps.gate.outputs.head }}

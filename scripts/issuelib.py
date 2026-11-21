@@ -14,6 +14,7 @@ merged PR.
 Needs Python 3.10+ and the gh CLI (signed in); the self-test also needs bash, git and jq.
 """
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -302,6 +303,17 @@ def self_test() -> None:
         for must_not in must_nots:
             if must_not in r.stdout:
                 failures.append(f"run-harness.sh --prompt {track} mentions {must_not!r}")
+    # The database preflight runs before any clone exists, so it goes on REPOS. Fails safe: anything not known
+    # to be Python-track counts as needing a database.
+    for repos, want in (("", "yes"), ("17-agent-container", "no"),
+                        ("17-agent-container 18-procure-to-pay 19-enablement-kit", "no"),
+                        ("01-build-tracker", "yes"), ("17-agent-container 01-build-tracker", "yes"),
+                        ("20-not-created-yet", "yes")):
+        env = dict(os.environ, REPOS=repos)
+        r = subprocess.run(["bash", str(SCRIPT), "--repos-need-db"], capture_output=True, text=True,
+                           check=True, env=env)
+        if r.stdout.strip() != want:
+            failures.append(f"run-harness.sh --repos-need-db REPOS={repos!r}: {r.stdout.strip()!r}, wanted {want!r}")
     for issue, want in DEP_CASES:
         got = dep_state(issue)
         r = subprocess.run(["bash", str(SCRIPT), "--dep-state"], input=json.dumps(issue),

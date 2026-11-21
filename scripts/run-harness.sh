@@ -238,6 +238,22 @@ track_tools_problem() { # $1 track; prints why this Mac can't build it, or nothi
   fi
 }
 
+# Whether this run could reach a node repo at all. The database preflight runs before any clone exists, so it
+# can only go on REPOS: a run narrowed to Python-track repos needs no Postgres, and refusing it would refuse a
+# run this Mac can do. With REPOS unset the run may reach any repo, so the answer is yes.
+#
+# This list is HAND-MAINTAINED and catalog.yaml carries no track field to derive it from. It fails SAFE: a repo
+# that is not listed counts as needing a database, so a new Python-track repo (app 20, when its repo exists)
+# merely has to pass --no-db-ok until it is added here. Pinned in `issuelib.py --self-test`.
+PYTHON_TRACK_REPOS="17-agent-container 18-procure-to-pay 19-enablement-kit"
+repos_need_db() {
+  [ -n "${REPOS:-}" ] || { echo yes; return 0; }
+  for r in $REPOS; do
+    case " $PYTHON_TRACK_REPOS " in *" $r "*) ;; *) echo yes; return 0 ;; esac
+  done
+  echo no
+}
+
 REPO_TRACK=""
 resolve_track() { # $1 clone dir; sets REPO_TRACK to "python" or "node"
   if [ -f "$1/pyproject.toml" ] && [ ! -f "$1/package.json" ]; then
@@ -304,6 +320,7 @@ case "${1:-}" in
   --git) shift; git "$@"; exit $? ;;                        # git as this script runs it (hooks and fsmonitor off)
   --track) resolve_track "${2:-}"; echo "$REPO_TRACK"; exit 0 ;;  # $2 clone dir: python or node
   --track-tools) track_tools_problem "${2:-node}"; exit 0 ;;      # $2 track: why this Mac can't build it, or nothing
+  --repos-need-db) repos_need_db; exit 0 ;;                       # honours REPOS: yes if a node repo could be reached
   --prompt) # $2 track [$3 repo]: the builder prompt that track would get. No gh, no clone.
     REPO_TRACK="${2:-node}"; REPO_PORT=3999
     [ "$REPO_TRACK" = python ] || REPO_DB_URL="postgres://localhost/x"
@@ -845,7 +862,9 @@ commits_on() { # $1 dir, $2 branch, $3 base (default origin/main): commits on th
 run_harness_once() { # $1 prompt, $2 dir, $3 output file; returns the harness's exit status
   local rc busy_msg
   # A retry (or a leftover app from the first attempt) could find the port taken; never start against that.
-  if port_busy "$REPO_PORT"; then
+  # A Python-track library starts no server, so it has no port to lose -- this is the second of the two places
+  # that refuse on a busy port, and gating only the first made the claim true in one place and false here.
+  if [ "${REPO_TRACK:-node}" != python ] && port_busy "$REPO_PORT"; then
     busy_msg="port $REPO_PORT for ${2##*/} is already in use, so $HARNESS wasn't started (another app, or a leftover server from an earlier attempt)"
     log "REFUSE: $busy_msg"
     printf '%s\n' "$busy_msg" > "$3"
@@ -1039,7 +1058,9 @@ $FAIL_MARK" >/dev/null 2>&1 || log "warning: couldn't comment on $repo#$n"
     if [ -s "$dir/.harness/pr-body.md" ]; then cat "$dir/.harness/pr-body.md"
     else printf '_The harness did not write a summary. Check the commits and the CI run._\n'
     fi
-    if [ -z "${REPO_DB_URL:-}" ]; then
+    if [ "${REPO_TRACK:-node}" = python ]; then
+      printf '\n\n**The image build and container smoke ran in CI, not locally.**\n'
+    elif [ -z "${REPO_DB_URL:-}" ]; then
       # shellcheck disable=SC2016  # Markdown backticks
       printf '\n\n**Integration tests and smoke did not run locally** (no local database, `--no-db-ok`). Rely on CI for them.\n'
     fi
@@ -1097,11 +1118,11 @@ if [ "$DRY" -eq 0 ]; then
   if [ "$NO_DB_OK" -eq 1 ]; then
     log "note: --no-db-ok: integration tests and smoke won't run locally; PRs will say so"
     unset TEST_DATABASE_URL
-  elif [ -z "${TEST_DATABASE_URL:-}" ]; then
+  elif [ -z "${TEST_DATABASE_URL:-}" ] && [ "$(repos_need_db)" = yes ]; then
     log "REFUSE: TEST_DATABASE_URL isn't set, so every integration test would be skipped locally and CI would be the first to run them."
     db_setup_help
     exit 1
-  elif ! db_reachable "$TEST_DATABASE_URL"; then
+  elif [ -n "${TEST_DATABASE_URL:-}" ] && ! db_reachable "$TEST_DATABASE_URL"; then
     log "REFUSE: TEST_DATABASE_URL is set but the database doesn't answer (is Docker Desktop or postgres running?)."
     db_setup_help
     exit 1

@@ -111,9 +111,10 @@ rather than left for the slice that trips over it.
 
 - **One budget across a fan-out.** 17.2 passes `Budget` to `run()` and raises `BudgetAlreadyStarted` on reuse,
   which is right for a single agent and wrong for app 20, whose coordinator runs subagents in parallel under one
-  allowance. **`Budget.child()` is owned by 17.5**, alongside the builder: a child draws on its parent, so the
-  run as a whole stops at the parent's limit and no subagent can be starved by sibling accounting. App 20 must
-  not be left to invent its own.
+  allowance. **`Budget.child()` is owned by 17.4**: a child draws on its parent, so the run as a whole stops at
+  the parent's limit and no subagent can be starved by sibling accounting. It sits with 17.4 rather than 17.5
+  because it edits the existing `core/budget.py`, which only a security-sensitive `claude` slice may do. App 20
+  must not be left to invent its own.
 - **A dangling tool block ends a conversation.** When a reply arrives with stop reason `end_turn` *and* tool
   calls, 17.2 correctly ends the run on the stop reason, but `RunResult.messages` then holds a `ToolUseBlock`
   with no matching result. Bedrock rejects that transcript if it is sent again, which is exactly what app 19's
@@ -122,7 +123,9 @@ rather than left for the slice that trips over it.
   that resends the transcript.
 - **The output cap is per result, not per turn.** `MAX_TOOL_OUTPUT_CHARS` bounds one tool result at 20,000
   characters, so a turn calling *n* tools can still inject *n* × 20,000. **17.4 owns a per-turn cap** as part of
-  the interceptor chain, which is where a cross-tool budget belongs.
+  the interceptor chain, which is where a cross-tool budget belongs. Named in 17.4's slice entry, not only here:
+  a responsibility recorded in prose alone never reaches the builder, because `open-issues.py` builds the issue
+  body from the slice entry.
 
 ## Threat model
 
@@ -153,7 +156,7 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
 
 3. **17.3 `[ai-builder] Bedrock provider and the reply recorder`** · `claude` · **2nd: Codex**
    `BedrockProvider` on the Converse API, stop-reason mapping, and the recorder that writes replay fixtures.
-   Also owns two things 17.2's review surfaced, **both of which edit `core/`**, so this slice is named as their
+   Also owns three things 17.2's review surfaced, **all of which edit `core/`**, so this slice is named as their
    owner and the foundation rule does not stop it:
    (a) **The newer Converse stop reasons.** 17.2 handles the six this spec listed and raises on anything else.
    Converse also returns `malformed_model_output`, `malformed_tool_use` and `model_context_window_exceeded`, and
@@ -161,11 +164,24 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
    them to `StopReason` and give each a branch in the loop. Do not add a default branch: the raise on an unknown
    value is the design rule.
    (b) **The model-call limiter**, as a `ModelProvider` decorator (see "Decisions this library makes").
+   (c) **A resumable transcript.** A reply with stop reason `end_turn` carrying tool calls correctly ends the
+   run, but leaves a `ToolUseBlock` with no matching result in `RunResult.messages`. Bedrock rejects that
+   transcript if it is sent again, which is what app 19's session resumption does. Append a synthetic,
+   clearly-labelled error result for the unanswered call, and test it by resending the transcript.
    Dependencies: 17.2.
 4. **17.4 `[fullstack-builder] Decorators, interceptor chain, permission gate and staged changes`** · `claude` · **2nd: Codex**
    The gate rule is presence-anywhere in the stack, so `Cached(PermissionGate(write))` is valid by construction.
    `Cached` must therefore key on the acting identity from `ctx`, or one caller's gate decision is served to
    another. A test must prove two callers with different permissions do not share a cached result.
+   Also owns two things from 17.2's review, **both of which edit `core/`**, so this slice is named as their owner
+   and the foundation rule does not stop it:
+   (a) **A per-turn output cap.** `MAX_TOOL_OUTPUT_CHARS` bounds one tool result, so a turn calling *n* tools can
+   still inject *n* times that. A cross-tool budget belongs in the interceptor chain, which this slice builds.
+   (b) **`Budget.child()`.** 17.2 passes `Budget` to `run()` and raises `BudgetAlreadyStarted` on reuse, which is
+   right for one agent and wrong for app 20, whose coordinator runs subagents in parallel under one allowance. A
+   child draws on its parent, so the run as a whole stops at the parent's limit and no subagent is starved by
+   sibling accounting. **This is here rather than in 17.5 because it edits the existing `core/budget.py`**, and
+   17.5 is a `grok` slice that is not security-sensitive, so the repo's `AGENTS.md` forbids it that edit.
    Dependencies: 17.2.
 5. **17.5 `[fullstack-builder] Event bus, agent builder and manifest`** · `grok`
    `EventBus` with the four events named in the public interface, and `AgentBuilder`: the YAML manifest schema
@@ -173,8 +189,9 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
    enforced here — the builder walks each tool's decorator stack to the innermost tool, reads its `effect`, and
    raises at construction if an `effect: write` tool has no `PermissionGate` anywhere in its stack. **It is Builder,
    not Factory**, and the naming matters for the README's pattern map. Subscribers must not be able to change the
-   loop's behavior. Also owns the **JSON-lines logger** (`core/log.py` plus a subscriber on the bus) and
-   **`Budget.child()`**, both per "Decisions this library makes". Dependencies: 17.2.
+   loop's behavior. Also owns the **JSON-lines logger**, per "Decisions this library makes": a new
+   `core/log.py` plus a subscriber on the bus. Both are new files, which is what this slice may add to `core/`
+   without being security-sensitive. Dependencies: 17.2.
 
 ### Wave 3
 

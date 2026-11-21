@@ -11,7 +11,7 @@ So the prose is generated too. Each doc carries a marked region:
     <!-- wave1:begin --> ...generated... <!-- wave1:end -->
 
 `--check` fails when a region is out of date, and `check.yml` runs it. The builder-facing copies
-are handled differently and on purpose: the role files enumerate no such list (one or two cite a
+are handled differently and on purpose: the role files enumerate no such list (three of them cite a
 single path in passing), the runner
 interpolates `WAVE1_RE` into its prompt, and the issue note is derived in `open-issues.py`. This
 script is only for the documents people read without a Python interpreter.
@@ -99,17 +99,42 @@ def path_like(text: str) -> list[str]:
 # keyed off backticks was half a pin: round 11's residual 3 was a separator dependence, and the first
 # attempt at fixing it just traded "`p` or ' p,'" for "`p`" alone, so an un-backticked list evaded it
 # the same way. This matches the token itself, so no separator can hide it.
-# The lookbehind matters: without it the second alternative matched "config.ts" out of
-# "drizzle.config.ts" and reported a guarded path as a stray one.
+# There were two lookbehinds here, and the comment justifying them was wrong: it said they stopped
+# alt2 pulling "config.ts" out of "drizzle.config.ts", but alt1 already prevents that by leftmost
+# match, and deleting both left the whole self-test green. What they actually did was blind the
+# matcher to any path preceded by `/`, `.`, `@`, `-` or a word character, so `/src/lib/db/` and
+# anything inside a URL tokenised to nothing. Removed.
 PATH_IN_PROSE = re.compile(
-    r"(?<![\w.@/-])(?:[\w.@-]+/)+[\w.@-]*"
-    r"|(?<![\w.@/-])[\w.@-]*[\w@-]\.(?:ts|tsx|js|py|sh|md|ya?ml|json|sql|toml)\b"
+    r"(?:[\w.@-]+/)+[\w.@-]*"
+    r"|[\w.@-]*[\w@-]\.(?:ts|tsx|js|mjs|cjs|py|sh|md|ya?ml|json|sql|toml|tf)\b"
 )
+EXTENSIONS = (".ts", ".tsx", ".js", ".mjs", ".cjs", ".py", ".sh", ".md", ".yml", ".yaml",
+              ".json", ".sql", ".toml", ".tf")
 
 
 def paths_in_prose(text: str) -> list[str]:
-    """Every path-shaped token, backticked or bare."""
-    return PATH_IN_PROSE.findall(text)
+    r"""Path-shaped tokens -- a directory with a trailing slash, or a file with a known extension.
+
+    Two things this must get right, pulling in opposite directions.
+
+    It must not miss a guarded path, so trailing sentence punctuation is trimmed: `[\w.@-]*` swallows
+    a full stop, and `src/lib/db/.` is not in `WAVE1_PATHS`, so a path ending a sentence would have
+    been reported as a path nothing accounts for -- a false positive on the very thing the check
+    exists to permit.
+
+    And it must not read ordinary prose as a path. `NOTES` values are hand-written, so "the per-row
+    read/write access rules" made the suite fail with `names paths nothing accounts for:
+    ['read/write']`. `and/or`, `CI/CD`, `N/A` and `24/7` all did the same. The shape rule below
+    excludes every one of them, because none ends in `/` or carries a file extension -- and
+    `self_test` asserts every WAVE1_PATHS entry satisfies that shape, so the filter can never
+    blind the matcher to a real guarded path without failing first.
+    """
+    out = []
+    for token in PATH_IN_PROSE.findall(text):
+        token = token.rstrip(".,;:-")
+        if token.endswith("/") or token.endswith(EXTENSIONS):
+            out.append(token)
+    return out
 
 
 def rendered() -> str:
@@ -241,6 +266,18 @@ def self_test() -> int:
         raise OSError("gone")
     if stray_markers(listed=["runs/01-x.md"], read=boom) != []:
         failures.append("stray_markers() did not skip an unreadable file")
+    # The shape `paths_in_prose` filters on. Without this, adding a guarded path that is neither a
+    # trailing-slash directory nor an extensioned file would make the tokeniser silently blind to it.
+    for path in WAVE1_PATHS:
+        if not (path.endswith("/") or path.endswith(EXTENSIONS)):
+            failures.append(
+                f"{path!r} is neither a directory ending in '/' nor a file with a known extension; "
+                "paths_in_prose would not see it (add its extension to EXTENSIONS)"
+            )
+    # Ordinary prose must not read as a path, or a hand-written note fails the suite spuriously.
+    for phrase in ("read/write", "and/or", "CI/CD", "N/A", "24/7"):
+        if paths_in_prose(f"the {phrase} rules"):
+            failures.append(f"paths_in_prose() reads {phrase!r} as a path")
     # Notes and paths must correspond exactly, in both directions.
     for path in WAVE1_PATHS:
         if path not in NOTES:

@@ -41,7 +41,8 @@ Roles (principals, not web sessions; each command and MCP session acts as one):
 
 There is **no Oracle anywhere in this repo.** The ERP is a SQLite file built from `erp/schema.sql` and a committed
 deterministic seed (two company codes, 9 suppliers, 24 purchase orders, goods receipts with three deliberate
-quantity and price variances, 12 invoices for the batch, one disputed credit). `p2p/core/erp.py` is the only
+quantity and price variances, 12 invoices for the batch, one disputed credit). The three staged-change tables
+seed empty: every row in them is written by a run. `p2p/core/erp.py` is the only
 module that opens it.
 
 The **gateway** (`p2p-erp`, an MCP server over stdio, statement 2.4) is the only way in. It exposes:
@@ -73,10 +74,10 @@ named below scopes a row to a person.
 | `extraction` | id, invoice_id, attempts, repaired, confidence, fields_json, model_task | company_code | the 4.4 audit trail |
 | `posting` | id (`pst_…`), invoice_id, payload_json, staged_by, decided_by, decision, applied_at | company_code, staged_by | one `StagedChange` per row |
 | `credit_memo` | id (`crd_…`), supplier_id, invoice_id, amount, reason, staged_by, decided_by, decision, applied_at | company_code, staged_by | staged write |
-| `payment_hold` | id (`hld_…`), invoice_id, case_id, reason, staged_by, decided_by, decision, applied_at | company_code, staged_by | staged write; 18.6 stages it, and applying it is the only path to `held` |
+| `payment_hold` | id (`hld_…`), invoice_id, case_id (nullable), reason, staged_by, decided_by, decision, applied_at | company_code, staged_by | staged write; a hold outside a dispute leaves `case_id` null; applying it is the only path to `held` |
 | `dispute_case` | id, supplier_id, state, opened_by, assigned_to, escalated_reason | company_code, assigned_to | `state`: open → investigating → credit_proposed → escalated → resolved |
 | `case_event` | case_id, seq, actor, kind, payload_json | via `dispute_case` | append-only; the case transcript (5.1) |
-| `batch_run` | id, started_by, items, ok, failed, summary_json | started_by | 4.5 |
+| `batch_run` | id, started_by, items, ok, failed, skipped, summary_json | started_by | 4.5; `skipped` counts `already advanced` items, which are neither ok nor failed |
 
 **The `invoice.state` transitions**, stated as a set rather than a chain because two of them are not sequential.
 18.2's accessor accepts exactly these and rejects anything else, so no later slice can invent a lifecycle:
@@ -91,10 +92,22 @@ named below scopes a row to a person.
 | `posted` | `held` | 18.6, an approver applies a staged `hold_payment`. A hold is a payment-side act on an invoice already in the ledger, which is why it is not reachable from `staged` |
 | any | itself | a repeated apply is the stated no-op the apply-once guard produces, not an error |
 
-**Re-running `p2p batch` or `p2p ingest` on an invoice that has already advanced writes no state at all** and
+**Re-running `p2p batch` or `p2p ingest` on an invoice that has already advanced writes no invoice state** and
 reports `already advanced`, naming the current state. It is not a transition: re-ingesting a `posted` invoice
 would mean `posted → extracted`, which this table rejects, so the accessor is never asked. A new `extraction` row
 is still recorded, because the audit trail is append-only.
+
+`already advanced` is **neither a success nor a failure**: it carries no `error_category` — none of the five fits,
+and inventing a sixth is forbidden — and it is counted in `batch_run.skipped` and `BatchSummary`'s `skipped`
+total, not in `ok` or `failed`. Both counters are 18.2's, declared here so 18.7 adds no column.
+
+`p2p ingest` on a document with no matching seeded `invoice` row **refuses** with a stated reason rather than
+inserting one. Creating invoices would make `invoice` a table a later slice writes rows to, not just a state on,
+and the seed owns the twelve the batch uses.
+
+**`p2p demo` and `scripts/smoke.sh` rebuild the ERP from `erp/schema.sql` plus the seed before they run**, so a
+second run is identical to the first. Without that, smoke back-to-back — which the track requires — would make
+every batch item `already advanced` on the second pass and assert against different output.
 
 A credit memo changes **no** invoice state: it is a separate document against the supplier, which is why
 `credit_memo` has no state column. `held` is terminal in this build — releasing a hold is payment execution, which
@@ -110,9 +123,14 @@ principal gets read actions only; **no principal may decide a change it staged**
 the caller. One integration test per rule, per table.
 
 **Staged-change ids are opaque prefixed keys** — `pst_…`, `crd_…`, `hld_…` — because a bare SQLite rowid is
-ambiguous across the three tables and the seed is deterministic, so the same integer exists in all of them. The
-prefix is what `apply_change` and `p2p approve` resolve on, and `StagedChange` carries it, so one token names one
-change with no `kind` argument to get wrong.
+ambiguous across the three tables: each is its own id space, so the same integer can name a row in all three. The
+prefix is what `apply_change` and `p2p approve` resolve on, so one token names one change with no `kind` argument
+to get wrong.
+
+**The key is app 18's own.** It is the id of the row the staged write records, returned by the accessor that
+recorded it. Nothing is asked of app 17: its `StagedChange` is `apply()` and a description, and this spec does
+not add a field to it. A staged write therefore returns both — app 17's `StagedChange` for the gateway's contract,
+and the row key for a person to type.
 
 ## Pages and API
 
@@ -139,7 +157,7 @@ any value is used, and every id in a model answer is re-checked against the ERP 
 | --- | --- | --- | --- |
 | `invoice-extract` | one invoice document, 20,000 chars | `InvoiceDraft` — supplier name, po_ref, number, date, currency, total, lines[], per-field `confidence` 0–1, `unreadable[]` | 4.2, 4.3, 4.4 |
 | `invoice-match` | an `InvoiceDraft` plus tool results, 8,000 chars per result | `MatchOutcome` — verdict `match`/`variance`/`no_po`, variances[] with kind, expected, actual, `confidence`, `needs_human` and why | 1.4, 1.6, 5.5 |
-| `invoice-batch` | up to 25 documents, each capped as above | `BatchSummary` — per item id, outcome, error_category; totals; `stopped_early` with a reason | 4.5 |
+| `invoice-batch` | up to 25 documents, each capped as above | `BatchSummary` — per item id, outcome (`ok` / `failed` / `skipped`), `error_category` only when failed; totals for all three; `stopped_early` with a reason | 4.5 |
 | `dispute-triage` | the case transcript (rolling summary + last 10 events, 12,000 chars) plus tool results | `DisputeStep` — next action from a closed set, `tool_choice` for it, draft reply, `escalate` with the matched criterion | 2.3, 5.1, 5.2 |
 
 - **Fixed decomposition (1.6).** `match` is always the same four steps in the same order: extract → fetch PO →
@@ -301,7 +319,8 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    resolved) as the State pattern, the escalation chain as app 17 interceptors over the five written criteria, the
    `dispute-triage` task with its closed set of next actions and per-step `tool_choice`, context preservation as a
    rolling summary plus the last 10 `case_event` rows, one clarifying question when nothing matches, and a staged
-   credit memo for amounts it proposes. It also stages the `hold_payment` change as a `payment_hold` row, the only
+   credit memo for amounts it proposes. It also stages the `hold_payment` change as a `payment_hold` row —
+   only against an invoice already `posted`, refused with a stated reason otherwise, since applying it is the only
    path to `invoice.state = held`; both its credit and its hold are applied by an approver through 18.2's
    `apply_change`, so this slice stages and never applies. A case reaching `resolved` does **not** release a hold —
    `held` is terminal, as the transition table says. Adds **no** tables: 18.2 seeded them. Statements 5.1, 5.2;

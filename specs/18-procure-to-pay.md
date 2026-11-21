@@ -41,7 +41,7 @@ Roles (principals, not web sessions; each command and MCP session acts as one):
 
 There is **no Oracle anywhere in this repo.** The ERP is a SQLite file built from `erp/schema.sql` and a committed
 deterministic seed (two company codes, 9 suppliers, 24 purchase orders, goods receipts with three deliberate
-quantity and price variances, 12 invoices for the batch, one disputed credit). The three staged-change tables
+quantity and price variances, 12 invoices for the batch, one invoice under dispute). The three staged-change tables
 seed empty: every row in them is written by a run. `p2p/core/erp.py` is the only
 module that opens it.
 
@@ -77,7 +77,7 @@ named below scopes a row to a person.
 | `payment_hold` | id (`hld_…`), invoice_id, case_id (nullable), reason, staged_by, decided_by, decision, applied_at | company_code, staged_by | staged write; a hold outside a dispute leaves `case_id` null; applying it is the only path to `held` |
 | `dispute_case` | id, supplier_id, state, opened_by, assigned_to, escalated_reason | company_code, assigned_to | `state`: open → investigating → credit_proposed → escalated → resolved |
 | `case_event` | case_id, seq, actor, kind, payload_json | via `dispute_case` | append-only; the case transcript (5.1) |
-| `batch_run` | id, started_by, items, ok, failed, skipped, summary_json | started_by | 4.5; `items` is documents **found** in the folder and `items = ok + failed + skipped` always, which is what makes a `stopped_early` run add up |
+| `batch_run` | id, started_by, items, ok, failed, skipped, summary_json | started_by | 4.5; `items` is documents **found** in the folder and `items = ok + failed + skipped` always, which is what makes a `stopped_early` run add up. `stopped_early` and its reason live in `summary_json` with the per-item rows, not in a column |
 
 **The `invoice.state` transitions**, stated as a set rather than a chain because two of them are not sequential.
 18.2's accessor accepts exactly these and rejects anything else, so no later slice can invent a lifecycle:
@@ -107,7 +107,7 @@ pydantic field, which must agree with it.
 | Outcome | When | Carries |
 | --- | --- | --- |
 | `ok` | ingested and matched, whether or not a posting was staged | — |
-| `failed` | anything the run tried and could not do — an unreadable document, an extraction still invalid after its one repair (`needs_human` -- two attempts in all), or **a document with no matching seeded `invoice` row**, which `p2p ingest` refuses rather than inserting one, since creating invoices would make `invoice` a table a later slice writes rows to and the seed owns the twelve the batch uses | `validation` for all three — an extraction that will not validate is repeated validation failure, **not** `business`: app 17's spec adds `internal` precisely because miscategorising something that is not "a rule said no" would have this app explain a policy that does not exist. `transient` only for a document the budget cut mid-extraction |
+| `failed` | anything the run tried and could not do — an unreadable document, an extraction still invalid after its one repair (`needs_human` — two attempts in all), or **a document with no matching seeded `invoice` row**, which `p2p ingest` refuses rather than inserting one, since creating invoices would make `invoice` a table a later slice writes rows to and the seed owns the twelve the batch uses | `validation` for all three — an extraction that will not validate is repeated validation failure, **not** `business`: app 17's spec adds `internal` precisely because miscategorising something that is not "a rule said no" would have this app explain a policy that does not exist. `transient` only for a document the budget cut mid-extraction |
 | `skipped` | the run never attempted it | `skip_reason`: `already_advanced`, or `not_reached` when the budget stopped the run before this document |
 
 `not_reached` is why a per-item outcome had to stay open to a third value: a document found and never attempted is
@@ -145,7 +145,7 @@ leaves it alone for ever after. Without an owner named, round 6 removed the only
 
 A credit memo changes **no** invoice state: it is a separate document against the supplier, which is why
 `credit_memo` has no state column. `held` is terminal in this build — releasing a hold is payment execution, which
-line 37 puts out of scope, and the gateway has no `release_payment` tool. **No slice may add `held → posted`**: an
+the Scope section puts out of scope, and the gateway has no `release_payment` tool. **No slice may add `held → posted`**: an
 invoice resolved in the supplier's favour stays `held`, and 18.6's `resolved` case state is the record that the
 dispute is finished, not that payment resumed. A builder who needs a release stops and comments.
 
@@ -349,7 +349,7 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    shape as a contract test, because app 19 connects to this server. Statements 2.1, 2.4; exercises 1.5 and 2.2.
    Security-sensitive: it is the write surface and the cross-repo tool boundary. Dependencies: 18.2.
 4. **18.4 `[ai-builder] Invoice extraction: few-shot, forced schema, validate and repair`** · `claude`
-   `p2p/extract/`: the `invoice-extract` task, the `InvoiceDraft` pydantic schema sent as a forced tool, the three
+   `p2p/extract/` and the `p2p ingest` command: the `invoice-extract` task, the `InvoiceDraft` pydantic schema sent as a forced tool, the three
    committed few-shot examples as files, the repair loop (one retry with the specific validation failures named,
    at most two attempts, `needs_human` after two failures), per-field confidence, the `extraction` audit row, and
    the recorded fixtures including one repaired draft. Reads nothing it does not own and stages nothing.
@@ -363,7 +363,7 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    set, the forcing rules (no PO, variance over 5%, flagged supplier, duplicate number), and the
    `p2p match` / `p2p staged` / `p2p review` / `p2p approve` commands. `p2p staged` is the only way an approver
    reaches a change it did not stage, so the command is this slice's work. Its **visibility rule is 18.2's**, in
-   `list_staged`, with the integration test there: an access filter in a caller is what line 150 and 18.2's own
+   `list_staged`, with the integration test there: an access filter in a caller is what the Access rules and 18.2's own
    rules forbid, and this slice renders what the accessor returns rather than deciding it.
    `p2p review` and `p2p approve` are generic over staged
    changes — a posting, a credit memo or a payment hold — and call 18.2's `apply_change`; this slice adds no second

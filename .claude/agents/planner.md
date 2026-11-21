@@ -20,11 +20,7 @@ Produce `specs/NN-slug.md` from `templates/spec.md`:
    endpoint) and the control for each.
 7. **Issues, in waves.** One issue per slice, grouped into waves in the spec's Issues section (format in
    `templates/spec.md`). **Wave 1 is the foundation**: schema, migrations, roles, access rules and auth config,
-   always `claude` and security-sensitive. No later slice may create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/lib/access/`, `src/proxy.ts`, `src/middleware.ts` on the Next.js template, or `p2p/core/`, `kit/core/`, `erp/` and `contracts/` on the Python track — `WAVE1_PATHS` in `scripts/issuelib.py` is the mechanically enforced list, and **your** spec's Issues section must name the paths that apply to the repo you are planning, since only the spec can say so),
-   unless a security-sensitive `claude` slice is named as the owner (e.g. a CSP in `src/proxy.ts`); if one
-   needs a schema change, give that change its own foundation slice. Every slice not planned for `claude` depends, directly or not, on wave 1. Put the role
-   in the title (`[ui-builder] Dashboard page`), the planned harness (`claude`, `codex` or `grok`, using the
-   defaults in `AGENTS.md` section 2) beside it, and end each slice with `Dependencies:`.
+   always `claude` and security-sensitive. No later slice may create or edit the foundation paths. Which paths those are is listed for you in the issue's own Notes section and in the runner's instructions, both generated from `WAVE1_PATHS` in `scripts/issuelib.py`; this file deliberately keeps no copy, because every hand-written copy of that list has gone stale. Your spec's Issues section may protect paths beyond the generated list — app 17's `agent_container/core/` is one — so read it too, and never assume a path is fair game because the guard is silent beside it, and end each slice with `Dependencies:`.
    Once the spec is merged, open the issues with `python3 scripts/open-issues.py specs/NN-slug.md` (`--dry-run`
    first). It writes a `Planned harness:` line and full-URL dependency links into every body, and labels only the
    issues with no open dependencies. The label is the start signal (Grok Build picks up labelled

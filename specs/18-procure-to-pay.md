@@ -108,20 +108,24 @@ pydantic field, which must agree with it.
 | --- | --- | --- |
 | `ok` | ingested and matched, whether or not a posting was staged | — |
 | `failed` | anything the run tried and could not do — an unreadable document, an extraction still invalid after its one repair (`needs_human` -- two attempts in all), or **a document with no matching seeded `invoice` row**, which `p2p ingest` refuses rather than inserting one, since creating invoices would make `invoice` a table a later slice writes rows to and the seed owns the twelve the batch uses | `validation` for all three — an extraction that will not validate is repeated validation failure, **not** `business`: app 17's spec adds `internal` precisely because miscategorising something that is not "a rule said no" would have this app explain a policy that does not exist. `transient` only for a document the budget cut mid-extraction |
-| `skipped` | the run never attempted it | `skip_reason`: `already_advanced`, or `not_reached` — which covers **both** reasons a found document goes unattempted, the budget stopping the run and the 25-document cap, since a folder may hold more than the cap |
+| `skipped` | the run never attempted it | `skip_reason`: `already_advanced`, or `not_reached` when the budget stopped the run before this document |
 
 `not_reached` is why a per-item outcome had to stay open to a third value: a document found and never attempted is
-neither a success nor a failure. **`stopped_early` names its cause** — `budget`, `cap`, or both — because the two
-have opposite remedies: raise the budget, or split the folder. A run that hits both says both.
+neither a success nor a failure. `stopped_early` carries the budget's own stated reason, which is the only way a
+run now ends early.
 
-**The cap counts attempts, not documents found**, and an `already_advanced` document does not consume one. That
-is what keeps a folder of 30 processable: the first run attempts 25 and reports five `not_reached` with
-`stopped_early: cap`, and a second run finds those 25 `already_advanced` — costing no attempts — and attempts the
-remaining five. Were the cap applied to documents found, a deterministic scan order would make documents 26 to 30
-unreachable by any number of reruns.
+**There is no run cap.** `p2p batch` refuses a folder holding more than 25 documents up front, as a validation
+error naming the count, and otherwise attempts every document in it. The `Budget` is the only thing that stops a
+run early. An earlier draft capped the run at 25 and processed a prefix, and four rounds of review went into the
+distinctions that needed — `not_reached` meaning two different things, `stopped_early` naming which, a rule that
+the cap counted attempts rather than documents so the remainder stayed reachable — before anyone noticed that the
+folder those rules described cannot exist: the seed holds twelve invoices, and a document with no seeded
+`invoice` row is `failed` rather than advanced, so a thirty-document folder was never going to behave as
+described. Refusing the folder costs a demo nothing and removes all of it.
 
 **`p2p demo` and `scripts/smoke.sh` work on their own database file**, at a **fixed path derived in code and not
-from configuration** -- `<temp dir>/p2p-demo.sqlite` -- deleted if a previous run left one behind, then built
+from configuration** -- a fresh `mkdtemp()` directory per run, which keeps two concurrent demos apart and needs
+no name guessed -- deleted if a previous run left one behind, then built
 from `erp/schema.sql` plus the seed and thrown away at the end. Deleting first is what makes a second run
 identical: a crashed run would otherwise leave a file the next run opens as an existing database and leaves
 alone, the round-6 symptom by the back door.
@@ -203,7 +207,7 @@ any value is used, and every id in a model answer is re-checked against the ERP 
 | --- | --- | --- | --- |
 | `invoice-extract` | one invoice document, 20,000 chars | `InvoiceDraft` — supplier name, po_ref, number, date, currency, total, lines[], per-field `confidence` 0–1, `unreadable[]` | 4.2, 4.3, 4.4 |
 | `invoice-match` | an `InvoiceDraft` plus tool results, 8,000 chars per result | `MatchOutcome` — verdict `match`/`variance`/`no_po`, variances[] with kind, expected, actual, `confidence`, `needs_human` and why | 1.4, 1.6, 5.5 |
-| `invoice-batch` | up to 25 documents, each capped as above | `BatchSummary` — per item id and outcome (`ok` / `failed` / `skipped`), `error_category` only when failed, `skip_reason` only when skipped, `change_key` whenever the item staged a posting; totals for all three, summing to `items`; `stopped_early` with a reason | 4.5 |
+| `invoice-batch` | at most 25 documents — a larger folder is refused up front, not truncated — each capped as above | `BatchSummary` — per item id and outcome (`ok` / `failed` / `skipped`), `error_category` only when failed, `skip_reason` only when skipped, `change_key` whenever the item staged a posting; totals for all three, summing to `items`; `stopped_early` with a reason | 4.5 |
 | `dispute-triage` | the case transcript (rolling summary + last 10 events, 12,000 chars) plus tool results | `DisputeStep` — next action from a closed set, `tool_choice` for it, draft reply, `escalate` with the matched criterion | 2.3, 5.1, 5.2 |
 
 - **Fixed decomposition (1.6).** `match` is always the same four steps in the same order: extract → fetch PO →
@@ -240,7 +244,7 @@ any value is used, and every id in a model answer is re-checked against the ERP 
 | Input | A good answer must… |
 | --- | --- |
 | A clean invoice matching its PO and receipt | return `verdict: match`, confidence ≥0.9, and stage a posting nobody has applied yet |
-| `p2p batch` over the **twelve-document** folder twice, on a persistent database | every item `skipped` with `skip_reason: already_advanced` on the second run, `stopped_early` unset; no invoice state written; `ok + failed + skipped == items` both times. Twelve on purpose: over a thirty-document folder the second run attempts the five the cap left, so an all-advanced assertion is false there |
+| `p2p batch` over the seeded folder twice, on a persistent database | on the second run every document that advanced on the first comes back `skipped` with `skip_reason: already_advanced`, the unreadable one is `failed` again, `stopped_early` is unset, no invoice state is written, and `ok + failed + skipped == items` both times |
 | An invoice 12 units over the goods receipt | return `variance` with kind `quantity`, expected and actual, and `needs_human` |
 | An invoice whose lines do not sum to its stated total | fail validation, be repaired once with the mismatch named, and record `repaired: true` |
 | An invoice with no PO reference | not stage anything, and escalate citing the "no PO" criterion |
@@ -361,8 +365,9 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    schema, the confidence bands (≥0.9, 0.6–0.9, <0.6) computed in code from per-field confidences and the variance
    set, the forcing rules (no PO, variance over 5%, flagged supplier, duplicate number), and the
    `p2p match` / `p2p staged` / `p2p review` / `p2p approve` commands. `p2p staged` is the only way an approver
-   reaches a change it did not stage, so it is this slice's work and not a later one's; its visibility rule gets
-   its own integration test, since the rule lives in the command rather than in 18.2's enumerated access rules.
+   reaches a change it did not stage, so the command is this slice's work. Its **visibility rule is 18.2's**, in
+   `list_staged`, with the integration test there: an access filter in a caller is what line 150 and 18.2's own
+   rules forbid, and this slice renders what the accessor returns rather than deciding it.
    `p2p review` and `p2p approve` are generic over staged
    changes — a posting, a credit memo or a payment hold — and call 18.2's `apply_change`; this slice adds no second
    apply path. Applying is a separate principal's act and refuses self-approval; a second apply is a no-op with a
@@ -388,12 +393,11 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    one `Budget` for the run and stop early with a stated reason when it is exhausted, record a `batch_run` row and
    print one `BatchSummary`. Every document lands in exactly one of `ok`, `failed` or `skipped` — `skipped`
    carrying `already_advanced` for an invoice a previous run moved and `not_reached` for one it never attempted,
-   whether because the budget ran out or because the folder held more than the 25-document cap — and the three
-   totals must sum to `items`. `stopped_early` names its cause, `budget` or `cap` or both. Two separate tests: a
-   folder of **30** documents reports 25 attempted, five `not_reached` and `stopped_early: cap`, and a second run
-   over that same folder attempts the five (the 25 `already_advanced` cost no attempts); and a re-run over the
-   **twelve-document** folder reports every item `already_advanced`, `stopped_early` unset, and writes no invoice
-   state. Each item that staged a posting carries its `change_key` in the summary and in
+   when the budget stopped the run before it — and the three totals must sum to `items`. A folder of more than 25
+   documents is **refused** with a validation error naming the count, which is its own test; the `Budget` is the
+   only early stop. A second test re-runs the seeded folder and asserts every document that advanced on the first
+   run comes back `already_advanced` and that no invoice state is written — note that the unreadable document in
+   that folder is `failed` on both runs, so the assertion is "everything that advanced", not "every item". Each item that staged a posting carries its `change_key` in the summary and in
    `batch_run.summary_json`, which is how an approver reaches those postings after the run's output is gone. Reuses 18.5's staged-write path exactly and adds **no** new write path, no new tool
    and no change to `p2p/core/`. Statement 4.5. Dependencies: 18.5.
 
@@ -403,7 +407,10 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    `p2p demo` tells the whole story on recorded replies at zero cost — ingest, repair, match, review, approve,
    batch, dispute, escalation — and `--live` switches to Bedrock. Records the fixtures with app 17's recorder
    (**app 17 slice 17.3**; if its provider and recorder are not in the pinned tag, stop and comment), and a
-   `scripts/smoke.sh` that runs the replay demo and asserts the printed outcomes. No network in the default path.
+   `scripts/smoke.sh` that runs the replay demo and asserts the printed outcomes, with a `--url` mode for the
+   live check after deploy that asserts `GET /health` returns the version and a passing replay round-trip. The
+   live surface is only that endpoint, so the full flow is the local path; the track's definition of done needs a
+   live smoke, and this is what there is to smoke. No network in the default path.
    Dependencies: 18.5, 18.6, 18.7.
 
 ### Wave 6

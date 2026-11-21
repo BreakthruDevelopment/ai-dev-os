@@ -14,10 +14,12 @@ merged PR.
 Needs Python 3.10+ and the gh CLI (signed in); the self-test also needs bash, git and jq.
 """
 import json
+import os
 import pathlib
 import re
 import subprocess
 import sys
+import tempfile
 
 OWNER = "BreakthruDevelopment"
 TOPIC = "30-apps-30-days"
@@ -270,6 +272,48 @@ def self_test() -> None:
     listed = [x.strip() for x in r.stdout.strip().split(",") if x.strip()]
     if listed != list(WAVE1_PATHS):
         failures.append(f"run-harness.sh --wave1-list disagrees with WAVE1_PATHS: {listed}")
+    # Track detection and the per-track prompt. App 17 has no package.json at all, so a run used to hand its
+    # builder `pnpm lint/typecheck/test/build` against a uv/ruff/pytest repo. Apps 18 and 19 are Python-track
+    # too, so this is the whole AWS demo track. Pinned in both directions: each track's prompt must carry its
+    # own toolchain and must NOT carry the other's.
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, files, want in (("python", ["pyproject.toml"], "python"),
+                                  ("node", ["package.json"], "node"),
+                                  ("both", ["pyproject.toml", "package.json"], "node"),
+                                  ("neither", [], "node")):
+            d = pathlib.Path(tmp) / name
+            d.mkdir()
+            for f in files:
+                (d / f).touch()
+            r = subprocess.run(["bash", str(SCRIPT), "--track", str(d)], capture_output=True, text=True, check=True)
+            if r.stdout.strip() != want:
+                failures.append(f"run-harness.sh --track {name}: {r.stdout.strip()!r}, wanted {want!r}")
+    for track, musts, must_nots in (
+            # The python prompt names pnpm and package.json on purpose, in a negative instruction
+            # ("there is no pnpm ... don't run pnpm"), so match the COMMANDS, not the words.
+            ("python", ["uv run pytest", "uv run mypy --strict", "uv run ruff check"],
+             ["pnpm lint", "pnpm test", "pnpm build", "pnpm install", "pnpm typecheck",
+              "pnpm smoke", "localhost:", ".next/standalone"]),
+            ("node", ["pnpm lint", "pnpm typecheck", "pnpm build"],
+             ["uv run", "pyproject.toml"])):
+        r = subprocess.run(["bash", str(SCRIPT), "--prompt", track], capture_output=True, text=True, check=True)
+        for must in musts:
+            if must not in r.stdout:
+                failures.append(f"run-harness.sh --prompt {track} omits {must!r}")
+        for must_not in must_nots:
+            if must_not in r.stdout:
+                failures.append(f"run-harness.sh --prompt {track} mentions {must_not!r}")
+    # The database preflight runs before any clone exists, so it goes on REPOS. Fails safe: anything not known
+    # to be Python-track counts as needing a database.
+    for repos, want in (("", "yes"), ("17-agent-container", "no"),
+                        ("17-agent-container 18-procure-to-pay 19-enablement-kit", "no"),
+                        ("01-build-tracker", "yes"), ("17-agent-container 01-build-tracker", "yes"),
+                        ("20-not-created-yet", "yes")):
+        env = dict(os.environ, REPOS=repos)
+        r = subprocess.run(["bash", str(SCRIPT), "--repos-need-db"], capture_output=True, text=True,
+                           check=True, env=env)
+        if r.stdout.strip() != want:
+            failures.append(f"run-harness.sh --repos-need-db REPOS={repos!r}: {r.stdout.strip()!r}, wanted {want!r}")
     for issue, want in DEP_CASES:
         got = dep_state(issue)
         r = subprocess.run(["bash", str(SCRIPT), "--dep-state"], input=json.dumps(issue),

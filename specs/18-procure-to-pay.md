@@ -123,19 +123,17 @@ folder those rules described cannot exist: the seed holds twelve invoices, and a
 `invoice` row is `failed` rather than advanced, so a thirty-document folder was never going to behave as
 described. Refusing the folder costs a demo nothing and removes all of it.
 
-**`p2p demo` and `scripts/smoke.sh` work on their own database file**, at a **fixed path derived in code and not
-from configuration** -- a fresh `mkdtemp()` directory per run, which keeps two concurrent demos apart and needs
-no name guessed -- deleted if a previous run left one behind, then built
-from `erp/schema.sql` plus the seed and thrown away at the end. Deleting first is what makes a second run
-identical: a crashed run would otherwise leave a file the next run opens as an existing database and leaves
-alone, the round-6 symptom by the back door.
+**`p2p demo` and `scripts/smoke.sh` work on their own database**, in a fresh `mkdtemp()` directory per run, built
+from `erp/schema.sql` plus the seed and removed with its directory at the end. A second run is identical to the
+first because the directory is new, not because anything was cleaned up: there is **no delete step**, and nothing
+to delete. Two concurrent runs cannot collide either, since neither can name the other's directory.
 
-**The delete refuses any other path.** It is the one destructive operation in this app, and the database path is
-otherwise a parameter of `erp.py`, so a demo that honoured configuration could be aimed at a person's real
-database and would delete it. The demo therefore computes its own path, ignores the configured one, and asserts
-the path it is about to remove is that computed path before removing it; a test asserts the delete refuses a
-configured path. This is 18.8's work and 18.8 is `grok`, which is why the rule is written here rather than left
-to the builder. Back-to-back smoke — which the track requires — therefore gives
+That is also what keeps the demo away from real data. The database path is otherwise a parameter of `erp.py`, so
+a demo honouring configuration could be aimed at a person's database — and an earlier draft, which deleted a
+file at a path before rebuilding it, would then have deleted it. `mkdtemp()` removes the hazard rather than
+guarding it: the demo ignores the configured path entirely, and removes only the directory it created. A test
+asserts the demo leaves a configured database untouched. This is 18.8's work and 18.8 is `grok`, which is why
+the rule is written here rather than left to the builder. Back-to-back smoke — which the track requires — therefore gives
 identical output, where sharing one file would make every batch item `already advanced` on the second pass. They
 get their own file rather than rebuilding the shared one because `p2p demo` may be run by anyone: rebuilding in
 place would discard a staged change an approver was about to apply and truncate the append-only `extraction` and
@@ -207,7 +205,6 @@ any value is used, and every id in a model answer is re-checked against the ERP 
 | --- | --- | --- | --- |
 | `invoice-extract` | one invoice document, 20,000 chars | `InvoiceDraft` — supplier name, po_ref, number, date, currency, total, lines[], per-field `confidence` 0–1, `unreadable[]` | 4.2, 4.3, 4.4 |
 | `invoice-match` | an `InvoiceDraft` plus tool results, 8,000 chars per result | `MatchOutcome` — verdict `match`/`variance`/`no_po`, variances[] with kind, expected, actual, `confidence`, `needs_human` and why | 1.4, 1.6, 5.5 |
-| `invoice-batch` | at most 25 documents — a larger folder is refused up front, not truncated — each capped as above | `BatchSummary` — per item id and outcome (`ok` / `failed` / `skipped`), `error_category` only when failed, `skip_reason` only when skipped, `change_key` whenever the item staged a posting; totals for all three, summing to `items`; `stopped_early` with a reason | 4.5 |
 | `dispute-triage` | the case transcript (rolling summary + last 10 events, 12,000 chars) plus tool results | `DisputeStep` — next action from a closed set, `tool_choice` for it, draft reply, `escalate` with the matched criterion | 2.3, 5.1, 5.2 |
 
 - **Fixed decomposition (1.6).** `match` is always the same four steps in the same order: extract → fetch PO →
@@ -393,9 +390,14 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    one `Budget` for the run and stop early with a stated reason when it is exhausted, record a `batch_run` row and
    print one `BatchSummary`. Every document lands in exactly one of `ok`, `failed` or `skipped` — `skipped`
    carrying `already_advanced` for an invoice a previous run moved and `not_reached` for one it never attempted,
-   when the budget stopped the run before it — and the three totals must sum to `items`. A folder of more than 25
-   documents is **refused** with a validation error naming the count, which is its own test; the `Budget` is the
-   only early stop. A second test re-runs the seeded folder and asserts every document that advanced on the first
+   when the budget stopped the run before it — and the three totals must sum to `items`. **`BatchSummary` is
+   assembled in code, not asked of a model**: there is no `invoice-batch` task, and a batch is 18.4's and 18.5's
+   tasks run per document with the totals counted around them. A model could not supply these values anyway —
+   `already_advanced` is database state, `not_reached` is a fact about the budget, and a `change_key` is generated
+   by a write made during the run — and 18.7 is forbidden any new tool, which is what a forced output schema would
+   need. A folder of more than **25** documents is **refused** with a validation error naming the count, and no
+   `batch_run` row is recorded, because nothing ran. Twenty-five is a demo bound, not a safety one: it keeps one
+   run's summary readable on a terminal and its cost predictable. The `Budget` is the only early stop. A second test re-runs the seeded folder and asserts every document that advanced on the first
    run comes back `already_advanced` and that no invoice state is written — note that the unreadable document in
    that folder is `failed` on both runs, so the assertion is "everything that advanced", not "every item". Each item that staged a posting carries its `change_key` in the summary and in
    `batch_run.summary_json`, which is how an approver reaches those postings after the run's output is gone. Reuses 18.5's staged-write path exactly and adds **no** new write path, no new tool

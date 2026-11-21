@@ -19,7 +19,10 @@ Produce `specs/NN-slug.md` from `templates/spec.md`:
    endpoint) and the control for each.
 7. **Issues, in waves.** One issue per slice, grouped into waves in the spec's Issues section (format in
    `templates/spec.md`). **Wave 1 is the foundation**: schema, migrations, roles, access rules and auth config,
-   always `claude` and security-sensitive. No later slice may create or edit the foundation paths,
+   always `claude` and security-sensitive. No later slice may create or edit the foundation paths — which are generated, never written out here: `WAVE1_PATHS` in
+   `scripts/issuelib.py` is rendered into each issue's Notes section and into the runner's instructions. **Your
+   spec's Issues section must name the paths that apply to the repo you are planning**, including any the
+   guard cannot express, as app 17's `agent_container/core/` allows additions but not edits —
    unless a security-sensitive `claude` slice is named as the owner (e.g. a CSP in `src/proxy.ts`); if one
    needs a schema change, give that change its own foundation slice. Every slice not planned for `claude` depends, directly or not, on wave 1. Put the role
    in the title (`[ui-builder] Dashboard page`), the planned harness (`claude`, `codex` or `grok`, using the
@@ -32,8 +35,6 @@ Produce `specs/NN-slug.md` from `templates/spec.md`:
 8. **Security-sensitive slices.** Every wave 1 slice is one. Also mark each slice that touches auth, roles and access, payments, tenancy, uploads,
    tokens or secrets, or AI tool calls that write data as needing a Codex second review, in the spec and the issue
    body, so its PR gets the `security-sensitive` label.
-
-   Which paths those are is generated, never written out here: `WAVE1_PATHS` in `scripts/issuelib.py` is rendered into each issue's Notes section and into the runner's instructions, and every hand-written copy has gone stale. **Your spec's Issues section must name the paths that apply to the repo you are planning**, including any the guard cannot express — app 17's `agent_container/core/` allows additions but not edits, which a path-prefix matcher cannot say.
 
 This is gate 1 of the BreakthruSoftwareFactory (`FACTORY.md`): Michael approves the scope by merging the spec PR.
 

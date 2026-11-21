@@ -22,6 +22,7 @@ additions are allowed and edits are not.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -50,7 +51,9 @@ def rendered() -> str:
     """One sentence naming the guarded set, then one naming what the guard cannot cover."""
     paths = ", ".join(f"`{p}`" for p in WAVE1_PATHS)
     return (
-        f"The paths the pre-push guard enforces are {paths} — one list, `WAVE1_PATHS` in "
+        f"The paths the pre-push guard enforces are {paths} — role and permission code lives in "
+        f"`src/lib/auth/`, and `src/proxy.ts` and `src/middleware.ts` sit in front of every request. One "
+        f"list, `WAVE1_PATHS` in "
         f"`scripts/issuelib.py`, mirrored by `WAVE1_RE` in `scripts/run-harness.sh`. A spec may "
         f"protect more than the guard can express: today {UNGUARDED}. This paragraph is generated "
         f"by `scripts/sync-wave1-docs.py`; edit the list in `issuelib.py`, not here."
@@ -77,27 +80,44 @@ def apply(text: str) -> str:
     return text
 
 
+def is_stray(rel: str, text: str) -> bool:
+    """Whether this file carries a region nothing renders. Split out so `self_test` can reach it."""
+    return BEGIN in text and rel not in DOCS
+
+
 def stray_markers() -> list[str]:
-    """Tracked Markdown outside DOCS that carries a region nothing renders.
+    """Markdown outside DOCS that carries a region nothing renders.
 
     `templates/spec.md` is in DOCS and carries a region, so every spec copied from it inherits one — and
     `specs/` is not rendered or checked, which would leave a marked, generated-looking, silently stale list in
     each new spec. Fail instead, and let whoever adds it decide: delete the region from that file, or add the
     file to DOCS.
     """
+    try:
+        listed = subprocess.run(["git", "-C", str(ROOT), "ls-files", "*.md"],
+                                capture_output=True, text=True, check=True).stdout.split()
+    except (OSError, subprocess.CalledProcessError):
+        # No git here: fall back to a walk, skipping the places a checkout keeps its own files.
+        listed = [p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*.md")
+                  if not any(part.startswith(".") or part == "node_modules" for part in
+                             p.relative_to(ROOT).parts[:-1])]
     out = []
-    for p in sorted(ROOT.rglob("*.md")):
-        rel = p.relative_to(ROOT).as_posix()
-        if rel in DOCS or any(part in {".git", "node_modules"} for part in p.parts):
-            continue
-        if BEGIN in p.read_text():
+    for rel in sorted(listed):
+        f = ROOT / rel
+        if f.is_file() and is_stray(rel, f.read_text()):
             out.append(rel)
     return out
 
 
 def self_test() -> int:
-    """Pin the two mutations that otherwise pass vacuously."""
+    """Pin the mutations that otherwise pass vacuously -- one per guard, including the stray check."""
     failures = []
+    if not is_stray("runs/01-x.md", f"a\n{BEGIN}\nb"):
+        failures.append("is_stray() missed a region outside DOCS")
+    if is_stray(DOCS[0], f"a\n{BEGIN}\nb"):
+        failures.append("is_stray() flagged a document DOCS renders")
+    if is_stray("runs/01-x.md", "no region here"):
+        failures.append("is_stray() flagged a file with no region")
     if not regions(f"{BEGIN}\nx\n{END}"):
         failures.append("regions() found none in a document that has one")
     marked = f"a\n{BEGIN}\nstale\n{END}\nb"

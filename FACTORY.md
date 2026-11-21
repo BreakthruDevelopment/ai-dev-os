@@ -56,19 +56,22 @@ Added 2026-11-14 after the app 13 incident below.
 - **Waves.** A spec's Issues section groups slices into waves. **Wave 1 is the foundation**: schema, migrations,
   roles, access rules and auth config, always `claude` and `security-sensitive`. The **foundation paths** on the Next.js
   template are `src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/` (where role and permission code
-  lives), `src/lib/access.ts`, `src/proxy.ts` and `src/middleware.ts`; on the Python track they are the repo's
+  lives), `src/lib/access.ts`, `src/lib/access/`, `src/proxy.ts` and `src/middleware.ts`; on the Python track they are the repo's
   `core/` package, `erp/` and `contracts/`. The single mechanically-enforced list is `WAVE1_PATHS` in
   `scripts/issuelib.py`, and each spec's Issues section names the paths that apply to its repo.
   **One known gap:** app 17's spec allows a later, non-security-sensitive slice to *add* files under its
   `core/` package while forbidding edits (17.5 adds `core/log.py`). The guard matches on path prefix and
   `git diff --name-only` lists additions, so it cannot express that, and `agent_container/core/` is therefore left
-  out of `WAVE1_PATHS` and protected by its spec and the reviewer alone. A spec that wants
-  add-but-not-edit enforced mechanically needs the guard taught the distinction first. No slice outside wave 1 creates or edits them
-  unless a security-sensitive `claude` slice is named as the owner (e.g. of a CSP in `src/proxy.ts`). Grok Build
-  and Codex never touch a foundation path **unless the spec names their slice as its owner** — app 17's 17.5 is a
-  `grok` slice that may add `core/log.py`, which is why that path is outside the guard. Read the spec, not this
-  sentence alone. If a later slice needs a schema change, the spec gives that change its own foundation
-  slice, or the builder stops and comments on the issue. Later waves list their
+  out of `WAVE1_PATHS` and protected by its spec and the reviewer alone. A spec that wants add-but-not-edit
+  enforced mechanically needs the guard taught the distinction first.
+  No slice outside wave 1 creates or edits a foundation path unless a **security-sensitive `claude` slice** is
+  named as its owner (e.g. of a CSP in `src/proxy.ts`). **Grok Build and Codex never touch a path that is in
+  `WAVE1_PATHS`, whatever a spec says** — a spec cannot hand one to them, and the runner refuses such a branch
+  regardless of labels, so a slice written that way would simply be undeliverable. The single exception is a
+  foundation path deliberately left *outside* the guard — today only app 17's `agent_container/core/` — where a
+  non-security-sensitive slice may **add** files and still may not edit existing ones; 17.5 adding `core/log.py`
+  is that case. If a later slice needs a schema change, the spec gives that change its own foundation slice, or
+  the builder stops and comments on the issue. Later waves list their
   dependencies as before, and every slice not planned for `claude` depends, directly or not, on wave 1.
 - **Planned harness vs start signal.** Every issue body has a `Planned harness: <name>` line (the owner) and a
   `## Dependencies` section of full issue URLs (or `None`). The harness label is the start signal
@@ -81,8 +84,8 @@ Added 2026-11-14 after the app 13 incident below.
   creation), so a removal sticks until a person adds the label back.
 - **The Mac runner fails closed.** `scripts/run-harness.sh` won't claim an issue without a `## Dependencies`
   section, with a bare `#N` or `repo#N` there, or without a `Planned harness:` line naming its harness. Before
-  pushing, it refuses every branch that changes the foundation paths, whatever the issue's labels (their owners are
-  all `claude` slices): the branch stays on the Mac and the issue gets a comment naming the files. That check
+  pushing, it refuses every branch that changes a path in `WAVE1_PATHS`, whatever the issue's labels (every owner
+  of one is a `claude` slice, and a spec may not name another harness): the branch stays on the Mac and the issue gets a comment naming the files. That check
   compares with the `main` commit recorded before the harness ran (not the clone's `origin/main`, which the harness
   could move), and holds the push if the branch doesn't build on that commit or git can't list its changes. A
   harness that finds its data layer missing writes `.harness/blocked.md` instead of committing; the runner posts it

@@ -49,7 +49,7 @@ Who would hire this out, what they need, and the roles in the app (for example c
 
 Slices are grouped into waves. **Wave 1 is the foundation**: schema, migrations, roles, access rules and auth
 config, always `claude` and security-sensitive (**2nd: Codex**). No slice outside wave 1 creates or edits the
-foundation paths — `src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`,
+foundation paths — `src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/lib/access/`,
 `src/proxy.ts`, `src/middleware.ts` on this template, or the `core/` package, `erp/` and `contracts/` on the
 Python track; `WAVE1_PATHS` in `scripts/issuelib.py` is what the guard enforces, and **this section must name the
 paths that apply to this repo** — unless a security-sensitive `claude` slice is named as the owner; if a later

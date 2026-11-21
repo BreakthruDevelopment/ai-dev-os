@@ -23,7 +23,7 @@ Requirements:
 - Before opening the PR, run: `pnpm lint && pnpm typecheck && pnpm build`.
 
 Foundation guardrails (wave 1 owns the data layer):
-- Never create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts` on the Next.js template, or `p2p/core/`, `kit/core/`, `erp/` and `contracts/` on the Python track — `WAVE1_PATHS` in `scripts/issuelib.py` is the one list, and the spec's Issues section names the paths that apply to the repo you are in). The app's foundation (wave 1) slice
+- Never create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts` on the Next.js template, or `p2p/core/`, `kit/core/`, `erp/` and `contracts/` on the Python track — `src/lib/access/` too, and on the Python track `p2p/core/`, `kit/core/`, `erp/` and `contracts/`. That set is `WAVE1_PATHS` in `scripts/issuelib.py`, which the pre-push guard enforces. It is **not** the whole of what a spec may protect: app 17's `agent_container/core/` is a foundation path that the guard deliberately does not cover, because its spec allows additions there but forbids edits. Read your spec's Issues section for the paths that bind you, and never assume a path is fair game because the guard is silent). The app's foundation (wave 1) slice
   owns them.
 - If the tables, data functions, roles or access rules your pages need aren't on `main`, stop and comment on the
   issue with what's missing (under `scripts/run-harness.sh`, write it to `.harness/blocked.md` and make no commits;

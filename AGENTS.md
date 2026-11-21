@@ -120,7 +120,7 @@ Wave 1 is the foundation (schema, migrations, roles, access rules, auth config):
 `security-sensitive`. No issue outside wave 1 creates or edits the foundation paths, unless a
 security-sensitive `claude` slice is named as the owner. On the Next.js template those are `src/lib/db/`,
 `drizzle/`, `drizzle.config.ts`, `src/lib/auth/` (where role and permission code lives), `src/lib/access.ts`,
-`src/proxy.ts` and `src/middleware.ts`; on the Python track they are the repo's `core/` package, `erp/` and
+`src/lib/access/`, `src/proxy.ts` and `src/middleware.ts`; on the Python track they are the repo's `core/` package, `erp/` and
 `contracts/`, and each spec's Issues section names the ones that apply to its repo. The mechanically enforced
 list is `WAVE1_PATHS` (`scripts/issuelib.py`), mirrored by `WAVE1_RE` in `scripts/run-harness.sh` with a
 self-test that fails if they disagree, and the note in every generated issue is derived from it. **App 17's

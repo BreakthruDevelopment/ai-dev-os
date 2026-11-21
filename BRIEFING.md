@@ -33,7 +33,7 @@ The agent setup that builds them (this repo) is itself a portfolio piece: an AI 
 | Budget | Nothing beyond the existing subscriptions (Claude, X/Grok, ChatGPT Plus, Google AI Pro) and cloud free tiers. No extra credits, no paid services. |
 | AWS demo track | **Apps 17-20 are an exception to the Stack, AI, Clouds and Budget rows** (Michael, 2026-11-19). Four Python repositories on Amazon Bedrock (Claude Sonnet 4.6, us-east-2) in a second AWS account, built for a Caylent interview on 2026-12-01: one shared agent container and three demos that cover the Claude Certified Architect exam's six scenarios. Build target 2026-11-24. Plan: [`specs/day-0-aws-demo-track.md`](specs/day-0-aws-demo-track.md). |
 | Order | App 1 is the **Build Tracker**, built first so it serves as mission control for the month. Full list in [`catalog.yaml`](catalog.yaml). |
-| Pace | 30-35 days total for the whole portfolio; the roadmap's W01-W16 are topic labels, not a schedule. Twenty-one apps remain against roughly 17-22 days, so it fits only if repeated work is built once and reused: retrieval/rerank/evals in app 33; HITL approvals, webhooks and agent tracing as optional template modules (new files only, so live apps are untouched). Parallelism is **across harnesses**, never many agents inside one Claude Code session (still on the dropped list): Claude Code runs foundations, reviews, merges, app 33 and template modules sequentially; Grok takes UI; Antigravity and Codex take non-security slices and docs. Claude Code is the constraint, so moving work out of it buys more than making it faster. If it still doesn't fit, the answer is fewer apps or more days, not a thinner definition of done. |
+| Pace | 30-35 days total for the whole portfolio; the roadmap's W01-W16 are topic labels, not a schedule. Twenty-one apps remain against roughly 17-22 days, so it fits only if repeated work is built once and reused: retrieval/rerank/evals in app 33; HITL approvals, webhooks and agent tracing as optional template modules (new files only, so live apps are untouched). Parallelism is **across harnesses**, never many agents inside one Claude Code session (still on the dropped list): Claude Code runs foundations, reviews, merges, app 33 and template modules sequentially; Grok takes UI and docs; Codex takes non-security slices. Claude Code is the constraint, so moving work out of it buys more than making it faster. If it still doesn't fit, the answer is fewer apps or more days, not a thinner definition of done. |
 | Roadmap coverage | Apps 16-33 are aimed so that together they prove every week of the **AI Engineer Roadmap** (W01-W16). Scored honestly in [`ROADMAP.md`](ROADMAP.md): **live** only when running in a deployed app, **built** when merged but not deployed, and the two are never conflated. Today: 0 live, 3 built, 10 partial, 3 gaps (a week is live only when every topic in it is; W02 is held back by OOP alone). Deploying app 31 flips all three **built** weeks to **live**, the largest single coverage gain available. |
 | Local compute | The Mac mini is a component host, not a dependency: tunnelled, token-protected endpoints with a cloud fallback. In version 2 it also takes batch embeddings, eval sweeps, reranker inference and scheduled ingestion - work that is wasteful to rent. Nothing on a live URL may require it to be awake. |
 | Waves | Every spec groups its issues into waves. Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and `security-sensitive`, and the only slice that may change the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`). Builders who find the data layer missing stop and comment; they never invent schema or auth ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)). |
@@ -63,7 +63,7 @@ calling the Claude API from the apps, paid DNS, and running many agents in paral
 ## How the AI team is organized
 
 - A **model** does the thinking (Claude, Grok, OpenAI's Codex models, Gemini).
-- A **harness** wraps a model so it can act on code: Claude Code, Codex, Grok Build, Antigravity, Grok Bot.
+- A **harness** wraps a model so it can act on code: Claude Code, Codex, Grok Build, Grok Bot.
 - An **agent** is a role running inside a harness. The eight roles live in [`roles/`](roles/), written once and
   usable by any harness.
 
@@ -72,14 +72,16 @@ calling the Claude API from the apps, paid DNS, and running many agents in paral
 | Claude Code | Claude | Issues labeled `claude`; scheduled tasks overnight | Planner, reviewer, AI builder, deploys, template changes; the nightly ops report (scheduled task, 5:37 AM Central, posted to the `Ops report (nightly)` issue in this repo) |
 | Codex | ChatGPT Plus (tightest limits) | Issues labeled `codex` | Fullstack on selected issues; second review on security-sensitive PRs |
 | Grok Build | X (SuperGrok) | Issues labeled `grok`, worked when Michael runs `scripts/run-harness.sh grok` on his Mac | UI pages, fullstack issues and READMEs; Michael wants it used more |
-| Antigravity | Google AI Pro | Issues labeled `antigravity`, worked when Michael runs `scripts/run-harness.sh antigravity` | Fullstack and docs, on trial |
+| ~~Antigravity~~ | Google AI Pro | **Retired 2026-11-20** without coming off trial; plan no new work to it | — |
 | Grok Bot | X (Grok) | Michael pastes in an issue, or a live app's README and URL | Backup `ui-builder` / `fullstack-builder` when Grok Build is out of usage: works the pasted issue on a `grok/<task>` branch and opens a PR that goes through the same gates. Build-in-public drafts: an X post, a LinkedIn post and a two-minute demo script per app. No secrets, never merges; Michael posts |
 
 **Jules is gone.** Google turns it read-only after 2026-11-11 and shuts it down on 2026-12-31
-([changelog](https://jules.google/docs/changelog/)); Google Antigravity replaces it. Its open issues were
-reassigned on 2026-11-09 ([`specs/day-0-apps-5-8.md`](specs/day-0-apps-5-8.md#2026-11-09-reassignment)).
+([changelog](https://jules.google/docs/changelog/)); Google Antigravity replaced it on 2026-11-09, and
+Antigravity was itself retired on 2026-11-20 without coming off trial. Jules's open issues were reassigned on
+2026-11-09 ([`specs/day-0-apps-5-8.md`](specs/day-0-apps-5-8.md#2026-11-09-reassignment)). **Three harnesses
+plan new work: Claude Code, Codex and Grok Build.**
 
-**Labels are the start signal.** Grok Build and Antigravity are CLIs on Michael's Mac, not GitHub apps, so a label
+**Labels are the start signal.** Grok Build is a CLI on Michael's Mac, not a GitHub app, so a label
 doesn't trigger them. An issue gets its harness label only once its dependencies are done (completed or merged)
 (`scripts/release-labels.py`); the runner script then picks it up, works it in `~/30apps/<repo>` and opens a PR. It
 fails closed: it skips anything whose dependencies are still open, any issue without a `## Dependencies` section of
@@ -106,7 +108,7 @@ and close-out (7).
 5. The day's app is deployed to its cloud, smoke-tested at its live URL; its DNS record is created by the deploy.
    Claude Code merges the `apps.yaml` PR once its checks are green and the plan holds no surprise.
 6. Overnight, Codex and scheduled Claude Code tasks work queued issues into PRs, and may squash-merge app-repo PRs
-   that go green; Grok Build and Antigravity run whenever Michael starts the runner. The nightly ops report lands in
+   that go green; Grok Build runs whenever Michael starts the runner. The nightly ops report lands in
    the `Ops report (nightly)` issue.
 7. Close-out: the run log (`runs/NN-slug.md`), `catalog.yaml` status and this briefing are updated, and Grok Bot
    drafts the launch posts and demo script from the README for Michael to post. An app is **done** only with a filled
@@ -209,5 +211,5 @@ Per-app evidence is in [`runs/`](runs/); the 2026-11-10 gap list is in [`runs/re
 | What to build | [`catalog.yaml`](catalog.yaml), then `specs/NN-slug.md` |
 | How code must be written in an app | That app repo's `AGENTS.md` |
 | The day's routine | [`runbooks/daily.md`](runbooks/daily.md) |
-| Running Grok Build and Antigravity | [`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md) |
+| Running Grok Build | [`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md) |
 | How deploys work | [`30-apps-infra` README](https://github.com/BreakthruDevelopment/30-apps-infra#how-deploys-work) |

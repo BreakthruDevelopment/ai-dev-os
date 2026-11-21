@@ -1,7 +1,7 @@
 # AI Dev OS: rules for every agent
 
 This repo is the operating system for the **30 apps in 30 days** build: who does what, how work moves, and the
-rules every AI tool follows. Claude Code, Codex, Grok Build, Antigravity and Grok Bot all read this file.
+rules every AI tool follows. Claude Code, Codex, Grok Build and Grok Bot all read this file.
 
 The process is called the **BreakthruSoftwareFactory**. Its five gates (spec, build, review, release, close-out),
 the definition of done and the required review are in [`FACTORY.md`](FACTORY.md); this file is its rulebook.
@@ -16,7 +16,7 @@ The BreakthruDevelopment org holds other, unrelated applications that must never
 - Touch only repos with the GitHub topic `30-apps-30-days`. Anything else is read-only.
 - Before creating a repo, list existing names. If the name is taken, **stop and ask**; never reuse or rename.
 - Never force-push, delete, rename, transfer or archive a repo or branch.
-- Never push to `main`. Work on `<harness>/<task>` branches (`claude/…`, `codex/…`, `grok/…`, `antigravity/…`) and open a PR.
+- Never push to `main`. Work on `<harness>/<task>` branches (`claude/…`, `codex/…`, `grok/…`) and open a PR.
 - Never commit or paste secrets. Keys go into GitHub Actions secrets or a cloud secret manager, entered by Michael.
 - **Who merges.** Any harness may squash-merge an **app-repo** PR (a repo tagged `30-apps-30-days` other than
   `ai-dev-os` and `30-apps-infra`) only when every required check is green on the current head commit, including
@@ -43,7 +43,7 @@ The BreakthruDevelopment org holds other, unrelated applications that must never
 | Layer | What it is | Here |
 | --- | --- | --- |
 | **Model** | The LLM doing the thinking | Claude (Opus, Sonnet), OpenAI's Codex models, Grok, Gemini |
-| **Harness** | The program that wraps a model so it can read files, run commands and open PRs; each has a subscription with its own usage limits | Claude Code, Codex, Grok Build, Antigravity, Grok Bot |
+| **Harness** | The program that wraps a model so it can read files, run commands and open PRs; each has a subscription with its own usage limits | Claude Code, Codex, Grok Build, Grok Bot |
 | **Agent** | A role (instructions, allowed tools, a goal) running inside a harness | The files in `roles/` |
 
 One harness can run many agents, and any role can run in any harness that has capacity. Roles are defined once,
@@ -55,22 +55,29 @@ in `roles/`, as plain instructions. Claude Code gets them as subagents in `.clau
 | Claude Code | Claude | An issue is labelled `claude` (sessions, or scheduled tasks overnight) | Planner, reviewer, AI builder, deploys, template changes |
 | Codex | ChatGPT Plus (tightest limits) | An issue is labelled `codex` | Fullstack on selected issues; second review on security-sensitive PRs |
 | Grok Build | X (SuperGrok) | Michael runs `scripts/run-harness.sh grok` on his Mac | UI pages, fullstack issues, READMEs (used more from 2026-11-09) |
-| Antigravity | Google AI Pro | Michael runs `scripts/run-harness.sh antigravity` on his Mac | Fullstack and docs (on trial) |
+| ~~Antigravity~~ | Google AI Pro | **Retired 2026-11-20**: never came off trial. Plan no new work to it | — |
 | Grok Bot | X (Grok) | Michael pastes in an issue, or an app's README and live URL | Backup builder when Grok Build is out of usage; launch posts and demo scripts (below) |
 
-Grok Build and Antigravity are CLIs on Michael's Mac, not GitHub apps: labels don't trigger them, the runner
-script does ([`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md)). Jules is gone: Google turns it
-read-only after 2026-11-11 and shuts it down on 2026-12-31; Antigravity replaces it.
+Grok Build is a CLI on Michael's Mac, not a GitHub app: labels don't trigger it, the runner script does
+([`runbooks/harnesses-on-mac.md`](runbooks/harnesses-on-mac.md)). Jules is gone (Google turned it read-only
+after 2026-11-11 and shuts it down on 2026-12-31), and Antigravity, which was to replace it, is retired too.
+
+**Three harnesses plan new work from 2026-11-20: Claude Code, Codex and Grok Build** (Michael's decision).
+Antigravity never came off trial, and a fourth harness to keep working is a cost the remaining schedule does
+not have. The machinery still *parses* `antigravity` and `jules` — `issuelib.HARNESSES`, `run-harness.sh` and
+the specs for apps 1-16 all name them, and rewriting that history would falsify the record — so nothing
+breaks; it simply stops being planned. A spec that still routes a slice to Antigravity is re-routed when it is
+next touched, not retroactively.
 
 | Role (`roles/`) | Default harness | Can move to |
 | --- | --- | --- |
 | `planner` | Claude Code | — |
-| `fullstack-builder` | Grok Build; Codex or Antigravity on the issues assigned to them; Claude Code for template changes | Claude Code, Codex, Antigravity, Grok Bot |
-| `ai-builder` | Claude Code | Antigravity, Grok Build |
-| `ui-builder` | Grok Build | Antigravity, Claude Code, Grok Bot |
+| `fullstack-builder` | Grok Build; Codex on the issues assigned to it; Claude Code for template changes | Claude Code, Codex, Grok Bot |
+| `ai-builder` | Claude Code | Grok Build |
+| `ui-builder` | Grok Build | Claude Code, Grok Bot |
 | `reviewer` | Claude Code on every PR, plus Codex on security-sensitive PRs | — |
-| `devops` | Claude Code | any (Terraform changes in `30-apps-infra`: Grok Build or Antigravity) |
-| `docs-writer` | Grok Build | Antigravity, any |
+| `devops` | Claude Code | any (Terraform changes in `30-apps-infra`: Grok Build) |
+| `docs-writer` | Grok Build | Claude Code, Codex |
 | `ops-monitor` | Claude Code scheduled task (nightly, 5:37 AM Central, posts to the `Ops report (nightly)` issue in this repo) | Claude Code session |
 
 **Grok Bot's jobs.** It holds no secrets and never merges. It has two jobs:
@@ -95,7 +102,7 @@ Harnesses never talk to each other directly. Work moves through:
 | --- | --- |
 | What to build | `catalog.yaml` (this repo) and the app's spec at `specs/NN-slug.md` |
 | The queue | One GitHub Project board across every app repo |
-| Work items | Issues, each with a role in the title (`[ui-builder] Dashboard page`), a `Planned harness:` line, and, once its dependencies are done, that harness's label: `claude`, `codex`, `grok` or `antigravity` |
+| Work items | Issues, each with a role in the title (`[ui-builder] Dashboard page`), a `Planned harness:` line, and, once its dependencies are done, that harness's label: `claude`, `codex` or `grok` |
 | Changes | Pull requests from `<harness>/<task>` branches |
 | Status | PR checks, the board, and the Build Tracker (app 1) |
 | What happened | A run log per app in `runs/NN-slug.md` |
@@ -126,7 +133,7 @@ When a harness hits its usage limit, Michael (or the planner) relabels its open 
 5. **Docs writer** fills in the README from `templates/app-readme.md`. Grok Bot drafts the launch posts and demo script from it.
 6. **Claude Code** merges the `apps.yaml` PR once its checks are green and the plan holds no surprise; **Michael** posts the app. DNS records are created in Cloudflare by Terraform on deploy
    (`30-apps-infra` README, "Custom domains and DNS"); nobody adds them by hand.
-7. **Overnight:** Codex and scheduled Claude Code tasks work queued issues into PRs; Grok Build and Antigravity work theirs whenever Michael starts the runner on his Mac. The ops monitor (a scheduled Claude Code task) releases labels whose dependencies closed and posts to the `Ops report (nightly)` issue. Agents may squash-merge app-repo PRs that go green; Claude Code also merges green deploy and playbook PRs; spec PRs wait for Michael.
+7. **Overnight:** Codex and scheduled Claude Code tasks work queued issues into PRs; Grok Build works its own whenever Michael starts the runner on his Mac. The ops monitor (a scheduled Claude Code task) releases labels whose dependencies closed and posts to the `Ops report (nightly)` issue. Agents may squash-merge app-repo PRs that go green; Claude Code also merges green deploy and playbook PRs; spec PRs wait for Michael.
 
 Steps 4 and 6 are **gate 4, release** (devops updates `apps.yaml`, Claude Code merges it, live smoke). **Gate 5,
 close-out** is the run log in `runs/NN-slug.md`, the `catalog.yaml` status and `BRIEFING.md` "Where things stand",

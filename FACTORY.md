@@ -18,21 +18,22 @@ Michael's standing instruction. The full rule is in [`AGENTS.md`](AGENTS.md).
 | Role (`roles/`) | Default harness | Notes |
 | --- | --- | --- |
 | Planner | Claude Code | Specs and issues |
-| Full-stack builder | Grok Build, Codex or Antigravity, by issue | Claude Code for template changes and security-critical slices; Grok Bot as backup |
+| Full-stack builder | Grok Build or Codex, by issue | Claude Code for template changes and security-critical slices; Grok Bot as backup |
 | AI builder | Claude Code | |
 | UI builder | Grok Build | Grok Bot as backup |
 | Reviewer | Claude Code on every PR; Codex second review on security-sensitive PRs | Required: see gate 3 |
 | DevOps | Claude Code | Deploys through `30-apps-infra` |
-| Docs writer | Grok Build or Antigravity | |
+| Docs writer | Grok Build | Claude Code or Codex if Grok is out of usage |
 | Ops monitor | Claude Code, scheduled task at 5:37 AM Central | Posts to the `Ops report (nightly)` issue |
 
 - **Grok Bot** holds no secrets and never merges. When Grok Build is out of usage, it builds issues Michael pastes
   in (as `ui-builder` or `fullstack-builder`) on `grok/<task>` branches, opening PRs that pass the same gates as
   everyone else's. It also drafts launch posts (X, LinkedIn) and a two-minute demo script from what Michael pastes
   in; Michael posts.
-- **Antigravity replaced Jules** as of 2026-11-09.
-- **Labels are the start signal:** `claude`, `codex`, `grok`, `antigravity`, added only once an issue's dependencies
-  are closed ([below](#waves-and-the-start-signal)). Grok Build and Antigravity are CLIs on Michael's Mac, run by
+- **Antigravity replaced Jules** as of 2026-11-09, and was itself **retired on 2026-11-20** without coming off
+  trial. New work is planned to three harnesses only: Claude Code, Codex and Grok Build.
+- **Labels are the start signal:** `claude`, `codex`, `grok` (and historically `antigravity`), added only once an issue's dependencies
+  are closed ([below](#waves-and-the-start-signal)). Grok Build is a CLI on Michael's Mac, run by
   `scripts/run-harness.sh` ([runbook](runbooks/harnesses-on-mac.md)).
 - **Usage limits:** relabel the issues to another harness that can take the role. Never buy credits.
 
@@ -57,7 +58,7 @@ Added 2026-11-14 after the app 13 incident below.
   `src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/` (where role and permission code lives),
   `src/lib/access.ts`, `src/proxy.ts` and `src/middleware.ts`. No slice outside wave 1 creates or edits them
   unless a security-sensitive `claude` slice is named as the owner (e.g. of a CSP in `src/proxy.ts`). Grok and
-  Antigravity never touch them. If a later slice needs a schema change, the spec gives that change its own foundation
+  never touch them. If a later slice needs a schema change, the spec gives that change its own foundation
   slice, or the builder stops and comments on the issue. Later waves list their
   dependencies as before, and every slice not planned for `claude` depends, directly or not, on wave 1.
 - **Planned harness vs start signal.** Every issue body has a `Planned harness: <name>` line (the owner) and a
@@ -84,7 +85,7 @@ Added 2026-11-14 after the app 13 incident below.
   `open-issues.py` opens such an issue with `hold` and no harness label; **Claude removes `hold` when the step is
   done**, and `release-labels.py` then adds the label once the issue dependencies are done too.
 - **Follow-up, not built yet:** an app-repo CI check that fails when a PR not labelled `security-sensitive` changes
-  the foundation paths. The runner only guards Grok Build and Antigravity on the Mac; that check would also cover
+  the foundation paths. The runner only guards Grok Build on the Mac; that check would also cover
   Codex, Grok Bot and people.
 - **Migrations.** A builder rebases on `main` before its PR and regenerates its migration if another merged first:
   never two `drizzle/NNNN_*` files with the same number.

@@ -23,6 +23,7 @@ additions are allowed and edits are not.
 from __future__ import annotations
 
 import importlib.util
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -69,6 +70,28 @@ UNGUARDED = (
 # BRIEFING.md is deliberately absent: its mention is inside a Markdown table cell, where a
 # multi-line generated block would break the table, so it links to the generated copies instead.
 DOCS = ("AGENTS.md", "FACTORY.md", "templates/spec.md", "runbooks/harnesses-on-mac.md")
+
+
+# The guarded list, recovered back out of the rendered paragraph. Round 10: every containment pin was
+# one-directional -- `path in text` says the truth appears, never that nothing else does, so the list
+# could be a SUPERSET of the truth with every check green. Appending one line to `paths` had all four
+# documents enforcing `agent_container/core/` and, a sentence later, placing it outside the guard.
+# Parsing it back means the comparison is a list equality in both directions, so an addition, a
+# removal and a reordering each fail.
+GUARDED_SEGMENT = re.compile(r"enforces, and what each is:\s*(.*?)\.\s*One list,", re.S)
+
+
+def guarded_in(text: str) -> list[str] | None:
+    """The paths the rendered paragraph claims are guarded, in order, or None if it cannot be read."""
+    m = GUARDED_SEGMENT.search(text)
+    if not m:
+        return None
+    return re.findall(r"`([^`]+)`\s*\(", m.group(1))
+
+
+def path_like(text: str) -> list[str]:
+    """Backticked tokens that name a file or directory. `claude` and `main` are not paths."""
+    return [t for t in re.findall(r"`([^`]+)`", text) if "/" in t or "." in t]
 
 
 def rendered() -> str:
@@ -221,6 +244,18 @@ def self_test() -> int:
             failures.append(f"rendered() omits {path!r} or its note")
     if UNGUARDED not in text:
         failures.append("rendered() omits the set the guard cannot express")
+    # Equality, not membership: an extra path in the rendered list fails here.
+    claimed = guarded_in(text)
+    if claimed is None:
+        failures.append("the rendered paragraph's guarded list can no longer be read back")
+    elif claimed != list(WAVE1_PATHS):
+        failures.append(f"the rendered paragraph claims {claimed}, not WAVE1_PATHS")
+    # And the paragraph names no path outside the guard apart from the ones UNGUARDED accounts for.
+    allowed = set(WAVE1_PATHS) | set(path_like(UNGUARDED)) | {
+        "scripts/issuelib.py", "scripts/run-harness.sh", "scripts/sync-wave1-docs.py",
+    }
+    if stray_paths := sorted(set(path_like(text)) - allowed):
+        failures.append(f"the rendered paragraph names paths nothing accounts for: {stray_paths}")
     # classify(), driven with text rather than the repo, so the comparison main() makes is exercised.
     fresh = f"before\n{BEGIN}\n{text}\n{END}\nafter"
     base = {name: fresh for name in DOCS}
@@ -233,16 +268,29 @@ def self_test() -> int:
     # The two derivations templates/spec.md asserts. Hard-coding either was green until round 9, and
     # open-issues.py carries a comment recording that this exact bug already happened once.
     runner = (ROOT / "scripts" / "run-harness.sh").read_text()
-    if "$(wave1_list)" not in runner:
-        failures.append("run-harness.sh's builder prompt no longer interpolates wave1_list")
+    # Inside the builder prompt, not anywhere in the file: a whole-file substring test passed while the
+    # prompt carried the old hard-coded sentence and `$(wave1_list)` survived only in a comment --
+    # exactly the mistake round 9 fixed one file over, repeated here.
+    prompts = re.findall(r"^\s*cat <<\s*EOF\s*$(.*?)^EOF\s*$", runner, re.S | re.M)
+    builder = [b for b in prompts if "You are the $3 agent" in b]
+    if not builder:
+        failures.append("could not find run-harness.sh's builder prompt heredoc")
+    for block in builder:
+        if "$(wave1_list)" not in block:
+            failures.append("run-harness.sh's builder prompt no longer interpolates wave1_list")
+        if hard := sorted(p for p in WAVE1_PATHS if f"`{p}`" in block or f" {p}," in block):
+            failures.append(f"run-harness.sh's builder prompt hard-codes guarded paths: {hard}")
     # By value, not by name: grepping for "WAVE1_PATHS" matched the import line while `_FOUNDATION`
     # itself was hard-coded, which is how round 9's 4b stayed green through a round of fixes.
     spec_mod = importlib.util.spec_from_file_location("_oi", ROOT / "scripts" / "open-issues.py")
-    if spec_mod and spec_mod.loader:
+    if not spec_mod or not spec_mod.loader:
+        # Never silently: skipping the check is itself the failure.
+        failures.append("could not load open-issues.py to check its foundation note")
+    else:
         oi = importlib.util.module_from_spec(spec_mod)
         try:
             spec_mod.loader.exec_module(oi)
-        except Exception as err:  # noqa: BLE001 - a broken import is itself the failure
+        except BaseException as err:  # noqa: BLE001 - a broken import is itself the failure
             failures.append(f"could not import open-issues.py to check its foundation note: {err}")
         else:
             want = ", ".join(f"`{path}`" for path in WAVE1_PATHS)
@@ -252,6 +300,10 @@ def self_test() -> int:
                 note = getattr(oi, name, "")
                 if any(path not in note for path in WAVE1_PATHS):
                     failures.append(f"open-issues.py's {name} does not name every guarded path")
+                # Both directions. Membership alone let `({_FOUNDATION}, `agent_container/core/`)`
+                # through, which told slice 17.5's builder not to add the files its own slice owns.
+                if extra := sorted(set(path_like(note)) - set(WAVE1_PATHS)):
+                    failures.append(f"open-issues.py's {name} names paths outside the guard: {extra}")
     # The runner's own derivation, by value too.
     try:
         listed_out = subprocess.run(["bash", str(ROOT / "scripts" / "run-harness.sh"), "--wave1-list"],
@@ -266,9 +318,13 @@ def self_test() -> int:
     if "agent_container/core/" in WAVE1_PATHS:
         failures.append("agent_container/core/ is in WAVE1_PATHS; the guard cannot express add-not-edit")
     spec = ROOT / "specs" / "17-agent-container.md"
-    if "agent_container/core/" not in UNGUARDED or (
-            spec.is_file() and "agent_container/core/" not in spec.read_text()):
-        failures.append("UNGUARDED no longer matches specs/17-agent-container.md")
+    if "agent_container/core/" not in UNGUARDED:
+        failures.append("UNGUARDED no longer names agent_container/core/")
+    elif not spec.is_file():
+        # Not `spec.is_file() and ...`: that skipped half the pin when the spec was renamed.
+        failures.append("specs/17-agent-container.md is gone; UNGUARDED credits a spec that is not there")
+    elif "agent_container/core/" not in spec.read_text():
+        failures.append("specs/17-agent-container.md no longer protects agent_container/core/")
     marked = f"a\n{BEGIN}\nstale\n{END}\nb"
     if apply(marked) == marked:
         failures.append("apply() left a stale region unchanged")

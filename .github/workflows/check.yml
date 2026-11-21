@@ -29,7 +29,18 @@ jobs:
           shellcheck scripts/run-harness.sh
       - name: Foundation-path prose matches WAVE1_PATHS
         run: |
-          python3 scripts/sync-wave1-docs.py --self-test
+          # The success line is required, not just exit 0. A self-test that exits 0 having printed
+          # NOTHING is the failure mode this step cannot otherwise see: round 11 reverted one word
+          # (`BaseException` -> `Exception`) and an import-time SystemExit in another script made the
+          # whole self-test vanish silently, with CI green. Any future silent exit fails here too,
+          # whatever causes it, which is the point -- this closes the class, not the instance.
+          out=$(python3 scripts/sync-wave1-docs.py --self-test); rc=$?
+          printf '%s\n' "$out"
+          test $rc -eq 0 || exit $rc
+          printf '%s' "$out" | grep -q 'self-test ok' || {
+            echo "::error::--self-test exited 0 without printing its result; it did not run to the end"
+            exit 1
+          }
           python3 scripts/sync-wave1-docs.py --check
       - name: Repo creation marks are valid
         run: python3 scripts/create-app-repos.py --check

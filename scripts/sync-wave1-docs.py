@@ -11,7 +11,8 @@ So the prose is generated too. Each doc carries a marked region:
     <!-- wave1:begin --> ...generated... <!-- wave1:end -->
 
 `--check` fails when a region is out of date, and `check.yml` runs it. The builder-facing copies
-are handled differently and on purpose: the role files name no paths at all, the runner
+are handled differently and on purpose: the role files enumerate no such list (one or two cite a
+single path in passing), the runner
 interpolates `WAVE1_RE` into its prompt, and the issue note is derived in `open-issues.py`. This
 script is only for the documents people read without a Python interpreter.
 
@@ -256,6 +257,16 @@ def self_test() -> int:
     }
     if stray_paths := sorted(set(path_like(text)) - allowed):
         failures.append(f"the rendered paragraph names paths nothing accounts for: {stray_paths}")
+    # By count, not just by membership. `path_like(UNGUARDED)` pre-authorises exactly the path that
+    # caused round 10's defect, so a SECOND mention of it -- `paths += ", and `agent_container/core/`
+    # as well"` -- was allowed by the set difference above and, lacking a following "(", invisible to
+    # `guarded_in` too. The paragraph may name it as often as UNGUARDED does and no more.
+    for path in set(path_like(UNGUARDED)) - set(WAVE1_PATHS):
+        want, got = UNGUARDED.count(f"`{path}`"), text.count(f"`{path}`")
+        if got != want:
+            failures.append(
+                f"the rendered paragraph names `{path}` {got} time(s); UNGUARDED accounts for {want}"
+            )
     # classify(), driven with text rather than the repo, so the comparison main() makes is exercised.
     fresh = f"before\n{BEGIN}\n{text}\n{END}\nafter"
     base = {name: fresh for name in DOCS}
@@ -278,8 +289,21 @@ def self_test() -> int:
     for block in builder:
         if "$(wave1_list)" not in block:
             failures.append("run-harness.sh's builder prompt no longer interpolates wave1_list")
-        if hard := sorted(p for p in WAVE1_PATHS if f"`{p}`" in block or f" {p}," in block):
-            failures.append(f"run-harness.sh's builder prompt hard-codes guarded paths: {hard}")
+        # The clause that states the refused set, rather than the whole prompt. Round 11: the old
+        # test iterated WAVE1_PATHS, so it could catch the prompt hard-coding a guarded path but not
+        # the prompt claiming an UNGUARDED path is guarded -- the direction round 10 added everywhere
+        # else. It was separator-dependent too (`` `p` `` or " p,"), so a space-separated,
+        # un-backticked "for reference" list evaded it. Now: the clause may name no path at all,
+        # whatever the punctuation, because `$(wave1_list)` is the only thing that belongs in it.
+        clause = re.search(r"Don't create or edit anything in these paths.*?\$\(wave1_list\)\.",
+                           block, re.S)
+        if not clause:
+            failures.append("could not find the builder prompt's refused-paths clause")
+        elif named := sorted(set(path_like(clause.group(0)))):
+            failures.append(
+                f"the builder prompt's refused-paths clause names paths itself: {named} "
+                "(it must say only $(wave1_list))"
+            )
     # By value, not by name: grepping for "WAVE1_PATHS" matched the import line while `_FOUNDATION`
     # itself was hard-coded, which is how round 9's 4b stayed green through a round of fixes.
     spec_mod = importlib.util.spec_from_file_location("_oi", ROOT / "scripts" / "open-issues.py")

@@ -50,18 +50,25 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import issuelib
-from issuelib import HARNESSES, OWNER
+from issuelib import HARNESSES, OWNER, WAVE1_PATHS
 
 MARK = "<!-- open-issues id={} -->"
 FOOTER = "\n---\n\U0001F916 Generated with [Claude Code](https://claude.com/claude-code)\n"
 ID = r"(?:\d+|NN)\.\d+"
 ITEM = re.compile(rf"^\s*\d+\.\s+\*\*(?P<id>{ID})\s+`(?P<title>\[[a-z-]+\][^`]*)`\*\*(?P<rest>.*)$")
 WAVE = re.compile(r"^###\s+Wave\s+(\d+)\b", re.I)
-WAVE1_NOTE = ("Wave 1 (foundation): this slice owns the schema, migrations, roles, access rules and auth config. "
-              "Later slices don't change the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`).")
-LATER_NOTE = ("Don't create or edit the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) "
-              "unless a security-sensitive `claude` slice is named as the owner: the foundation slice owns them. If the data layer this needs isn't on `main`, or it "
-              "needs a schema change, stop and comment here. Never invent schema, migrations, roles or session code.")
+# Derived from issuelib.WAVE1_PATHS, not written out again: the hard-coded copy here listed only the TypeScript
+# template's paths, so a Python-track issue told its builder to avoid paths its repo does not have and said
+# nothing about the ones it does. A repo only has one group of these, so the list names both and the spec says
+# which apply.
+_FOUNDATION = ", ".join(f"`{p}`" for p in WAVE1_PATHS)
+WAVE1_NOTE = ("Wave 1 (foundation): this slice owns the data layer, the roles and the access rules — whichever of "
+              f"the foundation paths this repo has. Later slices don't change them ({_FOUNDATION}); the spec's "
+              "Issues section names the ones that apply here.")
+LATER_NOTE = (f"Don't create or edit the foundation paths ({_FOUNDATION}) unless a security-sensitive `claude` "
+              "slice is named as the owner: the foundation slice owns them, and the spec's Issues section names "
+              "the ones that apply to this repo. If the data layer this needs isn't on `main`, or it needs a "
+              "schema change, stop and comment here. Never invent schema, migrations, roles or access code.")
 
 
 class PlanError(ValueError):

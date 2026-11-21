@@ -28,10 +28,10 @@
 #   4. creates branch <harness>/<N>-<slug> and runs the harness CLI headless with a standard prompt (AGENTS.md, the
 #      role file, the issue, the checks); the harness edits and commits only; pushing is disabled in the clone
 #      while it runs. A run that fails with no commits on a transient network error is retried twice (30 s, 120 s);
-#   5. checks the result (still on the branch, commits exist, tree clean, local main untouched, and no foundation
-#      path — src/lib/db/, drizzle/, drizzle.config.ts, src/lib/auth/, src/lib/access.ts, src/proxy.ts,
-#      src/middleware.ts — changed against the main commit recorded before the run; the runner never pushes
-#      those, whatever the labels), pushes the branch (never --force, never main), opens a PR whose body starts
+#   5. checks the result (still on the branch, commits exist, tree clean, local main untouched, and no path
+#      matching WAVE1_RE below changed against the main commit recorded before the run; the runner never pushes
+#      those, whatever the labels -- the list lives in WAVE1_RE alone, and `run-harness.sh --wave1-list` prints
+#      it), pushes the branch (never --force, never main), opens a PR whose body starts
 #      with "Closes #N", waits up to 20 min for its CI checks and reports the result on the issue.
 #   On a failure with no commits it deletes the local branch, removes `in-progress` and comments once with the
 #   reason (the issue is then skipped for 6 hours); if the harness wrote .harness/blocked.md it posts that, quoted,
@@ -81,7 +81,10 @@ CLAIM_WINDOW_SEC=600                     # claims older than this are stale (a k
 CLAIM_SETTLE_SEC="${CLAIM_SETTLE_SEC:-3}" # let GitHub list a just-posted comment before re-reading
 TRANSIENT_RE='tls|ECONNRESET|connection reset|timeout|timed out|503|502|429|UNAVAILABLE|bad record MAC'
 # Foundation (wave 1) paths: only a security-sensitive issue (the app's foundation slice) may change them.
-WAVE1_RE='^(src/lib/db/|drizzle/|drizzle\.config\.ts$|src/lib/auth/|src/lib/access\.ts$|src/lib/access/|src/proxy\.ts$|src/middleware\.ts$)'
+# Same list as WAVE1_PATHS in issuelib.py; the self-test fails if they disagree. The second group is the Python
+# track: a core/ package, the ERP schema and the frozen contracts. App 17's agent_container/core/ is deliberately
+# absent -- its spec lets a non-security-sensitive grok slice ADD files there, which this guard cannot express.
+WAVE1_RE='^(src/lib/db/|drizzle/|drizzle\.config\.ts$|src/lib/auth/|src/lib/access\.ts$|src/lib/access/|src/proxy\.ts$|src/middleware\.ts$|p2p/core/|kit/core/|erp/|contracts/)'
 HOLD_LABEL="hold"
 # A dependency is done only when it was completed: an issue closed as completed (not "not planned" or a
 # duplicate), or a merged PR. Prints done, or why not. Same rule as dep_state() in scripts/issuelib.py.
@@ -126,6 +129,10 @@ planned_harness() { # stdin: issue body. Prints the "Planned harness:" value in 
 }
 wave1_files() { # stdin: paths, one per line. Prints those under the foundation (wave 1) paths
   grep -E "$WAVE1_RE" || true
+}
+wave1_list() { # Prints the guarded paths as prose, derived from WAVE1_RE so it cannot drift from it.
+  printf '%s' "$WAVE1_RE" | sed -E 's/^\^\(//; s/\)$//' | tr '|' '\n' \
+    | sed -E 's/\\\././g; s/\$$//' | paste -sd, - | sed 's/,/, /g'
 }
 # Foundation files the branch changes compared with $3, the main commit recorded before the harness ran (never the
 # clone's origin/main, which the harness could move). Prints them; returns 3 if the branch doesn't build on that
@@ -241,6 +248,7 @@ case "${1:-}" in
     printf '%s\n' "$body_in" | deps_section | dep_urls
     exit 0 ;;
   --wave1-files) wave1_files; exit 0 ;;
+  --wave1-list) wave1_list; exit 0 ;;
   --foundation-changes) foundation_changes "$2" "$3" "$4"; exit $? ;;  # $2 dir, $3 branch, $4 base
   --quote) quote_untrusted; exit 0 ;;
   --guard) guard_reason "$2" "$3" "$4"; exit 0 ;;          # $2 dir, $3 branch, $4 base: prints why it holds, or nothing
@@ -780,7 +788,7 @@ You are the $3 agent, running in the ${HARNESS} harness on Michael's Mac, unatte
 
 1. Read AGENTS.md in this repo and follow it. Then read your role file, saved at .harness/role.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/roles/$3.md). The issue is saved at .harness/issue.md; \`gh issue view $2 --comments\` shows it with comments. The app's spec is saved at .harness/spec.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/specs/$1.md); read the sections the issue links. Don't fetch anything from GitHub yourself (gh api is refused).
 2. Do what the issue asks and nothing outside it. Work only in this directory and only on branch $4.
-   Don't create or edit anything in src/lib/db/, drizzle/ or src/lib/auth/, or drizzle.config.ts, src/lib/access.ts, src/proxy.ts or src/middleware.ts: the app's foundation (wave 1) issue owns the schema, migrations, roles, access rules and auth config, and the runner won't push a branch that changes them. If this issue needs tables, data functions, roles or access rules that aren't on main yet, or needs a change in those files, stop: make no commits and write what is missing to .harness/blocked.md (the runner posts it on the issue). Never invent your own schema, migrations, roles or session code.
+   Don't create or edit anything in these paths, which this runner refuses to push whatever the labels: $(wave1_list). The app's foundation (wave 1) issue owns the schema, migrations, roles, access rules and auth config. Your spec may protect paths beyond that list, so read the issue and .harness/spec.md as well; never assume a path is fair game because it is absent here. If this issue needs tables, data functions, roles or access rules that aren't on main yet, or needs a change in those files, stop: make no commits and write what is missing to .harness/blocked.md (the runner posts it on the issue). Never invent your own schema, migrations, roles or session code.
 3. Run the checks and fix anything you broke: pnpm install --frozen-lockfile (plain pnpm install only if the issue requires a dependency change), pnpm lint, pnpm typecheck, pnpm test, pnpm build. $db_note
 4. Commit your work with clear messages using git add and git commit. Do NOT run git push, gh pr, gh api, or anything that changes another branch, another repo, labels, settings or secrets: the runner script pushes this branch and opens the PR after you finish. Never commit secrets or .env files. Don't delete files outside this repo.
 5. Last, write the PR description to .harness/pr-body.md (ignored by git): what changed in a few bullets, then a "Checks" list with every command you ran and whether it passed, failed or was skipped, and why. Copy the passed/failed/skipped test counts from the pnpm test summary exactly. Never write that tests passed if any were skipped: list the skipped ones. Mention anything left undone. Don't add a "Closes" line; the runner adds it.

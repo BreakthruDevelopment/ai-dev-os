@@ -28,8 +28,23 @@ RELEASE_MARK = "<!-- release-labels:released harness={} -->"  # posted once an i
 # Foundation (wave 1) paths: only the foundation slice, which is security-sensitive, may create or edit them.
 # Role and permission code lives in src/lib/auth/ (rbac.ts, permissions.ts) in the template; src/proxy.ts and
 # src/middleware.ts sit in front of every request. Same list as WAVE1_RE in run-harness.sh.
+#
+# The second group is the Python track, whose foundation is a `core/` package plus the schema and the frozen
+# contracts rather than Drizzle and Better Auth. Added 2026-11-21: the list was TypeScript-only, so `p2p/core/`
+# and `kit/core/` were protected by their specs and the reviewer but by nothing mechanical, and the note in every
+# generated issue told a Python-track builder to avoid paths its repo does not have. Each group is inert in the
+# other's repos, so one list serves both.
+#
+# **`agent_container/core/` (app 17) is deliberately NOT here.** Its spec draws a distinction this guard cannot
+# express: "Wave 1 owns them; later slices extend by adding files", and slice 17.5 is a `grok` slice, not
+# security-sensitive, that is explicitly allowed to add `core/log.py`. The guard refuses on any path match and
+# `git diff --name-only` lists additions, so listing it would refuse that push and strand the branch. App 17's
+# `core/` stays protected by its spec and the reviewer. Apps 18 and 19 forbid their `core/` to be created *or*
+# edited outside wave 1, so they are safe to list; a Python-track repo that wants the add-and-not-edit rule needs
+# the guard to learn that distinction first.
 WAVE1_PATHS = ("src/lib/db/", "drizzle/", "drizzle.config.ts", "src/lib/auth/", "src/lib/access.ts", "src/lib/access/",
-               "src/proxy.ts", "src/middleware.ts")
+               "src/proxy.ts", "src/middleware.ts",
+               "p2p/core/", "kit/core/", "erp/", "contracts/")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "run-harness.sh"
@@ -199,9 +214,16 @@ CASES = [
 ]
 PATHS = (["src/lib/db/schema.ts", "src/lib/db/index.ts", "drizzle/0004_dispatch-board.sql", "drizzle/meta/_journal.json",
           "drizzle.config.ts", "src/lib/auth/rbac.ts", "src/lib/access.ts", "src/lib/access/rules.ts", "src/proxy.ts",
-          "src/middleware.ts"],
+          "src/middleware.ts",
+          "p2p/core/erp.py", "p2p/core/access.py", "kit/core/sandbox.py", "erp/schema.sql",
+          "erp/seed/suppliers.csv", "contracts/p2p-erp.json"],
          ["src/lib/accessibility.ts", "src/app/board/page.tsx", "src/lib/dispatch.ts", "test/drizzle/x.ts",
-          "src/proxy.test.ts", "drizzle.config.ts.bak", "src/lib/dbx.ts"])
+          "src/proxy.test.ts", "drizzle.config.ts.bak", "src/lib/dbx.ts",
+          "agent_container/core_utils.py", "agent_container/testing/contracts.py", "p2p/match/workflow.py",
+          "kit/corex/y.py", "kit/scout/brief.py", "tests/p2p/core/test_erp.py", "contracts.py", "erp.sql",
+          # App 17's core/ is excluded on purpose -- see the note on WAVE1_PATHS. 17.5 is a `grok` slice allowed
+          # to add core/log.py, and this guard cannot tell adding from editing.
+          "agent_container/core/loop.py", "agent_container/core/log.py"])
 # (issue JSON, dep_state)
 DEP_CASES = [
     ({"state": "open"}, "open"),
@@ -240,6 +262,14 @@ def self_test() -> None:
                        input="\n".join(hits + misses) + "\n", capture_output=True, text=True, check=True)
     if r.stdout.split() != hits:
         failures.append(f"run-harness.sh --wave1-files: {r.stdout.split()}")
+    # The runner prints this list into the prompt it hands a harness, derived from WAVE1_RE by stripping the
+    # regex. That stripping is a shell one-liner and silently mangles a grouped alternation such as
+    # `(p2p|kit)/core/` or an end-anchored group, so compare it with the real list rather than trusting it.
+    r = subprocess.run(["bash", str(ROOT / "scripts" / "run-harness.sh"), "--wave1-list"],
+                       capture_output=True, text=True, check=True)
+    listed = [x.strip() for x in r.stdout.strip().split(",") if x.strip()]
+    if listed != list(WAVE1_PATHS):
+        failures.append(f"run-harness.sh --wave1-list disagrees with WAVE1_PATHS: {listed}")
     for issue, want in DEP_CASES:
         got = dep_state(issue)
         r = subprocess.run(["bash", str(SCRIPT), "--dep-state"], input=json.dumps(issue),

@@ -14,7 +14,10 @@ Work rules:
   calls `assertCan()`. Roles, `src/lib/access.ts` and auth config are part of it. Generate a migration for every
   schema change (`pnpm db:generate --name <change>`).
 - **Any later slice:** build on the foundation's schema and access rules. Never create or edit
-  the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`) unless a security-sensitive `claude` slice is named as the owner
+  the foundation paths — which are generated for you, never written out here: the issue's own Notes section
+  and the runner's instructions both render `WAVE1_PATHS` from `scripts/issuelib.py`, and a spec can protect
+  paths the guard cannot express, as app 17's `agent_container/core/` does, so read the spec too and never
+  take the guard's silence for permission — unless a security-sensitive `claude` slice is named as the owner
   (that's then your issue). If the issue
   needs a change there, or the data layer it needs isn't on `main`, stop and comment on the issue with what's missing
   (under `scripts/run-harness.sh`, write it to `.harness/blocked.md` and make no commits; the runner posts it).

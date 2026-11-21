@@ -125,8 +125,8 @@ described. Refusing the folder costs a demo nothing and removes all of it.
 
 **`p2p demo` and `scripts/smoke.sh` work on their own database**, in a fresh `mkdtemp()` directory per run, built
 from `erp/schema.sql` plus the seed and removed with its directory at the end. A second run is identical to the
-first because the directory is new, not because anything was cleaned up: there is **no delete step**, and nothing
-to delete. Two concurrent runs cannot collide either, since neither can name the other's directory.
+first because the directory is new, not because anything was cleaned up: **nothing is deleted before a run**,
+and there is nothing at that path to delete. The directory goes when the run ends. Two concurrent runs cannot collide either, since neither can name the other's directory.
 
 That is also what keeps the demo away from real data. The database path is otherwise a parameter of `erp.py`, so
 a demo honouring configuration could be aimed at a person's database — and an earlier draft, which deleted a
@@ -196,7 +196,7 @@ and the row key for a person to type.
 
 ## AI feature
 
-Four model tasks, all through app 17's `ModelProvider` — **no direct Bedrock call anywhere in this repo** — on
+Three model tasks, all through app 17's `ModelProvider` — **no direct Bedrock call anywhere in this repo** — on
 Claude Sonnet 4.6, us-east-2, via the Global Anthropic inference profile, with the profile id in configuration.
 Output schemas are **pydantic** models (this track's equivalent of the template's zod), parsed server-side before
 any value is used, and every id in a model answer is re-checked against the ERP before it reaches a tool.
@@ -386,12 +386,14 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
 ### Wave 4
 
 7. **18.7 `[fullstack-builder] Batch run over a folder`** · `codex`
-   `p2p batch <dir>`: ingest and match up to 25 documents, isolate each failure with its `error_category`, carry
+   `p2p batch <dir>`: ingest and match **every** document in the folder — never a prefix of it — isolate each failure with its `error_category`, carry
    one `Budget` for the run and stop early with a stated reason when it is exhausted, record a `batch_run` row and
    print one `BatchSummary`. Every document lands in exactly one of `ok`, `failed` or `skipped` — `skipped`
    carrying `already_advanced` for an invoice a previous run moved and `not_reached` for one it never attempted,
-   when the budget stopped the run before it — and the three totals must sum to `items`. **`BatchSummary` is
-   assembled in code, not asked of a model**: there is no `invoice-batch` task, and a batch is 18.4's and 18.5's
+   when the budget stopped the run before it — and the three totals must sum to `items`. `BatchSummary` carries
+   per item its id and outcome, an `error_category` **only** when failed, a `skip_reason` **only** when skipped,
+   and a `change_key` whenever the item staged a posting; plus the three totals and `stopped_early` with the
+   budget's reason. **It is assembled in code, not asked of a model**: there is no `invoice-batch` task, and a batch is 18.4's and 18.5's
    tasks run per document with the totals counted around them. A model could not supply these values anyway —
    `already_advanced` is database state, `not_reached` is a fact about the budget, and a `change_key` is generated
    by a write made during the run — and 18.7 is forbidden any new tool, which is what a forced output schema would
@@ -413,7 +415,12 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    live check after deploy that asserts `GET /health` returns the version and a passing replay round-trip. The
    live surface is only that endpoint, so the full flow is the local path; the track's definition of done needs a
    live smoke, and this is what there is to smoke. No network in the default path.
-   Dependencies: 18.5, 18.6, 18.7.
+   **Both the demo and the smoke script build their own database in a fresh `mkdtemp()` directory**, removed with
+   that directory when they finish. They **ignore the configured database path** rather than deleting anything at
+   it: the path is a parameter of `erp.py`, so a demo honouring it could be aimed at a person's real database, and
+   an earlier draft that deleted a file before rebuilding would have deleted that database. A test asserts a
+   configured database is left untouched. This is repeated here, not only in the Scope section, because this slice
+   is the one that writes it. Dependencies: 18.5, 18.6, 18.7.
 
 ### Wave 6
 

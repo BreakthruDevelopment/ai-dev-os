@@ -95,6 +95,23 @@ def path_like(text: str) -> list[str]:
     return [t for t in re.findall(r"`([^`]+)`", text) if "/" in t or "." in t]
 
 
+# Paths written as plain prose, with no backticks and whatever punctuation around them. Every pin that
+# keyed off backticks was half a pin: round 11's residual 3 was a separator dependence, and the first
+# attempt at fixing it just traded "`p` or ' p,'" for "`p`" alone, so an un-backticked list evaded it
+# the same way. This matches the token itself, so no separator can hide it.
+# The lookbehind matters: without it the second alternative matched "config.ts" out of
+# "drizzle.config.ts" and reported a guarded path as a stray one.
+PATH_IN_PROSE = re.compile(
+    r"(?<![\w.@/-])(?:[\w.@-]+/)+[\w.@-]*"
+    r"|(?<![\w.@/-])[\w.@-]*[\w@-]\.(?:ts|tsx|js|py|sh|md|ya?ml|json|sql|toml)\b"
+)
+
+
+def paths_in_prose(text: str) -> list[str]:
+    """Every path-shaped token, backticked or bare."""
+    return PATH_IN_PROSE.findall(text)
+
+
 def rendered() -> str:
     """The guarded set with each path's note, then what the guard cannot cover."""
     if missing := [p for p in WAVE1_PATHS if p not in NOTES]:
@@ -252,20 +269,22 @@ def self_test() -> int:
     elif claimed != list(WAVE1_PATHS):
         failures.append(f"the rendered paragraph claims {claimed}, not WAVE1_PATHS")
     # And the paragraph names no path outside the guard apart from the ones UNGUARDED accounts for.
-    allowed = set(WAVE1_PATHS) | set(path_like(UNGUARDED)) | {
+    allowed = set(WAVE1_PATHS) | set(paths_in_prose(UNGUARDED)) | {
         "scripts/issuelib.py", "scripts/run-harness.sh", "scripts/sync-wave1-docs.py",
     }
-    if stray_paths := sorted(set(path_like(text)) - allowed):
+    if stray_paths := sorted(set(paths_in_prose(text)) - allowed):
         failures.append(f"the rendered paragraph names paths nothing accounts for: {stray_paths}")
     # By count, not just by membership. `path_like(UNGUARDED)` pre-authorises exactly the path that
     # caused round 10's defect, so a SECOND mention of it -- `paths += ", and `agent_container/core/`
     # as well"` -- was allowed by the set difference above and, lacking a following "(", invisible to
     # `guarded_in` too. The paragraph may name it as often as UNGUARDED does and no more.
-    for path in set(path_like(UNGUARDED)) - set(WAVE1_PATHS):
-        want, got = UNGUARDED.count(f"`{path}`"), text.count(f"`{path}`")
+    for path in set(paths_in_prose(UNGUARDED)) - set(WAVE1_PATHS):
+        # Plain occurrences, not backticked ones: an un-backticked extra mention defeated the first
+        # version of this pin, with every check green. Round 11's N1.
+        want, got = UNGUARDED.count(path), text.count(path)
         if got != want:
             failures.append(
-                f"the rendered paragraph names `{path}` {got} time(s); UNGUARDED accounts for {want}"
+                f"the rendered paragraph names {path} {got} time(s); UNGUARDED accounts for {want}"
             )
     # classify(), driven with text rather than the repo, so the comparison main() makes is exercised.
     fresh = f"before\n{BEGIN}\n{text}\n{END}\nafter"
@@ -289,17 +308,24 @@ def self_test() -> int:
     for block in builder:
         if "$(wave1_list)" not in block:
             failures.append("run-harness.sh's builder prompt no longer interpolates wave1_list")
-        # The clause that states the refused set, rather than the whole prompt. Round 11: the old
-        # test iterated WAVE1_PATHS, so it could catch the prompt hard-coding a guarded path but not
-        # the prompt claiming an UNGUARDED path is guarded -- the direction round 10 added everywhere
-        # else. It was separator-dependent too (`` `p` `` or " p,"), so a space-separated,
-        # un-backticked "for reference" list evaded it. Now: the clause may name no path at all,
-        # whatever the punctuation, because `$(wave1_list)` is the only thing that belongs in it.
+        # TWO checks, not one. The first version of this replaced the whole-prompt scan with the
+        # clause scan, which was strictly weaker: a hard-coded list in the sentence AFTER the clause
+        # went green, and `main` had caught it. Supplement, don't substitute.
+        #
+        # (a) Nowhere in the prompt is a guarded path written out. Plain substring, so no separator
+        # or punctuation can hide it -- the earlier "`p` or ' p,'" form was evaded by a bare
+        # space-separated list, and narrowing it to backticks alone only moved the hole.
+        if hard := sorted(p for p in WAVE1_PATHS if p in block):
+            failures.append(f"run-harness.sh's builder prompt writes out guarded paths: {hard}")
+        # (b) The clause that states the refused set may name no path AT ALL, guarded or not --
+        # `$(wave1_list)` is the only thing that belongs there. This is the direction (a) cannot
+        # cover: (a) iterates WAVE1_PATHS, so it cannot see the prompt claiming an UNGUARDED path is
+        # guarded, which is the direction round 10 added everywhere else and this check missed.
         clause = re.search(r"Don't create or edit anything in these paths.*?\$\(wave1_list\)\.",
                            block, re.S)
         if not clause:
             failures.append("could not find the builder prompt's refused-paths clause")
-        elif named := sorted(set(path_like(clause.group(0)))):
+        elif named := sorted(set(paths_in_prose(clause.group(0)))):
             failures.append(
                 f"the builder prompt's refused-paths clause names paths itself: {named} "
                 "(it must say only $(wave1_list))"

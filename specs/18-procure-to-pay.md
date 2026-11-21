@@ -216,8 +216,12 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    inside it; `p2p/core/access.py` with the four roles, `assert_can`, the disputes assignment rule, the read-only
    `service` principal and separation of duties; and `p2p/core/adapter.py`, the Adapter that turns an ERP call
    into an app-17 `Tool` with the right `effect`, so the gateway and the loop share one implementation. An
-   integration test per access rule, and the apply-once guard. Security-sensitive: access rules and the write
-   surface. Dependencies: 18.1.
+   integration test per access rule, and the apply-once guard.
+   **It also owns a write accessor on `erp.py` for every table a later slice writes** — `extraction` (18.4),
+   `posting` (18.5), `case_event` and `credit_memo` (18.6) and `batch_run` (18.7) — each taking the acting
+   principal and calling `assert_can`. Seeding a table is not a write path: without these, those four slices
+   would each have to edit `p2p/core/erp.py`, which is a foundation path they are forbidden to touch, and would
+   stop and comment instead. Security-sensitive: access rules and the write surface. Dependencies: 18.1.
 
 ### Wave 2
 

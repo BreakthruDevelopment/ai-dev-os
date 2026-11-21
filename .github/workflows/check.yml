@@ -22,14 +22,62 @@ jobs:
         run: python3 scripts/sync-claude-agents.py --check
       - name: Issue scripts and the Mac runner parse issues the same way
         run: |
-          python3 scripts/issuelib.py --self-test
-          python3 scripts/open-issues.py --self-test
-          python3 scripts/release-labels.py --self-test
+          # Every --self-test must print its result line, not merely exit 0. A self-test that exits 0
+          # having printed NOTHING is invisible to `test $? -eq 0`: round 11 reverted one word
+          # (`BaseException` -> `Exception`) and an import-time SystemExit in another script made a
+          # whole self-test vanish, with CI green. So the line is required, whatever causes its
+          # absence -- the class, not the instance. Applied to all four scripts, since singling one
+          # out was the first version's mistake.
+          #
+          # `|| rc=$?` rather than `; rc=$?`: Actions runs this under `bash -e`, so a bare assignment
+          # that fails kills the script AT the assignment -- rc, the printf and the test never run,
+          # and a genuine failure shows a red step with an empty log. The status is the command
+          # substitution's either way, which `||` preserves.
+          self_test() {
+            rc=0
+            out=$(python3 "scripts/$1.py" --self-test) || rc=$?
+            printf '%s\n' "$out"
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::scripts/$1.py --self-test failed"
+              exit "$rc"
+            fi
+            printf '%s' "$out" | grep -q 'self-test ok' || {
+              echo "::error::scripts/$1.py --self-test exited 0 without its result line; it did not run to the end"
+              exit 1
+            }
+          }
+          self_test issuelib
+          self_test open-issues
+          self_test release-labels
           bash -n scripts/run-harness.sh
           shellcheck scripts/run-harness.sh
       - name: Foundation-path prose matches WAVE1_PATHS
         run: |
-          python3 scripts/sync-wave1-docs.py --self-test
+          # Every --self-test must print its result line, not merely exit 0. A self-test that exits 0
+          # having printed NOTHING is invisible to `test $? -eq 0`: round 11 reverted one word
+          # (`BaseException` -> `Exception`) and an import-time SystemExit in another script made a
+          # whole self-test vanish, with CI green. So the line is required, whatever causes its
+          # absence -- the class, not the instance. Applied to all four scripts, since singling one
+          # out was the first version's mistake.
+          #
+          # `|| rc=$?` rather than `; rc=$?`: Actions runs this under `bash -e`, so a bare assignment
+          # that fails kills the script AT the assignment -- rc, the printf and the test never run,
+          # and a genuine failure shows a red step with an empty log. The status is the command
+          # substitution's either way, which `||` preserves.
+          self_test() {
+            rc=0
+            out=$(python3 "scripts/$1.py" --self-test) || rc=$?
+            printf '%s\n' "$out"
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::scripts/$1.py --self-test failed"
+              exit "$rc"
+            fi
+            printf '%s' "$out" | grep -q 'self-test ok' || {
+              echo "::error::scripts/$1.py --self-test exited 0 without its result line; it did not run to the end"
+              exit 1
+            }
+          }
+          self_test sync-wave1-docs
           python3 scripts/sync-wave1-docs.py --check
       - name: Repo creation marks are valid
         run: python3 scripts/create-app-repos.py --check

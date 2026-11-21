@@ -118,6 +118,8 @@ was **not** changed here. Requiring a check a repo doesn't run would block every
        types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
      pull_request_review:
        types: [submitted, edited, dismissed]
+     issue_comment:
+       types: [created, edited]
    permissions:
      contents: read
      pull-requests: read
@@ -126,6 +128,14 @@ was **not** changed here. Requiring a check a repo doesn't run would block every
      review:
        uses: BreakthruDevelopment/ai-dev-os/.github/workflows/review-gate.yml@main
    ```
+
+   `issue_comment` is required too, and it is the trigger that is easy to leave out. Codex records a clean pass
+   by **editing** its own state comment, which fires neither `pull_request` nor `pull_request_review`. Without
+   this trigger a security-sensitive PR can sit on a gate failure that is already false, with no event left to
+   clear it, until somebody clicks re-run by hand. That happened to `17-agent-container#9` on 2026-11-21: the
+   gate failed at 07:20:46 for want of a Codex review of the head, and Codex posted one at 07:22:38. Because a
+   reusable workflow runs on its **caller's** triggers, adding it in `ai-dev-os` does nothing for an app repo;
+   each app repo's own `review-gate.yml` needs the three lines.
 
    `actions: write` is required. After a passing review, the gate re-runs the PR's earlier `pull_request` run for
    the same commit, because that's the run the required check reads; without it someone would have to click

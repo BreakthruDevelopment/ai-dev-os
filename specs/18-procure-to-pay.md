@@ -107,14 +107,23 @@ pydantic field, which must agree with it.
 | Outcome | When | Carries |
 | --- | --- | --- |
 | `ok` | ingested and matched, whether or not a posting was staged | — |
-| `failed` | anything the run tried and could not do — an unreadable document, an extraction still invalid after three repair attempts (`needs_human`), or **a document with no matching seeded `invoice` row**, which `p2p ingest` refuses rather than inserting one, since creating invoices would make `invoice` a table a later slice writes rows to and the seed owns the twelve the batch uses | the `error_category` that fits: `validation` for the unmatched or unreadable document, `business` for `needs_human`, `transient` for one the budget cut mid-extraction |
+| `failed` | anything the run tried and could not do — an unreadable document, an extraction still invalid after its two repair attempts (`needs_human`), or **a document with no matching seeded `invoice` row**, which `p2p ingest` refuses rather than inserting one, since creating invoices would make `invoice` a table a later slice writes rows to and the seed owns the twelve the batch uses | `validation` for all three — an extraction that will not validate is repeated validation failure, **not** `business`: app 17's spec adds `internal` precisely because miscategorising something that is not "a rule said no" would have this app explain a policy that does not exist. `transient` only for a document the budget cut mid-extraction |
 | `skipped` | the run never attempted it | `skip_reason`: `already_advanced`, or `not_reached` — which covers **both** reasons a found document goes unattempted, the budget stopping the run and the 25-document cap, since a folder may hold more than the cap |
 
-`not_reached` is why a per-item outcome had to stay open to a third value: `stopped_early` means some documents
-were found and never attempted, and they are neither a success nor a failure either.
+`not_reached` is why a per-item outcome had to stay open to a third value: a document found and never attempted is
+neither a success nor a failure. **`stopped_early` names its cause** — `budget`, `cap`, or both — because the two
+have opposite remedies: raise the budget, or split the folder. A run that hits both says both.
 
-**`p2p demo` and `scripts/smoke.sh` work on their own database file**, built from `erp/schema.sql` plus the seed
-at the start of each run and thrown away after. Back-to-back smoke — which the track requires — therefore gives
+**The cap counts attempts, not documents found**, and an `already_advanced` document does not consume one. That
+is what keeps a folder of 30 processable: the first run attempts 25 and reports five `not_reached` with
+`stopped_early: cap`, and a second run finds those 25 `already_advanced` — costing no attempts — and attempts the
+remaining five. Were the cap applied to documents found, a deterministic scan order would make documents 26 to 30
+unreachable by any number of reruns.
+
+**`p2p demo` and `scripts/smoke.sh` work on their own database file**, deleted if a previous run left one behind,
+then built from `erp/schema.sql` plus the seed and thrown away at the end. Deleting first is the part that
+matters: a crashed run would otherwise leave a file that the next run opens as an existing database and leaves
+alone, which is the round-6 symptom returning by the back door. Back-to-back smoke — which the track requires — therefore gives
 identical output, where sharing one file would make every batch item `already advanced` on the second pass. They
 get their own file rather than rebuilding the shared one because `p2p demo` may be run by anyone: rebuilding in
 place would discard a staged change an approver was about to apply and truncate the append-only `extraction` and
@@ -166,13 +175,14 @@ and the row key for a person to type.
 | --- | --- | --- | --- |
 | `p2p ingest <file>` | CLI | clerk | extract one invoice, validate, repair, record `extraction` |
 | `p2p match <invoice>` | CLI | clerk | the fixed four-step workflow; stages a posting or stops with a stated reason |
+| `p2p staged` | CLI | approver, clerk, disputes | lists the staged changes the acting principal may decide — its own for a clerk or disputes agent, everything in the company code for an approver — with each `change_key`, what it would do and who staged it. Without it a key exists only in the output of the run that staged it, and separation of duties means the approver is never the principal who ran that command |
 | `p2p review <change>` | CLI | approver | shows the staged change and what to check; a posting also shows its confidence band, which the other two kinds do not have |
 | `p2p approve <change> --yes` / `--reject <reason>` | CLI | approver | applies or rejects **any** staged change — a posting, a credit memo or a payment hold; refuses self-approval |
 | `p2p batch <dir>` | CLI | clerk | ingest + match every file, isolate failures, print one summary |
 | `p2p dispute open/step/show <case>` | CLI | disputes | runs the disputes desk one step at a time |
 | `p2p demo [--live]` | CLI | anyone | the whole story on recorded replies; `--live` goes to Bedrock |
 | `p2p-erp` | MCP server (stdio) | service, and every role above | the gateway table above |
-| `GET /health` | Lambda | public | version and a replay round-trip |
+| `GET /health` | Lambda | public | version and a replay round-trip. Opens **no** ERP connection: a first open applies schema and seed, which is a write, and Lambda's filesystem is read-only outside `/tmp` |
 
 ## AI feature
 
@@ -363,9 +373,12 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    print one `BatchSummary`. Every document lands in exactly one of `ok`, `failed` or `skipped` — `skipped`
    carrying `already_advanced` for an invoice a previous run moved and `not_reached` for one it never attempted,
    whether because the budget ran out or because the folder held more than the 25-document cap — and the three
-   totals must sum to `items`, with a test for a folder of 30 documents and a test that re-running the same folder
-   reports every item `already_advanced` and writes no invoice state. Each item that staged a posting carries its
-   `change_key` in the summary, which is 18.8's only way to reach those postings. Reuses 18.5's staged-write path exactly and adds **no** new write path, no new tool
+   totals must sum to `items`. `stopped_early` names its cause, `budget` or `cap` or both. Two separate tests: a
+   folder of **30** documents reports 25 attempted, five `not_reached` and `stopped_early: cap`, and a second run
+   over that same folder attempts the five (the 25 `already_advanced` cost no attempts); and a re-run over the
+   **twelve-document** folder reports every item `already_advanced`, `stopped_early` unset, and writes no invoice
+   state. Each item that staged a posting carries its `change_key` in the summary and in
+   `batch_run.summary_json`, which is how an approver reaches those postings after the run's output is gone. Reuses 18.5's staged-write path exactly and adds **no** new write path, no new tool
    and no change to `p2p/core/`. Statement 4.5. Dependencies: 18.5.
 
 ### Wave 5

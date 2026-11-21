@@ -68,7 +68,7 @@ named below scopes a row to a person.
 | `supplier` | id, name, terms, risk_flag | company_code | seeded, read-only |
 | `purchase_order` | id, supplier_id, currency, total, lines | company_code | seeded |
 | `goods_receipt` | id, po_id, line_no, qty_received, received_at | company_code | seeded, holds the variances |
-| `invoice` | id, supplier_id, po_ref, number, date, currency, total, state | company_code | `state`: received → extracted → matched → staged → posted / held |
+| `invoice` | id, supplier_id, po_ref, number, date, currency, total, state | company_code | `state`: see the transition table below |
 | `invoice_line` | invoice_id, line_no, description, qty, unit_price, tax | via `invoice` | |
 | `extraction` | id, invoice_id, attempts, repaired, confidence, fields_json, model_task | company_code | the 4.4 audit trail |
 | `posting` | id, invoice_id, payload_json, staged_by, decided_by, decision, applied_at | company_code, staged_by | one `StagedChange` per row |
@@ -76,6 +76,23 @@ named below scopes a row to a person.
 | `dispute_case` | id, supplier_id, state, opened_by, assigned_to, escalated_reason | company_code, assigned_to | `state`: open → investigating → credit_proposed → escalated → resolved |
 | `case_event` | case_id, seq, actor, kind, payload_json | via `dispute_case` | append-only; the case transcript (5.1) |
 | `batch_run` | id, started_by, items, ok, failed, summary_json | started_by | 4.5 |
+
+**The `invoice.state` transitions**, stated as a set rather than a chain because two of them are not sequential.
+18.2's accessor accepts exactly these and rejects anything else, so no later slice can invent a lifecycle:
+
+| From | To | Who, and what causes it |
+| --- | --- | --- |
+| `received` | `extracted` | 18.4, a successful extraction |
+| `extracted` | `matched` | 18.5, the four-step match |
+| `matched` | `staged` | 18.5, a posting staged |
+| `staged` | `posted` | 18.5, an approver applies the staged posting |
+| `staged` | `matched` | 18.5, an approver rejects it; the reason goes on `posting.decision`, and the invoice returns to `matched` so it can be staged again |
+| `posted` | `held` | 18.6, an approver applies a staged `hold_payment`. A hold is a payment-side act on an invoice already in the ledger, which is why it is not reachable from `staged` |
+| any | itself | a no-op, not an error: a re-run of `p2p batch` re-ingests documents already advanced, and the apply-once guard makes a repeated apply a stated no-op |
+
+A credit memo changes **no** invoice state: it is a separate document against the supplier, which is why
+`credit_memo` has no state column. `held` is terminal in this build — releasing a hold is payment execution, which
+line 37 puts out of scope, and the gateway has no `release_payment` tool.
 
 Access rules (`p2p/core/access.py`, one function `assert_can(principal, action, row)`): every query takes the
 acting principal and filters on `company_code`; a `disputes` principal sees only cases assigned to it; a `service`
@@ -89,8 +106,8 @@ the caller. One integration test per rule.
 | --- | --- | --- | --- |
 | `p2p ingest <file>` | CLI | clerk | extract one invoice, validate, repair, record `extraction` |
 | `p2p match <invoice>` | CLI | clerk | the fixed four-step workflow; stages a posting or stops with a stated reason |
-| `p2p review <posting>` | CLI | approver | shows the staged change, its confidence band and what to check |
-| `p2p approve <posting> --yes` / `--reject <reason>` | CLI | approver | applies or rejects; refuses self-approval |
+| `p2p review <change>` | CLI | approver | shows the staged change, its confidence band and what to check |
+| `p2p approve <change> --yes` / `--reject <reason>` | CLI | approver | applies or rejects **any** staged change — a posting, a credit memo or a payment hold; refuses self-approval |
 | `p2p batch <dir>` | CLI | clerk | ingest + match every file, isolate failures, print one summary |
 | `p2p dispute open/step/show <case>` | CLI | disputes | runs the disputes desk one step at a time |
 | `p2p demo [--live]` | CLI | anyone | the whole story on recorded replies; `--live` goes to Bedrock |
@@ -219,13 +236,19 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    integration test per access rule, and the apply-once guard.
    **It also owns the read and write accessors on `erp.py` for every table a later slice touches.** The seven
    written after this slice, derived from the data model and the slice list: `extraction` (18.4), `invoice.state`
-   (18.4 `received → extracted`, 18.5 `→ matched → staged → posted`, 18.6 `→ held` via `hold_payment`),
-   `posting` (18.5), `dispute_case` and `case_event` and `credit_memo` (18.6), and `batch_run` (18.7). Each
-   accessor takes the acting principal and calls `assert_can`; the `invoice.state` accessor takes the target
-   state and rejects a transition the lifecycle on line 71 does not allow, so no later slice can invent one.
+   (18.4, 18.5 and 18.6 — see the transition table), `posting` (18.5), `dispute_case` and `case_event` and
+   `credit_memo` (18.6), and `batch_run` (18.7). Each accessor takes the acting principal and calls `assert_can`.
+   The `invoice.state` accessor takes the target state and accepts only a row of the transition table, so no later
+   slice can invent a lifecycle; a same-state write is the table's stated no-op, not an error.
+   **It also owns `apply_change(principal, change_id, decision)`**, the one path that applies or rejects a staged
+   change of any kind — posting, credit memo or payment hold. It enforces separation of duties, carries the
+   apply-once guard, and makes each kind's own state effect (a posting moves the invoice, a hold moves it to
+   `held`, a credit memo moves nothing). It belongs here rather than in 18.5 because 18.6 stages credits and holds
+   but depends on 18.3, not on 18.5: were the apply path 18.5's, 18.6 would either need a dependency on it or
+   would write its own second apply path, which is exactly the duplication separation of duties must not have.
    Seeding a table is not a write path. Without these, the four later slices would each have to edit
    `p2p/core/erp.py`, which is a foundation path they are forbidden to touch, and would stop and comment
-   instead. Security-sensitive: access rules and the write surface. Dependencies: 18.1.
+   instead. Security-sensitive: access rules, the write surface and the apply path. Dependencies: 18.1.
 
 ### Wave 2
 
@@ -251,8 +274,10 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    `p2p/match/`: the fixed four-step workflow (extract → PO → goods receipt → decide) as code, the `MatchOutcome`
    schema, the confidence bands (≥0.9, 0.6–0.9, <0.6) computed in code from per-field confidences and the variance
    set, the forcing rules (no PO, variance over 5%, flagged supplier, duplicate number), and the
-   `p2p match` / `p2p review` / `p2p approve` commands. Applying is a separate principal's act and refuses
-   self-approval; a second apply is a no-op with a stated reason. Every id in a model answer is re-checked against
+   `p2p match` / `p2p review` / `p2p approve` commands. `p2p review` and `p2p approve` are generic over staged
+   changes — a posting, a credit memo or a payment hold — and call 18.2's `apply_change`; this slice adds no second
+   apply path. Applying is a separate principal's act and refuses self-approval; a second apply is a no-op with a
+   stated reason. Every id in a model answer is re-checked against
    the ERP before use. Statements 1.4, 1.6, 5.5. Security-sensitive: it applies staged writes and enforces
    separation of duties. Dependencies: 18.3, 18.4.
 6. **18.6 `[fullstack-builder] Supplier disputes desk (exam scenario 1)`** · `claude` · **2nd: Codex**
@@ -260,8 +285,10 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
    resolved) as the State pattern, the escalation chain as app 17 interceptors over the five written criteria, the
    `dispute-triage` task with its closed set of next actions and per-step `tool_choice`, context preservation as a
    rolling summary plus the last 10 `case_event` rows, one clarifying question when nothing matches, and a staged
-   credit memo for amounts it proposes. Adds **no** tables: 18.2 seeded them. Statements 5.1, 5.2; exercises 2.3.
-   Security-sensitive: it stages a credit, which is money. Dependencies: 18.3.
+   credit memo for amounts it proposes. It also stages the `hold_payment` change, the only path to
+   `invoice.state = held`; both its credit and its hold are applied by an approver through 18.2's `apply_change`,
+   so this slice stages and never applies. Adds **no** tables: 18.2 seeded them. Statements 5.1, 5.2;
+   exercises 2.3. Security-sensitive: it stages a credit and a payment hold, which is money. Dependencies: 18.3.
 
 ### Wave 4
 

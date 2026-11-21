@@ -81,7 +81,9 @@ CLAIM_WINDOW_SEC=600                     # claims older than this are stale (a k
 CLAIM_SETTLE_SEC="${CLAIM_SETTLE_SEC:-3}" # let GitHub list a just-posted comment before re-reading
 TRANSIENT_RE='tls|ECONNRESET|connection reset|timeout|timed out|503|502|429|UNAVAILABLE|bad record MAC'
 # Foundation (wave 1) paths: only a security-sensitive issue (the app's foundation slice) may change them.
-WAVE1_RE='^(src/lib/db/|drizzle/|drizzle\.config\.ts$|src/lib/auth/|src/lib/access\.ts$|src/lib/access/|src/proxy\.ts$|src/middleware\.ts$)'
+# Same list as WAVE1_PATHS in issuelib.py; the self-test fails if they disagree. The second group is the Python
+# track (apps 17-20): a core/ package, the ERP schema and the frozen contracts.
+WAVE1_RE='^(src/lib/db/|drizzle/|drizzle\.config\.ts$|src/lib/auth/|src/lib/access\.ts$|src/lib/access/|src/proxy\.ts$|src/middleware\.ts$|agent_container/core/|p2p/core/|kit/core/|erp/|contracts/)'
 HOLD_LABEL="hold"
 # A dependency is done only when it was completed: an issue closed as completed (not "not planned" or a
 # duplicate), or a merged PR. Prints done, or why not. Same rule as dep_state() in scripts/issuelib.py.

@@ -28,8 +28,15 @@ RELEASE_MARK = "<!-- release-labels:released harness={} -->"  # posted once an i
 # Foundation (wave 1) paths: only the foundation slice, which is security-sensitive, may create or edit them.
 # Role and permission code lives in src/lib/auth/ (rbac.ts, permissions.ts) in the template; src/proxy.ts and
 # src/middleware.ts sit in front of every request. Same list as WAVE1_RE in run-harness.sh.
+#
+# The second group is the Python track (apps 17-20), whose foundation is a `core/` package plus the schema and the
+# frozen contracts rather than Drizzle and Better Auth. Added 2026-11-21: the list was TypeScript-only, so
+# `p2p/core/` and `kit/core/` were protected by their specs and the reviewer but by nothing mechanical, and the
+# note in every generated issue told a Python-track builder to avoid paths its repo does not have. Each group is
+# inert in the other's repos, so one list serves both.
 WAVE1_PATHS = ("src/lib/db/", "drizzle/", "drizzle.config.ts", "src/lib/auth/", "src/lib/access.ts", "src/lib/access/",
-               "src/proxy.ts", "src/middleware.ts")
+               "src/proxy.ts", "src/middleware.ts",
+               "agent_container/core/", "p2p/core/", "kit/core/", "erp/", "contracts/")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "run-harness.sh"
@@ -199,9 +206,13 @@ CASES = [
 ]
 PATHS = (["src/lib/db/schema.ts", "src/lib/db/index.ts", "drizzle/0004_dispatch-board.sql", "drizzle/meta/_journal.json",
           "drizzle.config.ts", "src/lib/auth/rbac.ts", "src/lib/access.ts", "src/lib/access/rules.ts", "src/proxy.ts",
-          "src/middleware.ts"],
+          "src/middleware.ts",
+          "agent_container/core/loop.py", "agent_container/core/tool.py", "p2p/core/erp.py", "p2p/core/access.py",
+          "kit/core/sandbox.py", "erp/schema.sql", "erp/seed/suppliers.csv", "contracts/p2p-erp.json"],
          ["src/lib/accessibility.ts", "src/app/board/page.tsx", "src/lib/dispatch.ts", "test/drizzle/x.ts",
-          "src/proxy.test.ts", "drizzle.config.ts.bak", "src/lib/dbx.ts"])
+          "src/proxy.test.ts", "drizzle.config.ts.bak", "src/lib/dbx.ts",
+          "agent_container/core_utils.py", "agent_container/testing/contracts.py", "p2p/match/workflow.py",
+          "kit/corex/y.py", "kit/scout/brief.py", "tests/p2p/core/test_erp.py", "contracts.py", "erp.sql"])
 # (issue JSON, dep_state)
 DEP_CASES = [
     ({"state": "open"}, "open"),

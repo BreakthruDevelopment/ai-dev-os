@@ -117,8 +117,13 @@ Harnesses never talk to each other directly. Work moves through:
 
 **Waves.** Every spec groups its issues into waves ([`FACTORY.md`](FACTORY.md#waves-and-the-start-signal)).
 Wave 1 is the foundation (schema, migrations, roles, access rules, auth config): always `claude` and
-`security-sensitive`. No issue outside wave 1 creates or edits the foundation paths (`src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`, `src/proxy.ts`, `src/middleware.ts`; role and permission code
-lives in `src/lib/auth/`), unless a security-sensitive `claude` slice is named as the owner. A later
+`security-sensitive`. No issue outside wave 1 creates or edits the foundation paths, unless a
+security-sensitive `claude` slice is named as the owner. On the Next.js template those are `src/lib/db/`,
+`drizzle/`, `drizzle.config.ts`, `src/lib/auth/` (where role and permission code lives), `src/lib/access.ts`,
+`src/proxy.ts` and `src/middleware.ts`; on the Python track (apps 17–20) they are the repo's `core/` package
+(`agent_container/core/`, `p2p/core/`, `kit/core/`), `erp/` and `contracts/`. One list lives in
+`WAVE1_PATHS` (`scripts/issuelib.py`), mirrored by `WAVE1_RE` in `scripts/run-harness.sh` with a self-test that
+fails if they disagree, and the note in every generated issue is derived from it. A later
 slice that needs a schema change gets a foundation slice, or its builder stops and comments on the issue.
 
 **The harness label is the start signal.** Every issue body carries a `Planned harness: <name>` line and a

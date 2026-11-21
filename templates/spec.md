@@ -51,8 +51,8 @@ Slices are grouped into waves. **Wave 1 is the foundation**: schema, migrations,
 config, always `claude` and security-sensitive (**2nd: Codex**). No slice outside wave 1 creates or edits the
 foundation paths — `src/lib/db/`, `drizzle/`, `drizzle.config.ts`, `src/lib/auth/`, `src/lib/access.ts`,
 `src/proxy.ts`, `src/middleware.ts` on this template, or the `core/` package, `erp/` and `contracts/` on the
-Python track; `WAVE1_PATHS` in `scripts/issuelib.py` is the list — unless a security-sensitive `claude` slice is
-named as the owner; if a later
+Python track; `WAVE1_PATHS` in `scripts/issuelib.py` is what the guard enforces, and **this section must name the
+paths that apply to this repo** — unless a security-sensitive `claude` slice is named as the owner; if a later
 slice needs a schema change, add a foundation slice for it here. Every slice not planned for `claude` depends,
 directly or not, on wave 1. Each slice names its role, its planned harness and ends with `Dependencies:` (slice ids
 and ranges such as `NN.1–NN.3`, other prerequisites as plain text, or `none`).

@@ -26,8 +26,7 @@ Foundation guardrails (wave 1 owns the data layer):
 - Never create or edit the foundation paths — which are generated for you, never written out here: the issue's own Notes section
   and the runner's instructions both render `WAVE1_PATHS` from `scripts/issuelib.py`, and a spec can protect
   paths the guard cannot express, as app 17's `agent_container/core/` does, so read the spec too and never
-  take the guard's silence for permission —. The app's foundation (wave 1) slice
-  owns them.
+  take the guard's silence for permission. The app's foundation (wave 1) slice owns them.
 - If the tables, data functions, roles or access rules your pages need aren't on `main`, stop and comment on the
   issue with what's missing (under `scripts/run-harness.sh`, write it to `.harness/blocked.md` and make no commits;
   the runner posts it). Never invent schema, migrations, roles or session code to get unblocked.

@@ -332,13 +332,27 @@ Eleven statements owned here, and the whole of Domain 3. Each README section wil
 
 Statement 2.4 is **exercised** here (19.6) and owned by app 18.
 
-The track assigns exam **scenarios 2, 4 and 5** to this repo: `day-0-aws-demo-track.md` line 15 says so, and
-`catalog.yaml` repeats it. What no source this project holds records is **what those scenarios are** — their
-subjects — and therefore which of the three sub-systems answers which. The one scenario whose subject is written
-down anywhere here is scenario 1: `day-0-aws-demo-track.md` line 85, on `main`, names it as the supplier disputes
-desk. So this spec states the
-assignment, which is known, and does not guess the mapping, which is not. Resolving it is a README task, listed as
-an open item below.
+### Exam scenarios 2, 4 and 5
+
+The track assigns exam **scenarios 2, 4 and 5** to this repo, and their subjects were supplied by Michael on
+2026-11-21 and recorded in `day-0-aws-demo-track.md`. The mapping no longer has to be guessed or deferred: the
+repo's three sub-systems answer one scenario each, which is why this repo has three of them.
+
+| Scenario | Subject | Answered by | Statements |
+| --- | --- | --- | --- |
+| 2 | Code generation with Claude Code: using slash commands, `.md` and configuration files, and deciding between plan mode and direct execution | **19.4**, the scaffold Factory (the `CLAUDE.md` hierarchy, path-scoped rules, slash commands and skills) and **19.9**, `kit plan`, which runs the same task planned-first and executed-directly from one forked prefix | 3.1, 3.2, 3.3 (19.4); 3.4 (19.9), with 3.5's refinement loop adjacent |
+| 4 | Developer productivity tools: navigating and understanding unfamiliar codebases efficiently using built-in tools (such as search/grep and targeted file reads) | **19.8**, the scout — directory listing, file read and grep over the sandbox, with the rolling summary and the per-step record of what it read and why — over **19.3**'s sample Java EE codebase as the substrate | 2.5, 5.4 |
+| 5 | Continuous integration (CI/CD): running Claude Code in automated pipelines for code reviews, test generation, and pull request feedback | **19.7**, the review passes against written criteria, and **19.10**, the same reviewer headless in GitHub Actions posting pull-request feedback | 3.6 (19.10); 4.1, 4.6 (19.7) |
+
+**Scenario 5 is not fully covered, and this spec says so rather than letting a README claim it.** Code review and
+pull-request feedback are answered in full; **"test generation" is not.** The reviewer's fourth pass judges tests
+and coverage and writes no tests, and nothing else in the kit generates any. Adding a test-writing mode is out of
+scope for this day — it would be a new write path in a repo whose whole security story is that only `kit new`
+writes, and only under a target root. The gap is recorded, named in the README, and not closed by pretending.
+
+**Two cut-order consequences**, now visible and recorded in `day-0-aws-demo-track.md`: cutting the scout drops
+scenario 4 **entirely**, and cutting session forking (19.5) strands 19.9, which is scenario 2's plan-mode clause.
+Neither is in Domain 3, which is why both looked cheap in the original cut order.
 
 ## Threat model
 
@@ -511,14 +525,19 @@ issues to the project board.
 
 13. **19.13 `[docs-writer] README, exam coverage and demo script`** · `grok`
     `templates/app-readme.md` filled in, every one of the 11 statements mapped to file and line, the scenario 2, 4
-    and 5 mapping resolved and stated, and the two-minute demo script. Dependencies: 19.12.
+    and 5 mapping **stated from the Exam scenarios table above** — it is recorded, not this slice's to resolve —
+    and the two-minute demo script. It also **checks that the built kit answers those three scenarios**: walk
+    19.4 and 19.9 against scenario 2, 19.8 against scenario 4, and 19.7 and 19.10 against scenario 5, and record
+    any part the code does not in fact answer. The "test generation" gap in scenario 5 is named, not glossed.
+    Dependencies: 19.12.
 
 ## Open items
 
-- **Which sub-system answers exam scenarios 2, 4 and 5.** The assignment of all three to this repo is recorded
-  (`day-0-aws-demo-track.md` line 15, and `catalog.yaml`); what those scenarios are about is not recorded
-  anywhere this project holds, so the mapping cannot be derived here. 19.13 resolves it against the exam's own
-  scenario list.
+- ~~**Which sub-system answers exam scenarios 2, 4 and 5.**~~ **Closed 2026-11-21**: Michael supplied the six
+  scenario subjects, they are recorded in `day-0-aws-demo-track.md`, and the mapping is the Exam scenarios table
+  above — 19.4 and 19.9 for scenario 2, 19.8 for 4, 19.7 and 19.10 for 5. What remains open is the **"test
+  generation" clause of scenario 5**, which nothing in this kit answers; it is a stated gap, out of scope for this
+  day because a test-writing mode is a new write path, and 19.13 names it rather than claiming it.
 - ~~**The mechanical wave-1 guard is TypeScript-only.**~~ **Fixed** (`ai-dev-os#61`, `#63`, `#64`): `p2p/core/`,
   `kit/core/`, `erp/` and `contracts/` are in `WAVE1_PATHS` and `WAVE1_RE`, and the prose copies are generated
   from that one list. App 17's `agent_container/core/` stays outside the guard on purpose, because its spec allows

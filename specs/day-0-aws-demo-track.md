@@ -15,6 +15,65 @@ Suite. Michael leads the engagement: discover where AI pays off, build the first
 | 19 | `19-enablement-kit` | Enable the client's engineers | 2, 4 and 5 |
 | 20 | `20-discovery-workbench` | Discover and scope | 3 |
 
+### The six scenarios and their subjects
+
+**Supplied by Michael on 2026-11-21**, and recorded here as the single source of truth: nothing this project held
+before that date carried the subjects, only the numbers and the repo assignments above. The three app specs map
+them to slices rather than restating them.
+
+| # | Subject | Repo | Answered by |
+| --- | --- | --- | --- |
+| 1 | Customer support agent: resolving high-ambiguity requests (refunds, billing disputes, account issues) using backend MCP tools and escalating to human agents when needed | 18 | 18.6, the disputes desk, over 18.3's MCP gateway |
+| 2 | Code generation with Claude Code: using slash commands, `.md` and configuration files, and deciding between plan mode and direct execution | 19 | 19.4 (the `CLAUDE.md` hierarchy, path rules, commands, skills) and 19.9 (plan mode versus direct execution) |
+| 3 | Multi-agent research system: coordinating task decomposition across sub-agents and synthesizing well-sourced, cited reports | 20 | 20.4 (coordination) **and 20.5** (the cited readout) — both halves, not one |
+| 4 | Developer productivity tools: navigating and understanding unfamiliar codebases efficiently using built-in tools (such as search/grep and targeted file reads) | 19 | 19.8, the scout, over 19.3's sample Java EE codebase |
+| 5 | Continuous integration (CI/CD): running Claude Code in automated pipelines for code reviews, test generation, and pull request feedback | 19 | 19.7 (the review passes and written criteria) and 19.10 (headless in CI, posting pull-request feedback) |
+| 6 | Structured data extraction: extracting accurate, validated JSON from unstructured documents while avoiding hallucinated or missing fields | 18 | 18.4, invoice extraction |
+
+App 17 underpins all six: each runs on its loop, its provider and its gate.
+
+Two places where the fit is less than exact, recorded now that the subjects are known:
+
+- **Scenario 1 is the loosest fit on the track.** The exam says *customer* support; app 18 does *supplier*
+  disputes. "Billing disputes" is in the scenario text, the desk runs over backend MCP tools, a credit memo stands
+  in for a refund, a payment-status lookup for an account issue, and escalation to a human is statements 5.2 and
+  5.5 — so everything the scenario exercises is present and only the counterparty differs. The substitution
+  **stands**; each README says so in those words rather than implying the exam asked about suppliers.
+- **Scenario 5 lacks "test generation."** The reviewer's fourth pass judges tests and coverage and writes none,
+  and nothing else in app 19 generates tests. Code review and pull-request feedback are covered in full. Recorded
+  as a stated gap rather than papered over: a README claiming the whole scenario would be wrong.
+
+### The five domains and their weights
+
+Also **supplied by Michael on 2026-11-21**, from studytech.ai and szymonpaluch.com. They are **his figures and
+approximate** — the official guide is confidential, so treat them as planning weights, not as quotable fact.
+
+| Domain | Weight | Statements | Owned by |
+| --- | --- | --- | --- |
+| Agentic Architecture & Orchestration (1.x) | 27% | 7 | 17 (1.1, 1.5), 18 (1.4, 1.6), 19 (1.7), 20 (1.2, 1.3) |
+| Claude Code Configuration & Workflows (3.x) | 20% | 6 | **19 alone** (3.1–3.6) |
+| Prompt Engineering & Structured Output (4.x) | 20% | 6 | 18 (4.2–4.5), 19 (4.1, 4.6) |
+| Tool Design & MCP Integration (2.x) | 18% | 5 | 17 (2.2), 18 (2.1, 2.3, 2.4), 19 (2.5) |
+| Context Management & Reliability (5.x) | 15% | 6 | 18 (5.1, 5.2, 5.5), 19 (5.4), 20 (5.3, 5.6) |
+
+The domain-to-prefix mapping was **checked against the statement subjects**, not assumed: Michael's list is
+ordered by weight rather than by domain number, which is where an error would hide. Every 1.x statement is loop,
+coordinator, handoff or decomposition; every 2.x is a tool or MCP concern; 3.x is entirely Claude Code
+configuration and workflow; 4.x is prompting and structured output; 5.x is context, escalation, propagation and
+calibration. The counts are 7 / 5 / 6 / 6 / 6 = 30, and the weights sum to 100.
+
+**Weighted ownership**, spreading each domain's weight evenly over its statements and crediting the first repo
+listed in the coverage table: **app 18 39.3%, app 19 36.6%, app 20 12.7%, app 17 11.3%** (per statement: 3.86 in
+domain 1, 3.60 in domain 2, 3.33 in domains 3 and 4, 2.50 in domain 5; the four sum to 100.0). Two consequences:
+
+- **Domain 3 is sole-sourced to app 19** — the only domain owned entirely by one repo. Trimming app 19 forfeits a
+  fifth of the exam with nothing else able to carry it, which is why the cut order already protects its Domain 3
+  coverage and why app 19 outranks app 20 for scarce `claude` capacity.
+- **Exam weight is not demo value.** App 20's 20.6, 20.7 and 20.8 carry zero statements and zero scenarios, while
+  20.4 carries 10.2% and 20.5 carries 2.5%. That does not make the first three cuttable: 20.6 is the only surface
+  anything can be shown from, and 20.8 is the artifact that proves the coverage claim to a reader. The weights
+  rank what the exam rewards, not what an interview sees.
+
 Nothing here is SOA Suite, uses SOA Suite, or imitates it. These are modern agentic systems: Python, the Bedrock
 Converse API, MCP, Claude Code and Amazon Bedrock. The Claude Agent SDK is deliberately **not** used: app 17
 hand-builds its loop so the design is the thing on show rather than a framework's. (`ROADMAP.md`'s W07 row is
@@ -29,7 +88,8 @@ Three sources, in priority order:
 
 1. **The Claude Certified Architect (Foundations) exam** — five domains, 30 task statements, six scenarios. All six
    scenarios are built as running systems, and the table below gives every task statement a home. Each README will
-   carry its own slice of it with file and line references.
+   carry its own slice of it with file and line references. The scenario subjects and the domain weights are above;
+   as of 2026-11-21 they are recorded, not guessed.
 2. **Caylent's postings** for Forward Deployed Engineer and Forward Deployed AI Lead. They repeat three things:
    turn ambiguity into scoped work, ship software that runs after you leave, and leave a reusable artifact behind.
    The four repositories are those three things plus the artifact. The AI Lead posting lists "Certified Claude
@@ -83,7 +143,9 @@ is entirely app 19, which is why app 19 cannot be cut.
 ## Decisions taken
 
 - **Scenario 1 is the supplier disputes desk** inside app 18, not a separate customer-support app. Same
-  architecture — lookups, a credit, escalation on explicit criteria — inside the engagement's own story.
+  architecture — lookups, a credit, escalation on explicit criteria — inside the engagement's own story. This
+  bullet records only the decision; the scenario's own subject, and the one way the substitution diverges from it,
+  are in the scenario table above and are not restated here.
 - **Slots 21–29 and 32 are untouched** and keep their existing catalog entries. Michael's original instruction
   covered 17–29 and 32; narrowing to four repositories left the rest unassigned, and that is a separate decision.
 - **Bedrock is confirmed**: the second AWS account (project "Ctrl Shift Believe"), region **us-east-2**, model
@@ -124,6 +186,13 @@ Five days. The order is by value: whatever is finished on Tuesday must be the pa
 template in the factory at all, and 17.1 to 17.2 are strictly serial. The plan stands because the week has a week
 of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesday costs nothing real.
 
+**App 20's Wednesday set changed on 2026-11-21**, when the scenario subjects arrived: it is 20.1–20.6 with the
+ROI model and `GET /` cut, and 20.7's deploy plus 20.8's README on Friday. The earlier proposal (20.1–20.4 by
+Wednesday, 20.5–20.8 to Friday) would have shipped the coordination half of scenario 3 and dropped the
+cited-report half it is named for. Details and the fallback are in
+[`20-discovery-workbench.md`](20-discovery-workbench.md) under "Wednesday". Scarce `claude` capacity goes to apps
+18 and 19 first; app 19 sole-sources Domain 3.
+
 **Known risks, recorded now rather than discovered later:**
 
 - Friday is a single point of failure: everything imports app 17, and nothing can be parallelised around it.
@@ -137,6 +206,13 @@ of slack behind it: the interview is 2026-12-01, so Tuesday slipping to Wednesda
   model, then app 17's Lambda health endpoint (slice 17.7 — the lowest-value item in app 17), then session
   forking, then batch processing, then app 19's scout. Never cut app 17, app 18 end to end, app 19's Domain 3
   coverage, or the recorded replays.
+- **The cut order has two scenario costs that were invisible until 2026-11-21.** Neither item is in Domain 3,
+  which is why both looked cheap: **cutting app 19's scout drops scenario 4 entirely** (19.8 is its whole answer,
+  over 19.3's sample codebase, and carries 2.5 and 5.4), and **cutting session forking strands 19.9**, whose
+  `kit plan` runs two continuations from one forked prefix — that is scenario 2's plan-mode clause, and 19.9
+  depends on 19.5. Cut the ROI model and app 17's Lambda health endpoint first: those two carry no scenario at
+  all. If the order has to reach further, batch processing (18.7, statement 4.5) is the next item that costs no
+  scenario, since scenario 6 is answered by 18.4 alone.
 - **Realistic target:** apps 17 and 18 end to end by Tuesday. Four polished repos with all 30 statements mapped to
   file and line is not.
 

@@ -183,9 +183,20 @@ answer is re-checked against `source_document` before it is followed.
 | 5.6 | Provenance and uncertainty in synthesis | 20.5 |
 | 1.6 (adaptive) · 2.3 · 5.1 | exercised here, all three owned by app 18 | 20.4 |
 
-Exam **scenario 3** is this repo's, per `day-0-aws-demo-track.md`. What scenario 3 *is* is not recorded anywhere
-this project holds, so this spec states the assignment and does not guess the subject; 20.8 resolves it against
-the exam's own scenario list, exactly as app 19 does for 2, 4 and 5.
+### Exam scenario 3
+
+Exam **scenario 3** is this repo's, and its subject was supplied by Michael on 2026-11-21 and recorded in
+`day-0-aws-demo-track.md`: *"Multi-agent research system: coordinating task decomposition across sub-agents and
+synthesizing well-sourced, cited reports."* Nothing about it is deferred to 20.8 any more.
+
+**It has two halves, and they live in different slices.** Coordination — the adaptive plan, the parallel
+subagents, scoped context and error propagation — is statements 1.2, 1.3 and 5.3, all in **20.4**. "Synthesizing
+well-sourced, cited reports" is statement 5.6, in **20.5**: the quote verified verbatim per claim, the
+contradicted fact surfaced as a conflict with both quotes, the `unknown` maturity level where no verified claim
+backs one, and `coverage` rendered first. A build that ships 20.4 without 20.5 delivers the coordination half of
+this repo's only scenario and drops the half it is named for. **20.5 is therefore not an optional polish slice**,
+and the cut list below is written around that. The ROI model *inside* 20.5 is a different matter: it carries no
+statement and no scenario, and remains the track's first named cut.
 
 ## Threat model
 
@@ -218,12 +229,20 @@ Every slice: Python 3.12, `uv`, `ruff`, `mypy --strict`, `pytest`; the required 
 recorded replies with no network. App 17 is pinned at `v0.1.0` (`9955f1f`); a slice that needs something that tag
 does not carry **stops and comments on its issue** rather than inventing it.
 
-**Demo essentials and the cut list.** Essential for the live demo: 20.1, 20.2, 20.3, 20.4 and 20.6 — the
-coordinator fanning out, one subagent failing visibly, and a command that shows it. 20.5's readout is what makes
-the demo *land*, but it degrades gracefully: **the ROI model is the track's first named cut** and costs one
-pydantic field (`roi`, already nullable) and one function. If Wednesday is tight, cut in this order: the ROI
-model, then `GET /` (the coverage map; keep `/healthz` so the deploy still smokes), then 20.8's README to
-Thursday. Never cut 20.4 — without the coordinator this repo has no reason to exist.
+**Demo essentials and the cut list** (rewritten 2026-11-21, when scenario 3's subject became known). Essential:
+20.1, 20.2, 20.3, 20.4, **20.5** and 20.6 — the coordinator fanning out, one subagent failing visibly, the cited
+readout that is the other half of scenario 3, and a command that shows all of it. An earlier draft of this
+paragraph listed 20.5 as the slice that merely "makes the demo land"; that was written without the scenario
+subject and is wrong. What remains cuttable, in order: **the ROI model** (the track's first named cut, and it
+costs one nullable pydantic field and one function — it carries no statement and no scenario), then **`GET /`**,
+the coverage map endpoint — keep `/healthz` so the deploy still smokes, and note 20.8's README carries the same
+map — then **20.7's deploy** and **20.8's README** to Friday. Never cut 20.4, and never ship 20.4 without 20.5:
+one is the coordination half of this repo's only scenario and the other is the cited-report half.
+
+**Zero exam weight is not zero value.** On the domain weights recorded in `day-0-aws-demo-track.md`, 20.4 carries
+10.2% of the exam and 20.5 carries 2.5%, while 20.6, 20.7 and 20.8 carry none. That ranks what the exam rewards,
+not what an interview sees: 20.6 is the only surface anything can be shown from, and 20.8 is the artifact that
+proves the coverage claim to a reader. Only 20.7 is cheap on both counts.
 
 **Harness routing.** `claude` 5, `grok` 3, `codex` 0 — Codex's work here is the second review on the four
 security-sensitive slices (20.1, 20.2, 20.4, 20.7), since the Codex build environment still does not exist and
@@ -329,8 +348,11 @@ issues to the project board.
 
 8. **20.8 `[docs-writer] README, exam coverage and demo script`** · `grok`
    `templates/app-readme.md` filled in, the pattern map (Mediator, Composite, Template Method) and the four owned
-   statements each mapped to file and line, the scenario 3 subject resolved against the exam's own scenario list
-   and stated, and the two-minute demo script. Dependencies: 20.7.
+   statements each mapped to file and line, the scenario 3 subject **stated from the Exam scenario 3 section
+   above** — it is recorded in `day-0-aws-demo-track.md` and is not this slice's to resolve — and the two-minute
+   demo script. It also **checks that the built workbench answers scenario 3 in both halves**: 20.4 for
+   coordinating task decomposition across sub-agents, 20.5 for the well-sourced, cited report, with any part the
+   code does not in fact answer recorded rather than asserted. Dependencies: 20.7.
 
 ## Open items
 
@@ -338,11 +360,22 @@ issues to the project board.
   is carried by this spec and by review. Adding `workbench/core/` to `WAVE1_PATHS` (and regenerating the prose
   with `scripts/sync-wave1-docs.py`) is a one-line `ai-dev-os` change and is safe here, because no slice outside
   wave 1 adds a file there — unlike app 17's `agent_container/core/`, which must stay outside the guard.
-- **Exam scenario 3's subject** is not recorded anywhere this project holds; 20.8 resolves it.
+- ~~**Exam scenario 3's subject** is not recorded anywhere this project holds; 20.8 resolves it.~~ **Closed
+  2026-11-21**: Michael supplied it, it is recorded in `day-0-aws-demo-track.md`, and the Exam scenario 3 section
+  above maps its two halves to 20.4 and 20.5. The consequence is in the cut list and in the Wednesday item: the
+  previously proposed Wednesday set of 20.1–20.4 would have shipped half a scenario.
 - **Codex environment.** No slice is routed to `codex`; its work here is the second review on 20.1, 20.2, 20.4
   and 20.7.
-- **Wednesday.** Apps 18 and 19 were unblocked on 2026-11-21 and have not started building. Eight slices here,
-  five of them `claude`, with 20.1 → 20.2 → 20.4 → 20.5 → 20.6 strictly serial, is **not** a Wednesday delivery
-  alongside them at the review-round rates this factory actually sees. The honest plan is 20.1–20.4 plus a
-  one-command demo by Wednesday and the readout, deploy and README by Friday, which still leaves four clear days
-  before the interview.
+- **Wednesday**, restated 2026-11-21 with the scenario subjects known. Apps 18 and 19 were unblocked on
+  2026-11-21 and have not started building. Eight slices here, five of them `claude`, with
+  20.1 → 20.2 → 20.4 → 20.5 → 20.6 strictly serial, is **not** a Wednesday delivery alongside them at the
+  review-round rates this factory actually sees. The earlier plan — 20.1–20.4 plus a one-command demo by
+  Wednesday, 20.5–20.8 to Friday — is now **wrong**: it would deliver the coordination half of this repo's only
+  scenario and drop the cited-report half it is named for.
+  **The plan of record: Wednesday is 20.1, 20.2, 20.3, 20.4, 20.5 and 20.6, with the ROI model and `GET /` cut;
+  Friday is 20.7's deploy and 20.8's README**, restoring the two cuts if there is room. That is the whole repo
+  minus the deploy and the docs, so **app 20 has almost nothing left to cut** and the remaining levers are
+  throughput and the date. If Wednesday cannot hold all six, slip **app 20's date** to Thursday rather than
+  shipping 20.4 without 20.5: a half-answered scenario 3 reads worse to an interviewer than app 20 arriving a day
+  late, and the interview is 2026-12-01. `claude` capacity goes to apps 18 and 19 first — app 19 sole-sources
+  Domain 3, a fifth of the exam, and no other repo can carry it.

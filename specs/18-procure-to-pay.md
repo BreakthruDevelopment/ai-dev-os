@@ -273,6 +273,24 @@ exercised here (the day-0 table lists 17 first for both).
 | 5.5 human review and confidence calibration | 18.5 — the bands, the review command, separation of duties |
 | (1.5 exercised) | 18.3 interceptors on gateway calls; (2.2 exercised) the gateway's error categories |
 
+### Exam scenarios 1 and 6
+
+Subjects supplied by Michael on 2026-11-21 and recorded in `day-0-aws-demo-track.md`. This table is the mapping
+from each to the slice that answers it, which is what a builder here needs. Nothing is deferred to the README any
+more: before that date the subjects were unrecorded anywhere this project holds, and only scenario 1's had been
+written down, as a decision rather than as the exam's own words.
+
+| Scenario | Subject | Answered by |
+| --- | --- | --- |
+| 1 | Customer support agent: resolving high-ambiguity requests (refunds, billing disputes, account issues) using backend MCP tools and escalating to human agents when needed | **18.6**, the disputes desk, over **18.3**'s gateway: the `dispute-triage` closed action set and the single clarifying question are the ambiguity half; the five written criteria and the confidence band are the escalation half (5.2, 5.5); a staged credit memo stands in for a refund and `get_payment_status` for an account issue |
+| 6 | Structured data extraction: extracting accurate, validated JSON from unstructured documents while avoiding hallucinated or missing fields | **18.4**: few-shot (4.2), the schema as a forced tool (4.3), validate-and-repair with the failures named (4.4). "No hallucinated or missing fields" is the per-field `confidence`, `unreadable[]`, and the rule that every id in a model answer is re-checked against the ERP. **18.7** runs the same task at folder scale (4.5), which the scenario does not require, so cutting the batch costs no scenario |
+
+**Scenario 1's one divergence, stated rather than hidden.** The exam says *customer* support and this desk serves
+*suppliers*. Everything the scenario exercises is present and only the counterparty differs, so the substitution
+**stands**: it was taken deliberately (`day-0-aws-demo-track.md`, "Decisions taken") and the subject, now known,
+does not overturn it. No change to 18.6 is proposed. The README must say so in those words and must not imply the
+exam asked about suppliers.
+
 ## Threat model
 
 | Risk | Control |
@@ -439,4 +457,9 @@ app 17 has not tagged yet **stops and comments on its issue** rather than invent
 10. **18.10 `[docs-writer] README`** · `grok`
     From `templates/app-readme.md`, plus the pattern map (Adapter, Command, State, Proxy, Chain of Responsibility,
     Template Method, Strategy) and the exam map above, each claim with a file and line reference, and the gateway's
-    tool and error contract for app 19's readers. Dependencies: 18.9.
+    tool and error contract for app 19's readers. It also **checks that the built app answers its two assigned
+    scenarios**: walk 18.6 against scenario 1 and 18.4 against scenario 6 as the Exam scenarios table states them,
+    and record any part the code does not in fact answer rather than asserting coverage. State the
+    supplier-for-customer substitution in the spec's own words. Nothing is resolved against the exam's scenario
+    list here — the subjects are recorded in `day-0-aws-demo-track.md` and are not this slice's to decide.
+    Dependencies: 18.9.

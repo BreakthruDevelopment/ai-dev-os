@@ -200,13 +200,17 @@ and tool contracts, and the permission gate. Wave 1 owns them; later slices exte
 
 ### Wave 4
 
-7. **17.7 `[devops] Deploy app 17`** · `claude` · **2nd: Codex** · repo **`30-apps-infra`**
-   Security-sensitive: it provisions IAM in a new AWS account. **Second on the cut list**, after app 20's ROI model
-   — the track plan's cut order is the authority — because a Lambda health endpoint is the lowest-value item in
-   this repo and the demo runs from the command line without it. App 20's ROI model is cut before it.
-   A Lambda health endpoint running the replay demo, in the second AWS account, us-east-2. **Do not set up GitHub
-   OIDC in this slice**: the account's IAM console offers no Identity providers page, so the deploy uses the
-   existing IAM user key already in repo secrets, and this slice adds only the smallest policy the deploy needs.
-   Record what that policy grants on the PR. Dependencies: 17.6.
+7. ~~**17.7 `[devops] Deploy app 17`** · `claude` · repo **`30-apps-infra`**~~ — **CUT 2026-11-22**
+   (Michael). It was second on the cut list and the cut reached it. `30-apps-infra#96`, closed as not planned.
+   The reasoning, kept because this is the precedent for cutting a deploy: app 17 is a library with no pages, no
+   database and no auth, so the Lambda health endpoint was the only deployable thing in it, and the demo it would
+   have exposed is `agent-container demo`, which runs from the command line on a recorded fixture with no network
+   and no AWS credentials. The slice would have provisioned IAM in a new AWS account to expose what the library
+   already does locally. No `apps.yaml` entry was ever added, so nothing is deployed and nothing needs tearing
+   down; `app17.breakthruventures.ai` has no DNS record and no Terraform resources. Reopen it if the endpoint is
+   wanted later — nothing in the library has to change for it.
 8. **17.8 `[docs-writer] README`** · `grok`
-   Includes the pattern map and the exam map, each with file and line. Dependencies: 17.7.
+   Includes the pattern map and the exam map, each with file and line. **No live URL and no "try it" link**: 17.7
+   is cut, so there is nothing deployed to point at. Document the command line instead — `agent-container demo` on
+   the recorded fixture, `--live` for Bedrock — and say that apps 18, 19 and 20 import this library.
+   Dependencies: 17.6 (was 17.7, re-pointed when 17.7 was cut).

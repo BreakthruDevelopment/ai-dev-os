@@ -102,12 +102,21 @@ stronger than it was before 2026-11-22 (it now actually exercises the wheel). Th
 Nothing else in the definition changes, and no app with a web surface gets an easier bar.
 
 This is left as a question rather than an edit to `FACTORY.md`, because loosening the definition of done is
-Michael's call and not a scheduled run's. App 20 may want the same allowance; apps 18 and 19 both deploy.
+Michael's call and not a scheduled run's — and because the app that wants the exemption should not be the one
+that drafts the rule. App 20 may want the same allowance; apps 18 and 19 both deploy, so the general rule is
+better written from more than one case.
+
+**Tracked as [`ai-dev-os#69`](https://github.com/BreakthruDevelopment/ai-dev-os/issues/69)**, not only here: a
+governance question parked in a run log is one nobody re-reads, and app 17 would otherwise sit at `building` with
+no owner for the condition it cannot meet.
 
 ## What slipped or surprised us
 
-- **Apps 18, 19 and 20 pin `v0.1.0` (`9955f1f`), now two merges behind `main`.** Both merges are things those apps
-  want — #19 is the approval-record fix that 18 and 19 depend on, and #17 is the demo. `main` wants a **`v0.1.1`**
+- **Apps 18, 19 and 20 pin `v0.1.0` (`9955f1f`), now three merges behind `main` — two of them library code.**
+  `git log --first-parent v0.1.0..main` is #15, #17 and #19; #15 touched only
+  `.github/workflows/review-gate.yml` (+6 lines), so consumers are three commits but two code merges behind. Both
+  code merges are things those apps want — #19 is the approval-record fix that 18 and 19 depend on, and #17 is the
+  demo. `main` wants a **`v0.1.1`**
   and the consumers' `pyproject.toml` pins want moving deliberately. **Tag creation is blocked by policy in the
   scheduled environment**, so the code is in and the tag is not. This is the one thing outstanding that affects
   other repos.
@@ -115,7 +124,11 @@ Michael's call and not a scheduled run's. App 20 may want the same allowance; ap
 - Issue **#11** (a `StrEnum` compared with `is` in `ToolResult.failure`) was reassigned from `claude` to `codex`
   mid-run and left with Codex, confirmed deliberate. App 20's slice 20.4 throttling eval depends on it:
   `ToolResult.failure` returns `is_retryable=False` for the wire string `"transient"`.
-- Residual imprecision shipped knowingly: `agent_container/testing/contracts.py`'s "irreducible trust floor"
-  docstring claims more than the suite delivers, and one `_require` before `apply()` would close five of six
-  adversarial cases. Filed with the measurements on `17-agent-container#20` rather than held for a fifth review
-  round on a non-urgent backlog issue. A library three apps read now carries a docstring that overstates.
+- Residual imprecision shipped knowingly. `agent_container/testing/contracts.py:325` on `main` says
+  "What remains on trust, irreducibly:" and then claims more than the suite delivers: the word *irreducibly* is
+  wrong, because one `_require` before `apply()` calibrates the two renderers and closes five of six adversarial
+  cases with all 588 tests still passing, and the paragraph's claim that the suite checks `recomposed` "for
+  consistency with the record" is wrong too — it is checked only for *difference* from it. Filed with those
+  measurements in a **comment** on `17-agent-container#20` (not its body), rather than held for a fifth review
+  round on a non-urgent backlog issue. A library that apps 18, 19 and 20 read now carries a docstring that
+  overstates, which is the cost of that call.

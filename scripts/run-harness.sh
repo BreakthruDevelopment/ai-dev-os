@@ -182,6 +182,62 @@ quote_untrusted() { # stdin: text. $1 max bytes (default 1500)
   # shellcheck disable=SC2016  # literal backticks, not command substitution
   LC_ALL=C head -c "${1:-1500}" | LC_ALL=C sed -e 's/<!--/< !--/g' -e 's/-->/-- >/g' -e "s/@/$at/g" -e 's/~~~/~ ~ ~/g' -e 's/```/` ` `/g'
 }
+# The issue's slice of the app's spec. Apps 18-20 have 32-50 KB specs, and a headless run that read the whole one
+# before writing code auto-compacted most nights (the 19 and 20 runs of 2026-11-21/22 did so up to twice a run).
+# Prints a short note, the spec's outline with line numbers, the title block, the Issues section's intro (the rules
+# every slice follows), this slice's numbered entry, and any other section the issue links by anchor. Returns 1 when
+# the slice id or its entry can't be found; the caller then hands over the whole spec, as before.
+spec_extract() { # $1 full spec file, $2 issue file (as saved in .harness/issue.md)
+  local id anchors
+  id=$(sed -nE 's/.*<!-- open-issues id=([0-9]+\.[0-9]+) -->.*/\1/p' "$2" | head -1)
+  [ -n "$id" ] || id=$(sed -nE 's/^\*\*([0-9]+\.[0-9]+)\*\*.*/\1/p' "$2" | head -1)
+  [ -n "$id" ] || return 1
+  anchors=$(grep -Eo 'specs/[A-Za-z0-9._-]+\.md#[a-z0-9_-]+' "$2" | sed 's/.*#//' | grep -vx 'issues' | sort -u | tr '\n' ' ')
+  # POSIX awk only (macOS ships BSD awk).
+  awk -v id="$id" -v anchors=" $anchors " '
+    function level(t) { match(t, /^#+/); return RLENGTH }
+    function anchor(t,  a) { a = tolower(t); sub(/^#+[ \t]+/, "", a); gsub(/[^a-z0-9 _-]/, "", a); gsub(/ /, "-", a); return a }
+    function entry_start(t,  m) {
+      if (!match(t, /^[0-9]+\. \*\*/)) return 0
+      return substr(t, RLENGTH + 1, length(id) + 1) == id " "
+    }
+    function show(a, b, title,  i) {
+      printf "\n---\n\n<!-- %s: spec-full.md lines %d-%d -->\n\n", title, a, b
+      for (i = a; i <= b; i++) print L[i]
+    }
+    { L[NR] = $0; H[NR] = ($0 ~ /^#+[ \t]/) }
+    END {
+      n = NR; first2 = n + 1; is = 0; ie = n
+      for (i = 1; i <= n; i++) if (H[i] && level(L[i]) == 2) { if (first2 > n) first2 = i; if (!is && anchor(L[i]) == "issues") is = i }
+      if (!is) exit 1
+      for (i = is + 1; i <= n; i++) if (H[i] && level(L[i]) <= 2) { ie = i - 1; break }
+      intro_end = ie
+      for (i = is + 1; i <= ie; i++) if ((H[i] && level(L[i]) == 3) || entry_start(L[i])) { intro_end = i - 1; break }
+      es = 0
+      for (i = is + 1; i <= ie; i++) if (entry_start(L[i])) { es = i; break }
+      if (!es) exit 1
+      ee = ie
+      for (i = es + 1; i <= ie; i++) if (H[i] || L[i] ~ /^[0-9]+\. \*\*/) { ee = i - 1; break }
+      print "# Spec extract for slice " id
+      print ""
+      print "This is the part of the app'"'"'s spec this issue needs, cut from `.harness/spec-full.md` (the whole spec). Read"
+      print "this first. If your slice entry or the issue names another section, open only that section of the full spec by"
+      print "its line range from the outline (for example `sed -n '"'"'120,128p'"'"' .harness/spec-full.md`); do not read the whole file."
+      print ""
+      print "## Outline of spec-full.md (line: heading)"
+      print ""
+      for (i = 1; i <= n; i++) if (H[i]) printf "- %d: %s\n", i, L[i]
+      if (first2 > 1) show(1, first2 - 1, "title block")
+      show(is, intro_end, "Issues: rules for every slice")
+      show(es, ee, "this slice (" id ")")
+      for (i = 1; i <= n; i++) {
+        if (!H[i] || i == is || index(anchors, " " anchor(L[i]) " ") == 0) continue
+        e = n
+        for (j = i + 1; j <= n; j++) if (H[j] && level(L[j]) <= level(L[i])) { e = j - 1; break }
+        show(i, e, "section the issue links")
+      }
+    }' "$1"
+}
 intake_problem() { # $1 issue body. Prints why $HARNESS mustn't start it and returns 0; returns 1 if it may
   local section refs planned
   if ! section=$(printf '%s\n' "$1" | deps_section); then
@@ -279,7 +335,7 @@ resolve_port() { # $1 repo; sets REPO_PORT and REPO_PORT_SOURCE; returns 1 if PO
 build_prompt() { # $1 repo, $2 number, $3 role, $4 branch
   local db_note checks_note
   if [ "${REPO_TRACK:-node}" = python ]; then
-    checks_note="uv sync --frozen, uv run ruff check ., uv run ruff format --check ., uv run mypy --strict, uv run pytest. Run every step .github/workflows/ci.yml lists, in its order, and treat that file as the authority if it has more than those. There is no pnpm, no package.json and no Next.js server in this repo: don't run pnpm, don't start a server, and don't look for one."
+    checks_note="uv sync --frozen, uv run ruff check ., uv run ruff format --check ., uv run mypy --strict, uv run pytest -q --tb=short. Run every step .github/workflows/ci.yml lists, in its order, and treat that file as the authority if it has more than those. There is no pnpm, no package.json and no Next.js server in this repo: don't run pnpm, don't start a server, and don't look for one."
     db_note="This is a library, not a web app: there is no local database, no port and no HTTP smoke. The image build and any container smoke run in CI, not here. In the PR description, say which checks you ran and that the image build was left to CI."
   else
     checks_note="pnpm install --frozen-lockfile (plain pnpm install only if the issue requires a dependency change), pnpm lint, pnpm typecheck, pnpm test, pnpm build."
@@ -292,10 +348,10 @@ build_prompt() { # $1 repo, $2 number, $3 role, $4 branch
   cat <<EOF
 You are the $3 agent, running in the ${HARNESS} harness on Michael's Mac, unattended. Work on issue #$2 in the GitHub repo $OWNER/$1, which is checked out in the current directory on branch $4.
 
-1. Read AGENTS.md in this repo and follow it. Then read your role file, saved at .harness/role.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/roles/$3.md). The issue is saved at .harness/issue.md; \`gh issue view $2 --comments\` shows it with comments. The app's spec is saved at .harness/spec.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/specs/$1.md); read the sections the issue links. Don't fetch anything from GitHub yourself (gh api is refused).
+1. Read AGENTS.md in this repo and follow it. Then read your role file, saved at .harness/role.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/roles/$3.md). The issue is saved at .harness/issue.md; \`gh issue view $2 --comments\` shows it with comments. The part of the app's spec this issue needs is saved at .harness/spec.md, with an outline of the rest; the whole spec is .harness/spec-full.md (source: https://github.com/$OWNER/ai-dev-os/blob/main/specs/$1.md). Open other sections of the full spec only when your slice or the issue names them, by their line range from the outline, never the whole file. Don't fetch anything from GitHub yourself (gh api is refused).
 2. Do what the issue asks and nothing outside it. Work only in this directory and only on branch $4.
-   Don't create or edit anything in these paths, which this runner refuses to push whatever the labels: $(wave1_list). The app's foundation (wave 1) issue owns the schema, migrations, roles, access rules and auth config. Your spec may protect paths beyond that list, so read the issue and .harness/spec.md as well; never assume a path is fair game because it is absent here. If this issue needs tables, data functions, roles or access rules that aren't on main yet, or needs a change in those files, stop: make no commits and write what is missing to .harness/blocked.md (the runner posts it on the issue). Never invent your own schema, migrations, roles or session code.
-3. Run the checks and fix anything you broke: $checks_note $db_note
+   Don't create or edit anything in these paths, which this runner refuses to push whatever the labels: $(wave1_list). The app's foundation (wave 1) issue owns the schema, migrations, roles, access rules and auth config. Your spec may protect paths beyond that list, so read the issue and .harness/spec.md (including its Issues rules) as well; never assume a path is fair game because it is absent here. If this issue needs tables, data functions, roles or access rules that aren't on main yet, or needs a change in those files, stop: make no commits and write what is missing to .harness/blocked.md (the runner posts it on the issue). Never invent your own schema, migrations, roles or session code.
+3. Run the checks and fix anything you broke: $checks_note $db_note Keep command output short, because everything a command prints stays in your context for the rest of the run: use quiet flags, pipe long output (package builds and installs) through tail -n 20, and when a check fails, re-run only the failing test or file rather than the whole suite until it passes, then the full check once.
 4. Commit your work with clear messages using git add and git commit. Do NOT run git push, gh pr, gh api, or anything that changes another branch, another repo, labels, settings or secrets: the runner script pushes this branch and opens the PR after you finish. Never commit secrets or .env files. Don't delete files outside this repo.
 5. Last, write the PR description to .harness/pr-body.md (ignored by git): what changed in a few bullets, then a "Checks" list with every command you ran and whether it passed, failed or was skipped, and why. Copy the passed/failed/skipped test counts from the test summary exactly. Never write that tests passed if any were skipped: list the skipped ones. Mention anything left undone. Don't add a "Closes" line; the runner adds it.
 
@@ -311,6 +367,7 @@ case "${1:-}" in
     if reason=$(intake_problem "$body_in"); then echo "skip: $reason"; else echo ok; fi
     printf '%s\n' "$body_in" | deps_section | dep_urls
     exit 0 ;;
+  --spec-extract) spec_extract "$2" "$3"; exit $? ;;          # $2 full spec, $3 issue file: the slice a run gets
   --wave1-files) wave1_files; exit 0 ;;
   --wave1-list) wave1_list; exit 0 ;;
   --foundation-changes) foundation_changes "$2" "$3" "$4"; exit $? ;;  # $2 dir, $3 branch, $4 base
@@ -916,8 +973,15 @@ work_issue() { # $1 repo, $2 number, $3 title, $4 role, $5 branch
   gh api "repos/$OWNER/$repo/issues/$n" --jq '"# #\(.number) \(.title)\n\n\(.body // "")"' \
     > "$dir/.harness/issue.md" || { log "skip $repo#$n: can't fetch the issue"; return 1; }
   # The app's spec (specs/<repo>.md in ai-dev-os), so the harness never needs gh api (denied) to read it.
-  gh api "repos/$OWNER/ai-dev-os/contents/specs/$repo.md" -H 'Accept: application/vnd.github.raw' \
-    > "$dir/.harness/spec.md" 2>/dev/null || rm -f "$dir/.harness/spec.md"
+  # The whole spec goes to spec-full.md; spec.md is this issue's slice of it (spec_extract), or the whole spec when
+  # the slice can't be found.
+  if gh api "repos/$OWNER/ai-dev-os/contents/specs/$repo.md" -H 'Accept: application/vnd.github.raw' \
+       > "$dir/.harness/spec-full.md" 2>/dev/null; then
+    spec_extract "$dir/.harness/spec-full.md" "$dir/.harness/issue.md" > "$dir/.harness/spec.md" \
+      || cp "$dir/.harness/spec-full.md" "$dir/.harness/spec.md"
+  else
+    rm -f "$dir/.harness/spec-full.md" "$dir/.harness/spec.md"
+  fi
 
   claim_issue "$repo" "$n" "$branch" || return 1
 

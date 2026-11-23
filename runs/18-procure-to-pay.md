@@ -14,7 +14,7 @@ BreakthruSoftwareFactory run log ([`FACTORY.md`](../FACTORY.md)). Link evidence;
 | Live smoke | n/a — nothing deployed |
 | Catalog status | building |
 
-Eight of the ten slices are merged. The remaining chain — demo and smoke, then deploy, then README — is
+Seven of the ten slices are merged, plus the backlog slice 18.11 raised out of a review. The remaining chain — demo and smoke, then deploy, then README — is
 **entirely behind one Grok slice**, `#8`.
 
 ## Open PRs
@@ -99,7 +99,7 @@ an `except OSError` that misattributes a folder permission error to the database
 
 ## What slipped or surprised us
 
-Grok built five of the eight merged slices here — more than on any app so far — and the work was good: 18.7 came
+Grok built five of the eight merged PRs here — more than on any app so far — and the work was good: 18.7 came
 in with a 532-line test file that survived six mutations. The cost is that Grok cannot answer a review, so every
 blocking finding on its PRs is Claude's to fix or the slice waits for Michael. That is now the shape of app 18's
 critical path, not a one-off.

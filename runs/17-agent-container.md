@@ -116,10 +116,10 @@ no owner for the condition it cannot meet.
   `git log --first-parent v0.1.0..main` is #15, #17 and #19; #15 touched only
   `.github/workflows/review-gate.yml` (+6 lines), so consumers are three commits but two code merges behind. Both
   code merges are things those apps want — #19 is the approval-record fix that 18 and 19 depend on, and #17 is the
-  demo. `main` wants a **`v0.1.1`**
-  and the consumers' `pyproject.toml` pins want moving deliberately. **Tag creation is blocked by policy in the
-  scheduled environment**, so the code is in and the tag is not. This is the one thing outstanding that affects
-  other repos.
+  demo. **Resolved 2026-11-22:** Michael created the annotated tag **`v0.1.1`** on `8b3d030`. Tag creation is
+  blocked by policy in the scheduled environment, which is why it waited for him. The consumers' `pyproject.toml`
+  pins still read `v0.1.0`; moving each one is that app's own business, in the PR that first needs it, because the
+  lock records the resolved commit and a pin bump wants CI in its own repo to prove it.
 - **17.7 cut**, the first cut deploy in the track. Recorded in the spec as the precedent.
 - Issue **#11** (a `StrEnum` compared with `is` in `ToolResult.failure`) was reassigned from `claude` to `codex`
   mid-run and left with Codex, confirmed deliberate. App 20's slice 20.4 throttling eval depends on it:
@@ -132,3 +132,48 @@ no owner for the condition it cannot meet.
   measurements in a **comment** on `17-agent-container#20` (not its body), rather than held for a fifth review
   round on a non-urgent backlog issue. A library that apps 18, 19 and 20 read now carries a docstring that
   overstates, which is the cost of that call.
+
+## Status at 2026-11-23 (start of day)
+
+`main` = `8b3d030`. Tags `v0.1.0` and `v0.1.1` both exist.
+
+**Open PRs: none.** Every slice 17.1–17.6 is merged, plus #13's fix (#19). Nothing is in flight.
+
+**Ready for Grok tonight: `#7` (README) — and only that.** Labelled `grok`, no unmet dependencies
+(`release-labels.py --dry-run` reports nothing waiting). It needs Michael to start the runner on his Mac; labels
+do not trigger Grok. It must document `agent-container demo` and the pattern and exam maps, **not** a live URL —
+there is no deployment.
+
+**Blocked, and why:**
+
+| What | Blocked on |
+| --- | --- |
+| `catalog.yaml` → `done` | `#7` (Grok) **and** [`ai-dev-os#69`](https://github.com/BreakthruDevelopment/ai-dev-os/issues/69) — app 17 cannot clear the live-smoke condition, so the definition of done has to admit the case first. Michael's call. |
+| `BRIEFING.md` agreeing with the catalog | BRIEFING still lists apps 13–30 as `planned`. Left for whoever closes out the whole AWS demo track, in one pass, rather than patched per app. |
+| `#11`, `#16`, `#18` | Codex capacity. Not ours to build. |
+
+`#20` is not blocked — it is simply the only Claude work left here.
+
+**Decisions taken 2026-11-22:**
+
+- **17.7 cut** (Michael). First cut deploy in the track; recorded in the spec as the precedent.
+- **`#13` re-pointed `grok` → `claude` + `security-sensitive`**, then built and merged as #19. Grok had refused it
+  correctly under the foundation rule; handing it back would have stalled on the same rule. The authorization was
+  self-granted, which is worth knowing.
+- **`#11` left with Codex**, confirmed deliberate after its label moved mid-run.
+- **#19 merged with a knowingly imprecise docstring**, residue filed with measurements in a comment on `#20`,
+  rather than a fifth review round on a non-urgent backlog issue.
+- **The definition-of-done question got a venue (`ai-dev-os#69`)** instead of a `FACTORY.md` edit, on the grounds
+  that the app wanting the exemption should not draft the rule.
+- **A review-round cap was adopted** for future runs: two rounds, then file the residue and merge if CI is green
+  and nothing in shipped behaviour is broken. Nine rounds across two PRs on 2026-11-22 is what prompted it; three
+  of four overnight tasks died at `USAGE_LIMIT_REACHED` that morning.
+
+**First three steps tomorrow:**
+
+1. **Build `#20`** — the only `claude` work here. Its three items and their measurements are in a comment on the
+   issue; it is security-sensitive because it edits `core/decorators.py`, and `#20` is the named owner of that edit.
+2. **Review and merge whatever Grok or Codex left** — `#7`'s PR if the runner ran, or Codex's on `#11`/`#16`/`#18`.
+   An unreviewed PR from them unblocks nothing, so this comes before building.
+3. **Close app 17 out** once `#7` is merged and `#69` is answered: `catalog.yaml` to `done`, and `BRIEFING.md`
+   in the same track-wide pass.

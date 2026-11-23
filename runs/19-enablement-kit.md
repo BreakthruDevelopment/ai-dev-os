@@ -191,17 +191,18 @@ a slip.
 | Full-stack builder | Grok Build | #15, #18, #19, #20 | 19.3, 19.4, 19.5, 19.6. **#18, #19 and #20 each needed fix commits pushed by Claude Code** to clear a blocking review — three on #18, three on #19, one on #20. Only **#15** was Grok's work alone: one commit, `Verdict: ready` first time, no inline comments |
 | Full-stack builder | Claude Code | #13, #16 | 19.1, 19.2 — wave 1, both `security-sensitive` |
 | AI builder | Claude Code | #17, #21 | 19.7 merged; 19.8 open and held |
-| Reviewer | Claude Code; Codex | every PR | Codex auto-reviews **every** PR in this repo, not only the `security-sensitive` ones — decision 3's argument depends on that. Findings in the table above and under Carried findings |
+| Reviewer | Claude Code; Codex | every PR | Claude Code reviewed all eight. Codex reviewed **seven of the eight** — everything but #15, which lived six minutes — and **three of those seven carry no label at all** (#18, #19, #20), which is what decision 3's argument rests on: Codex is not confined to the `security-sensitive` ones. Findings in the table above and under Carried findings |
 | DevOps | — | — | Not started: `30-apps-infra#98` is behind `#11` |
 | Docs writer | — | — | `#12` is behind the deploy |
 
 ## What slipped or surprised us
 
 - **Three of the four Grok PRs needed a second round, and for three different reasons.** #15 passed first time.
-  #18's blocking round was a symlink-then-`..` defect in `_resolve_target`; #19's led with a FIFO hang; #20's was
-  eight documented controls that could be deleted with `pytest` still green. Only the last of those is a
-  *test that cannot fail* in the strict sense this log uses below — which is the point of keeping the
-  distinction: the common thread is reviews that mutate what they credit, not one recurring bug.
+  #18 had two blocking rounds, the second a symlink-then-`..` defect in `_resolve_target`; #19's led with a FIFO
+  hang; #20's was eight documented controls that could be deleted with `pytest` still green. **None of those
+  three lead findings is a *test that cannot fail* in the strict sense used below**: #18's and #19's rounds each
+  carried one behind the lead finding, and #20's eight are the no-test shape. That is the point of keeping the
+  distinction — the common thread is reviews that mutate what they credit, not one recurring bug.
 - **The fix for a test-that-cannot-fail can itself be one.** PR #19's first fix commit argued all three
   enforcement points of the byte cap were "redundant", which is true of the two read-side comparisons and cannot
   be true of a write cap. The second round caught it.

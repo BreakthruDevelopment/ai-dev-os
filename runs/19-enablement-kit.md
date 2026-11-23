@@ -10,7 +10,7 @@ so the full close-out table is filled when they are. Status below is as of **202
 | Repo | https://github.com/BreakthruDevelopment/19-enablement-kit |
 | Live cloud | aws |
 | URL | https://app19.breakthruventures.ai (not deployed yet) |
-| `apps.yaml` PR | not opened — `30-apps-infra#98` is two slices away (see Blocked) |
+| `apps.yaml` PR | not opened — `30-apps-infra#98` is three slices away (see Blocked) |
 | Catalog status | `building` |
 
 **Why this repo is the track's bottleneck:** it solely owns **Domain 3** of the Claude Certified Architect exam
@@ -19,17 +19,19 @@ statements. No other app in the portfolio covers a single statement in Domain 3.
 
 ## Merged so far
 
-| Slice | Issue | PR | Harness | Merged |
+| Slice | Issue | PR | Harness | Merged (Central) |
 | --- | --- | --- | --- | --- |
 | 19.1 Python scaffolding and CI | #1 | [#13](https://github.com/BreakthruDevelopment/19-enablement-kit/pull/13) | Claude Code | 11-21 |
-| 19.2 Principals, read-only sandbox Proxy, frozen contract | #2 | [#16](https://github.com/BreakthruDevelopment/19-enablement-kit/pull/16) | Claude Code | 11-22 |
-| 19.3 Sample Java EE codebase | #3 | [#15](https://github.com/BreakthruDevelopment/19-enablement-kit/pull/15) | Grok | 11-22 |
+| 19.2 Principals, read-only sandbox Proxy, frozen contract | #2 | [#16](https://github.com/BreakthruDevelopment/19-enablement-kit/pull/16) | Claude Code | 11-21 |
+| 19.3 Sample Java EE codebase | #3 | [#15](https://github.com/BreakthruDevelopment/19-enablement-kit/pull/15) | Grok | 11-21 |
 | 19.4 Scaffold Factory and `kit new` | #4 | [#18](https://github.com/BreakthruDevelopment/19-enablement-kit/pull/18) | Grok | 11-22 |
 | 19.7 PR reviewer: passes and written criteria | #7 | [#17](https://github.com/BreakthruDevelopment/19-enablement-kit/pull/17) | Claude Code | 11-22 |
 | 19.5 Session state, resumption, forking | #5 | [#19](https://github.com/BreakthruDevelopment/19-enablement-kit/pull/19) | Grok, fixed by Claude Code | **11-23** |
 | 19.6 MCP client against app 18's frozen contract | #6 | [#20](https://github.com/BreakthruDevelopment/19-enablement-kit/pull/20) | Grok | **11-23** |
 
-`main` is green: 492 tests collected, `uv sync --locked` / `ruff` / `mypy --strict` / `pytest` / `uv build` all pass.
+`main` is green: 492 tests collected, 491 passed and 1 skipped (19.6's live-gateway test), with `uv sync --locked`
+/ `ruff` / `mypy --strict` / `uv build` all passing. CI itself runs `uv sync --frozen`, which does not validate the
+lock — that is `#14`, Codex's.
 
 ## Open PRs
 
@@ -41,8 +43,9 @@ Nothing else is open. Both Grok PRs that were open overnight are merged.
 
 ### Why #21 is held
 
-Codex raised two new P2s on `b7544a8`. Both are real (confirmed against the code), both are tracked in
-**`19-enablement-kit#22`**, and both are left **unresolved on purpose**:
+Codex raised two new P2s **on `f225e2f`**, not on the current head: GitHub reports them against `b7544a8`
+only because the lines did not move. Both are real (confirmed against the code at the current head), both are
+tracked in **`19-enablement-kit#22`**, and both are left **unresolved on purpose**:
 
 1. **A `build.gradle` seed yields no references at all.** `BUILD_NAMES` seeds it, but `.gradle` is not in
    `_KINDS`, so `kind_of()` returns `other` and neither extraction branch in `references()` runs. A Gradle-only
@@ -52,7 +55,14 @@ Codex raised two new P2s on `b7544a8`. Both are real (confirmed against the code
    that unrelated directory instead. `_seeds()` deliberately selects nested build files, so it is reachable by
    design. This one is a *misattribution*, which is worse than a miss.
 
-Neither is reachable from `sample/legacy-oms/` — a flat Ant tree — which is why 19.8's suite misses both. Fixing
+**Codex has never run on `b7544a8`.** Its `codex-review-state:v1` marker still reads `commit_sha: f225e2f`, and
+the `@codex review` re-requested at 08:07 was answered at 08:19 with *"To use Codex here, create an environment
+for this repo"*. So the second review a `security-sensitive` PR needs may not be obtainable at all right now —
+that is **Michael's to unblock**, and it is a second reason #21 is held, independent of the two findings. A
+marker behind the head is the stale-marker case in [`roles/reviewer.md`](../roles/reviewer.md), cleared by
+`@codex review` on the current head; here that request errors.
+
+Neither finding is reachable from `sample/legacy-oms/` — a flat Ant tree — which is why 19.8's suite misses both. Fixing
 either changes the exploration strategy and would mean regenerating the recorded demo brief and several evals,
 with new fixtures for a nested and a Gradle project. **That is a slice, not a patch**, and resolving a thread
 that has not been addressed would tell the gate something untrue: on a `security-sensitive` PR with no
@@ -70,7 +80,8 @@ because `b7544a8` is newer than the `ready` review on `f225e2f`.
 
 ## Blocked, and why
 
-- **`#11` → `30-apps-infra#98` → `#12` is the whole remaining critical path**, and it runs through Grok twice.
+- **`#11` → `30-apps-infra#98` → `#12` is the whole remaining critical path**, three slices from a deploy
+  (`#8`, `#9`, `#11`), and it runs through Grok twice.
   `#11` waits on #8 (PR #21, in review) and #9 (unstarted). `#98` (deploy, `claude`) waits on #11. `#12` (README,
   `grok`) waits on #98. So **app 19 cannot deploy until Grok runs #9 and #11**, and Grok only runs when Michael
   starts `scripts/run-harness.sh grok` on his Mac.
@@ -82,15 +93,18 @@ because `b7544a8` is newer than the `ready` review on `f225e2f`.
 
 ## Decisions made today (2026-11-23)
 
-1. **Fixed Grok's PR #19 rather than handing it back.** Review 2 left one blocking item — `_write`'s byte cap had
-   no test, and deleting it kept the suite green. Claude Code wrote the test, pushed to Grok's branch (ordinary
-   push, no force), re-requested both reviews, and merged on `Verdict: ready`. Grok does not return to a failed PR
+1. **Fixed Grok's PR #19 rather than handing it back. Michael may have decided differently** — this is the
+   furthest the run went on its own authority: Claude Code wrote code on another harness's branch, then reviewed
+   and merged it, all as the same GitHub account. Review 2 left one blocking item — `_write`'s byte cap had no
+   test, and deleting it kept the suite green. The test was written, pushed to Grok's branch (ordinary push, no
+   force), both reviews re-requested, and the PR merged on `Verdict: ready`. Grok does not return to a failed PR
    on its own, so the alternative was losing the slice.
 2. **Also deleted `test_an_oversized_file_is_refused`** in that push: its payload was `b"{" * (cap+1)`, not valid
    JSON, so the decoder refused it whatever the caps did and it could not fail. Its substance is covered by
    `test_corrupt_session_files_are_refused`.
 3. **Merged #19 and #20 without `security-sensitive`.** Two consecutive reviews recommended the label for 19.5
-   (first per-principal persistent state; a filesystem read path reimplemented outside `kit/core/`). The spec marks
+   (first per-principal persistent state; a filesystem read path reimplemented outside `kit/core/`) — in fact
+   three did, at `82dd5c0`, `7fcf70e` and `1681620`. The spec marks
    only 19.1, 19.2, 19.7, 19.8 and 19.10, and adding it would have turned the gate **red**, not green: Codex's
    marker is current at the head but reads `has_unresolved_findings: true` over a live P2 thread. **Michael may
    have decided differently** — see the carried findings below.
@@ -120,7 +134,9 @@ because `b7544a8` is newer than the `ready` review on `f225e2f`.
 
 1. **Decide `#22`, then land PR #21.** Either fix the two Gradle/nested-root findings inside 19.8, or accept them
    as a follow-up slice and resolve the two Codex threads as a known deferral. Then re-run the gate-3 review on
-   the current head and merge, followed by `python3 scripts/release-labels.py --repo 19-enablement-kit`.
+   the current head, request `@codex review` on that head — **check first whether Codex can run here at all**,
+   since the last request returned "create an environment for this repo" — and merge, followed by
+   `python3 scripts/release-labels.py --repo 19-enablement-kit`.
 2. **Build `#10`** (19.10, headless reviewer in CI) — `claude`, `security-sensitive`, unblocked, and the last
    Claude-owned slice before the deploy chain. Not started this run: starting a build-plus-two-review-rounds
    cycle at the end of the window risks leaving a half-finished push, which is worse than not starting.
@@ -129,12 +145,52 @@ because `b7544a8` is newer than the `ready` review on `f225e2f`.
 
 ## Tests that cannot fail: the running count
 
-This repo has now produced **seven** controls that shipped with a test incapable of failing — four found in one
-night, plus the two found this morning in Grok's PRs #19 and #20 (eleven controls between them), plus the
-`_annotate_next()` ordering in PR #21, where the fix **passed either way** across 584 tests.
+Counted strictly — a control with a test that passes whether or not the control is there — this repo has now
+produced **six**: the four found on 2026-11-22, the `MAX_SESSION_BYTES` read-side test in Grok's PR #19 whose
+payload was not valid JSON, and the `_annotate_next()` ordering in PR #21, where the fix **passed either way**
+across 584 tests. A seventh case is adjacent but not the same thing — `kit/erp/client.py:103` in PR #20 is a
+control with *no* test rather than a test that cannot fail, and it is listed under Carried findings above. The
+distinction is worth keeping: the first kind lies to you, the second merely says nothing.
 
 Every review on this repo now mutates each control it credits, and PR #21 was built that way: 34 mutations by the
 builder (all killed but two equivalent mutants, and the run caught four weak tests the builder had written
 itself), then eight reproduced independently by the reviewer, then six more on the logging fix. The reviewer also
 found a *second* unreported survivor and one guard that was dead weight described as a bound — which is the
-lesson worth keeping: a comment claiming a bound is a comment someone later trusts as one.
+lesson worth keeping: **a comment claiming a bound is a comment someone later trusts as one.** That happened
+twice in this slice, two commits apart (`MAX_SEARCHED_LINE`, then the log emitter's docstring), so it is a habit
+rather than a slip.
+
+## Gates
+
+| Gate | Evidence | Date (Central) |
+| --- | --- | --- |
+| 1 Spec: Michael approved scope | `specs/19-enablement-kit.md` merged | before 11-21 |
+| 2 Build: PRs merged with CI green | #13, #15, #16, #17, #18, #19, #20 | 11-21 to 11-23 |
+| 3 Review: `Reviewer sign-off` green on every merged PR | every merged PR carries a `Reviewer: claude-code` / `Verdict: ready` review on its merged head; Codex second-reviewed the `security-sensitive` ones | 11-21 to 11-23 |
+| 4 Release | **not reached** — needs `#11`, then `30-apps-infra#98` | — |
+| 5 Close-out | **not reached** — this log is the in-progress form; `catalog.yaml` moved to `building` with it | — |
+
+## Who did what
+
+| Role | Harness | PR | Notes |
+| --- | --- | --- | --- |
+| Planner | Claude Code | spec | 13 slices in 6 waves |
+| Full-stack builder | Grok Build | #15, #18, #19, #20 | 19.3, 19.4, 19.5, 19.6. #19 and #20 each needed a fix pushed by Claude Code to clear a blocking review |
+| Full-stack builder | Claude Code | #13, #16 | 19.1, 19.2 — wave 1, both `security-sensitive` |
+| AI builder | Claude Code | #17, #21 | 19.7 merged; 19.8 open and held |
+| Reviewer | Claude Code (+ Codex on `security-sensitive`) | every PR | Findings in the table above and under Carried findings |
+| DevOps | — | — | Not started: `30-apps-infra#98` is behind `#11` |
+| Docs writer | — | — | `#12` is behind the deploy |
+
+## What slipped or surprised us
+
+- **Every Grok PR needed a second round, and both for the same reason**: a control with a test that could not
+  fail. That is now the expected shape of a review on this repo rather than a surprise, which is why each review
+  mutates the controls it credits.
+- **The fix for a test-that-cannot-fail can itself be one.** PR #19's first fix commit argued all three
+  enforcement points of the byte cap were "redundant", which is true of the two read-side comparisons and cannot
+  be true of a write cap. The second round caught it.
+- **Codex may not be able to run on this repo right now** — see "Why #21 is held". That is the one thing in app
+  19's way that no agent can clear.
+- **The reviewer graded the run's own work and found two real errors in this very log**, including a
+  misattributed commit. Worth noting because a self-reported run log is exactly where a run flatters itself.

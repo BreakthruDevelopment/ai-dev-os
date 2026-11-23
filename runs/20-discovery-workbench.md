@@ -34,7 +34,7 @@ reason nobody planned for.
 ## Ready for Grok tonight: nothing
 
 Nothing here needs the Mac runner started for app 20 — but not because Grok's share was small.
-**Grok built three of the six slices**: 20.3 (the synthetic discovery pack, #3), 20.5 (#15) and 20.6
+**Grok built three of the six slices**: 20.3 (the synthetic discovery pack, #10), 20.5 (#15) and 20.6
 (#21). Its fourth, **20.8 the README (#7), is still open and still planned `grok`** — it carries no
 label only because `infra#99` is open, so it will come to Grok once the deploy lands.
 
@@ -90,7 +90,7 @@ were being worked by other runs tonight, so their repos were not touched.
 | Full-stack builder | Claude Code (20.1, 20.2), Grok Build (20.3, 20.6) | #8, #9, #10, #21 |
 | AI builder | Claude Code (20.4), Grok Build (20.5) | #11, #15 |
 | UI builder | — | No UI: a Python CLI and two text endpoints |
-| Reviewer | Claude Code on all 4 PRs (+ Codex on #21) | 2 blocking, then ready on each merged head |
+| Reviewer | Claude Code on all 9 PRs; Codex on all four `security-sensitive` ones (#8, #9, #11, #21) | **11 blocking rounds** — 3 on #9, **6 on #11 (20.4, the most review-heavy slice of the app)**, 1 on #15, 1 on #21 — then `ready` on each merged head. Codex left suggestions on #9 and #11 (#11's became issue #12) and a clean marker on #8 and #21 |
 | DevOps | Claude Code | **Blocked before any change.** Nothing written in `30-apps-infra` |
 | Docs writer | Grok Build (planned) | #7, open, waiting on `infra#99` |
 | Launch drafts | Grok Bot (Michael posts) | Not started: no live URL |
@@ -99,12 +99,17 @@ were being worked by other runs tonight, so their repos were not touched.
 
 - **A whole track with no publish workflow.** Six slices of a deployable app were planned, built and
   reviewed without anyone noticing there was no way to publish its image or make the container serve.
-  That is a planning gap, not a build gap: no slice in the spec's Issues section owned it. Apps 17 and 18
-  are in the same position. **It is worth asking of apps 21+ at spec time, not at deploy time.**
+  That is a planning gap, not a build gap: no slice in the spec's Issues section owned it — 20.1 owns
+  `.github/workflows/` but names only a Dockerfile, and 20.7 is the `apps.yaml` entry. Apps 17, 18 and 19
+  are all in the same position. **It is worth asking of apps 21+ at spec time, not at deploy time.**
 - **Review pushed back on the reviewer's own work, twice**, and both times it was right: #20's third
-  assertion was conceded over-specified and rewritten to assert by content, and the same PR shipped
-  without holding the `\t` exception it existed to hold until a second round caught it. Six of #15's
-  non-blocking follow-ups were also dropped rather than filed, and only four were later written up.
+  assertion was conceded over-specified and rewritten to assert by content, and its first commit did not
+  yet hold the `\t` exception it existed to hold — caught at `141c212` and held in the second commit, so
+  it never merged unheld. Of #15's six non-blocking findings, three were filed as #17–#19 (eleven minutes
+  after the merge, not before it), two were held in code in #20, and the sixth — the unbounded
+  `coverage.gaps[]` count and the uncapped run-state block in `build_message` — was found still unfiled
+  when this log was reviewed, and is now #25. **Non-blocking findings need filing in the same turn as the
+  merge, or they are only remembered by whoever happens to re-read the review.**
 - **Sabotage-verify after committing.** A `git checkout --` during a sabotage matrix wiped uncommitted
   fixes and cost a re-apply.
 - The spec routes 20.5 to `claude`; issue #5 was opened and labelled `grok`. Harmless here — Grok built
@@ -112,15 +117,15 @@ were being worked by other runs tonight, so their repos were not touched.
 
 ## Review findings worth keeping
 
-**One of the three blocking findings was a test that cannot fail; the other two were live defects.**
-Both kinds are worth keeping.
+Of **tonight's** three blocking findings (the table above counts all 11 the app took), one was a test
+that cannot fail and the other two were live defects. Both kinds are worth keeping.
 
 The test-gap one: 20.5 shipped `workbench/readout/text.py`, a module whose entire purpose is a safety
 rule, with no test. With `_quote_lines`' prefix removed the suite stayed green at 306 passed — a
 model-authored quote could forge a second `coverage:` block under the real one, which is the single thing
 `coverage` exists to prevent.
 
-Four further unheld rules were found and closed the same way, all **non-blocking** when found: 20.6's
+Five further unheld rules were found and closed the same way, all **non-blocking** when found: 20.6's
 `/healthz` could be stubbed `return True, "end_turn"` with every test still passing, so nothing required
 the endpoint to touch the agent loop at all; and in 20.5 the ROI bounds check, `_level`'s folding to
 `unknown`, the conflict filter and the deliberate `\t` exception in `_quote_lines` were each removable
@@ -131,9 +136,6 @@ malformed request line got zero bytes and a stderr traceback, and the client's o
 the response body and status line. Writing the fix surfaced a third route the review had not found
 (`self.command` is `None`, not just `self.path`) and a fifth call site reachable with a *valid* version.
 **Lesson for the next slice with a network surface: send it bad bytes.**
-
-One process note: sabotage-verify *after* committing. `git checkout --` during a sabotage matrix wiped
-uncommitted fixes and cost a re-apply.
 
 ## First three steps tomorrow
 

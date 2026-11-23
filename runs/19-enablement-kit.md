@@ -95,7 +95,9 @@ because `b7544a8` is newer than the `ready` review on `f225e2f`.
 
 1. **Fixed Grok's PR #19 rather than handing it back. Michael may have decided differently** — this is the
    furthest the run went on its own authority: Claude Code wrote code on another harness's branch, then reviewed
-   and merged it, all as the same GitHub account. Review 2 left one blocking item — `_write`'s byte cap had no
+   and merged it, all as the same GitHub account. It is also **not the first time on this app** — #18 took three
+   Claude Code fix commits and #20 one, in earlier sessions — so this is the established practice here rather
+   than a one-off, which is the better reason for Michael to look at it. Review 2 left one blocking item — `_write`'s byte cap had no
    test, and deleting it kept the suite green. The test was written, pushed to Grok's branch (ordinary push, no
    force), both reviews re-requested, and the PR merged on `Verdict: ready`. Grok does not return to a failed PR
    on its own, so the alternative was losing the slice.
@@ -143,28 +145,39 @@ because `b7544a8` is newer than the `ready` review on `f225e2f`.
 3. **Start Grok on `#9`**, then `#11` when it releases. Until those two land, `30-apps-infra#98` and `#12` cannot
    move and the app cannot go live. If Grok is out of usage, re-point #9 and #11 (Michael's or the planner's call).
 
-## Tests that cannot fail: the running count
+## Tests that cannot fail: the running list
 
-Counted strictly — a control with a test that passes whether or not the control is there — this repo has now
-produced **six**: the four found on 2026-11-22, the `MAX_SESSION_BYTES` read-side test in Grok's PR #19 whose
-payload was not valid JSON, and the `_annotate_next()` ordering in PR #21, where the fix **passed either way**
-across 584 tests. A seventh case is adjacent but not the same thing — `kit/erp/client.py:103` in PR #20 is a
-control with *no* test rather than a test that cannot fail, and it is listed under Carried findings above. The
-distinction is worth keeping: the first kind lies to you, the second merely says nothing.
+Counted strictly — a control whose test passes whether or not the control is there — these are the instances,
+itemised so the count is checkable rather than asserted:
+
+1. **#18**, review of `22854c0`: three tests that cannot fail, called out together.
+2. **#17**, review of `5cbe53b`: `tests/test_review_evals.py:970`, the "further finding(s)" test.
+3. **#17**, review of `837087a`: the same defect again, over `ReviewResult.omitted`.
+4. **#19**, review of `82dd5c0`: `test_an_oversized_file_is_refused`, whose payload was not valid JSON, so the
+   decoder refused it whatever the three byte caps did.
+5. **#21**, review of `431463d`: the `_annotate_next()` ordering, where the fix **passed either way** across 584
+   tests.
+
+That is **seven** by instance (three of them inside item 1) or five by review. An eighth case is adjacent but
+not the same thing: `kit/erp/client.py:103` in #20 is a control with *no* test rather than a test that cannot
+fail, as are the eight #20's first review found, and they are listed under Carried findings. The distinction is
+worth keeping — the first kind lies to you, the second merely says nothing — and the itemisation matters more
+than the total, which is why an earlier draft of this log claiming a bare "six" was wrong to.
 
 Every review on this repo now mutates each control it credits, and PR #21 was built that way: 34 mutations by the
 builder (all killed but two equivalent mutants, and the run caught four weak tests the builder had written
 itself), then eight reproduced independently by the reviewer, then six more on the logging fix. The reviewer also
 found a *second* unreported survivor and one guard that was dead weight described as a bound — which is the
 lesson worth keeping: **a comment claiming a bound is a comment someone later trusts as one.** That happened
-twice in this slice, two commits apart (`MAX_SEARCHED_LINE`, then the log emitter's docstring), so it is a habit
-rather than a slip.
+twice in this slice, one commit apart (`MAX_SEARCHED_LINE`, raised at `431463d` and corrected in `f225e2f`;
+then the log emitter's docstring, raised at `f225e2f` and corrected in `b7544a8`), so it is a habit rather than
+a slip.
 
 ## Gates
 
 | Gate | Evidence | Date (Central) |
 | --- | --- | --- |
-| 1 Spec: Michael approved scope | `specs/19-enablement-kit.md` merged | before 11-21 |
+| 1 Spec: Michael approved scope | `specs/19-enablement-kit.md` merged (PR #60) | 11-21, 15:39 |
 | 2 Build: PRs merged with CI green | #13, #15, #16, #17, #18, #19, #20 | 11-21 to 11-23 |
 | 3 Review: `Reviewer sign-off` green on every merged PR | every merged PR carries a `Reviewer: claude-code` / `Verdict: ready` review on its merged head; Codex second-reviewed the `security-sensitive` ones | 11-21 to 11-23 |
 | 4 Release | **not reached** — needs `#11`, then `30-apps-infra#98` | — |
@@ -175,22 +188,33 @@ rather than a slip.
 | Role | Harness | PR | Notes |
 | --- | --- | --- | --- |
 | Planner | Claude Code | spec | 13 slices in 6 waves |
-| Full-stack builder | Grok Build | #15, #18, #19, #20 | 19.3, 19.4, 19.5, 19.6. #19 and #20 each needed a fix pushed by Claude Code to clear a blocking review |
+| Full-stack builder | Grok Build | #15, #18, #19, #20 | 19.3, 19.4, 19.5, 19.6. **#18, #19 and #20 each needed fix commits pushed by Claude Code** to clear a blocking review — three on #18, three on #19, one on #20. Only **#15** was Grok's work alone: one commit, `Verdict: ready` first time, no inline comments |
 | Full-stack builder | Claude Code | #13, #16 | 19.1, 19.2 — wave 1, both `security-sensitive` |
 | AI builder | Claude Code | #17, #21 | 19.7 merged; 19.8 open and held |
-| Reviewer | Claude Code (+ Codex on `security-sensitive`) | every PR | Findings in the table above and under Carried findings |
+| Reviewer | Claude Code; Codex | every PR | Codex auto-reviews **every** PR in this repo, not only the `security-sensitive` ones — decision 3's argument depends on that. Findings in the table above and under Carried findings |
 | DevOps | — | — | Not started: `30-apps-infra#98` is behind `#11` |
 | Docs writer | — | — | `#12` is behind the deploy |
 
 ## What slipped or surprised us
 
-- **Every Grok PR needed a second round, and both for the same reason**: a control with a test that could not
-  fail. That is now the expected shape of a review on this repo rather than a surprise, which is why each review
-  mutates the controls it credits.
+- **Three of the four Grok PRs needed a second round, and for three different reasons.** #15 passed first time.
+  #18's blocking round was a symlink-then-`..` defect in `_resolve_target`; #19's led with a FIFO hang; #20's was
+  eight documented controls that could be deleted with `pytest` still green. Only the last of those is a
+  *test that cannot fail* in the strict sense this log uses below — which is the point of keeping the
+  distinction: the common thread is reviews that mutate what they credit, not one recurring bug.
 - **The fix for a test-that-cannot-fail can itself be one.** PR #19's first fix commit argued all three
   enforcement points of the byte cap were "redundant", which is true of the two read-side comparisons and cannot
   be true of a write cap. The second round caught it.
-- **Codex may not be able to run on this repo right now** — see "Why #21 is held". That is the one thing in app
-  19's way that no agent can clear.
-- **The reviewer graded the run's own work and found two real errors in this very log**, including a
-  misattributed commit. Worth noting because a self-reported run log is exactly where a run flatters itself.
+- **Codex may not be able to run on this repo right now** — see "Why #21 is held". That is one of two things in
+  app 19's way that no agent can clear; the other is Grok Build, which only runs when Michael starts the runner
+  on his Mac, and `#9` and `#11` both wait on it.
+- **The reviewer graded the run's own work and found real errors in this very log across three rounds** — a
+  misattributed commit, a stale `catalog.yaml`, and then the one that matters: this section originally credited
+  Claude Code fix commits to #19 and #20 and left out #18, which had three. That was the first error in the log
+  running in the *flattering* direction rather than the self-critical one, and it understated decision 1. A
+  self-reported run log is exactly where a run flatters itself, so it was worth three rounds.
+- **A `ready` verdict can be granted over live findings nobody read.** The gate-3 `ready` on PR #21's `f225e2f`
+  was posted at 08:19:30; Codex had raised its two new P2s on that same head at 08:10:12, nine minutes earlier.
+  The review read the marker as covering the two *older* threads and called them addressed. So that sign-off was
+  not merely overtaken by a later commit — it was given over two then-live findings that had not been examined.
+  Reading the marker is not the same as reading the threads, and only the threads say what is open.

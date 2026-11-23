@@ -25,10 +25,10 @@ Seven of the ten slices are merged, plus the backlog slice 18.11 raised out of a
 
 | Issue | Slice | Note |
 | --- | --- | --- |
-| [`#8`](https://github.com/BreakthruDevelopment/18-procure-to-pay/issues/8) | 18.8, command-line demo, recorded replies, smoke | Labelled `grok` 2026-11-23 when `#7` merged. **The only runnable issue in this repo**, and the whole tail depends on it |
+| [`#8`](https://github.com/BreakthruDevelopment/18-procure-to-pay/issues/8) | 18.8, command-line demo, recorded replies, smoke | Labelled `grok` at 00:39 CST 2026-11-23 when `#7` merged, and **claimed by Grok on Michael's Mac two minutes later** (00:41 CST, runner `BreakthruDev:99328`). **The only runnable issue in this repo**, and the whole tail depends on it |
 
-Grok Build is a CLI on Michael's Mac, so `#8` needs `scripts/run-harness.sh grok` started there; the label alone
-starts nothing.
+So `#8` is in flight, not waiting: Grok picked the label up almost immediately. No branch pushed as of 00:45 CST.
+If it has not opened a PR by morning, check whether the runner is still alive before assuming the slice is moving.
 
 ## Blocked, and why
 
@@ -37,8 +37,11 @@ starts nothing.
 | `30-apps-infra#97` (18.9, deploy — `claude`, security-sensitive) | `#8`. It is a one-line `apps.yaml` entry and needs no credentials — AWS pulls `main` every 10 minutes — but there is no point deploying before there is a smoke test to run against `GET /health` |
 | [`#9`](https://github.com/BreakthruDevelopment/18-procure-to-pay/issues/9) (18.10, README — `grok`) | `30-apps-infra#97`, so transitively on `#8` too |
 
-Nothing is blocked on a missing contract, a credential, or app 17: the pinned `v0.1.0` tag has everything the
-merged slices needed, and no slice has had to stop and comment.
+Nothing is blocked on a credential, and nothing on app 17: the pinned `v0.1.0` tag has held for every merged
+slice. One slice did stop and comment, as the spec requires — 18.6 needed a case-wide read the wave-1 foundation
+did not expose and is forbidden to add, which became backlog issue
+[`#15`](https://github.com/BreakthruDevelopment/18-procure-to-pay/issues/15) (18.11) and was built by Claude Code
+as `#16`. That is the process working, not a blockage: the slice stopped instead of inventing a foundation path.
 
 ## Who did what
 
@@ -89,8 +92,9 @@ an `except OSError` that misattributes a folder permission error to the database
 
 ## First three steps tomorrow
 
-1. **Get `#8` moving** — it gates everything. Either Michael starts `scripts/run-harness.sh grok` on the Mac, or
-   the slice is re-pointed to `claude`/`codex` as a planning decision. Nothing else in app 18 can progress first.
+1. **Check on `#8`** — Grok claimed it at 00:41 CST and it gates everything. If a PR is up, review and merge it;
+   if the runner died without pushing a branch, restart it or re-point the slice to `claude`/`codex` as a planning
+   decision. Nothing else in app 18 can progress first.
 2. **Merge `#8`'s PR when it is green**, then open `30-apps-infra#97` — a one-line `apps.yaml` entry for aws /
    us-east-2. Read the Terraform plan before merging and stop for Michael if it would destroy anything beyond a
    known change. The app is live about ten minutes after that merge.

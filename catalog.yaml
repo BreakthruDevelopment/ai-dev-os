@@ -213,7 +213,7 @@ apps:
     client_need: "Engagement discovery: turning an ambiguous client problem into scoped work"
     ai_feature: "A coordinator delegates scoped questions to parallel subagents and assembles a maturity assessment, outcome map, ROI model and roadmap, with every claim traced to its source and coverage gaps named rather than hidden"
     notable: "Patterns: Mediator (the coordinator), Composite (a team presents as one agent), Template Method (the readout). CCA scenario 3"
-    status: planned
+    status: building
   - n: 21
     repo: 21-meeting-notes
     name: "Meeting Notes"

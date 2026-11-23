@@ -117,9 +117,11 @@ no owner for the condition it cannot meet.
   `.github/workflows/review-gate.yml` (+6 lines), so consumers are three commits but two code merges behind. Both
   code merges are things those apps want — #19 is the approval-record fix that 18 and 19 depend on, and #17 is the
   demo. **Resolved 2026-11-22:** Michael created the annotated tag **`v0.1.1`** on `8b3d030`. Tag creation is
-  blocked by policy in the scheduled environment, which is why it waited for him. The consumers' `pyproject.toml`
-  pins still read `v0.1.0`; moving each one is that app's own business, in the PR that first needs it, because the
-  lock records the resolved commit and a pin bump wants CI in its own repo to prove it.
+  blocked by policy in the scheduled environment, which is why it waited for him. **App 20 moved its pin the same
+  day** (`20-discovery-workbench#14`, merged 2026-11-22, ~50 minutes after the tag); apps 18 and 19 still read
+  `v0.1.0`. Moving each one is that app's own business, in the PR that first needs it, because `uv.lock` records
+  the resolved commit rather than the tag — so an edit to `pyproject.toml` alone installs the old library, and a
+  pin bump wants CI in its own repo to prove it.
 - **17.7 cut**, the first cut deploy in the track. Recorded in the spec as the precedent.
 - Issue **#11** (a `StrEnum` compared with `is` in `ToolResult.failure`) was reassigned from `claude` to `codex`
   mid-run and left with Codex, confirmed deliberate. App 20's slice 20.4 throttling eval depends on it:

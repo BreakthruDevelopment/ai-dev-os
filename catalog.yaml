@@ -202,7 +202,7 @@ apps:
     client_need: "AI-assisted development rollout for a client's engineering team"
     ai_feature: "Claude Code configured for a team (CLAUDE.md hierarchy, path-scoped rules, skills, slash commands), a pull request reviewer running headless in CI with explicit criteria, and a scout that explores a legacy Java EE codebase and writes a migration brief"
     notable: "Patterns: Chain of Responsibility (review passes), Factory (project scaffolds), Proxy (read-only sandbox). CCA scenarios 2, 4 and 5"
-    status: planned
+    status: building
   - n: 20
     repo: 20-discovery-workbench
     create_repo: true

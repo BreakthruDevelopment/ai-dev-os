@@ -403,8 +403,14 @@ unless a security-sensitive `claude` slice names it as owner ... A quiet guard i
 | [#30](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/30) | `security-sensitive` | no |
 | [#38](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/38) | `security-sensitive` | no |
 
-So only #26 is compliant on the strict reading, #30 and #38 are compliant only if the label alone suffices,
-and #20 is compliant on neither. **No mechanical guard enforces either reading**: `.github/workflows/` is in
+**The table scores the issues, not the PR bodies, and on PR bodies two rows read differently**: #20's is the
+most explicit declaration of the four — it names the path, the spec, slice 20.1 as owner and the guard gap —
+and #38's says it names `.github/workflows/ci.yml` as in scope and is a `security-sensitive` `claude` slice.
+Under the `AGENTS.md` wording as literally written ("unless a security-sensitive `claude` slice names it as
+owner", which does not say *where* it must name it) #38 arguably complies already, which is part of why this
+needs deciding rather than enforcing. On the strict reading — the naming belongs in the issue, because that
+is what `release-labels.py` and a later reader both see — only #26 is compliant, #30 and #38 are compliant
+only if the label alone suffices, and #20 is compliant on neither. **No mechanical guard enforces either reading**: `.github/workflows/` is in
 neither `WAVE1_PATHS` (`scripts/issuelib.py`) nor `WAVE1_RE` (`scripts/run-harness.sh`), by design — the spec
 says so in as many words. The question for Michael is one sentence: **does the `security-sensitive` label
 alone license a later slice to edit a spec-declared foundation path, or must its issue name the path?** It is

@@ -7,12 +7,17 @@ BreakthruSoftwareFactory run log ([`FACTORY.md`](../FACTORY.md)). Link evidence;
 | App | 20, Discovery workbench |
 | Spec | `specs/20-discovery-workbench.md` |
 | Repo | https://github.com/BreakthruDevelopment/20-discovery-workbench |
-| Live cloud | aws (planned) — **nothing deployed**, see "Blocked" |
-| URL | none. `app20.breakthruventures.ai` has no DNS record |
-| `apps.yaml` PR | none — deliberately not opened, see "Blocked" |
-| Image tag | **none exists.** No publish workflow in this repo |
-| Live smoke | not run. CI smoke green on every merge; `scripts/smoke.sh` passes locally against the installed wheel, three times, byte-identically |
+| Live cloud | aws — `apps.yaml` entry merged 2026-11-28 (`30-apps-infra#100`); the deployer Lambda pulls `main` every 10 minutes |
+| URL | `https://app20.breakthruventures.ai` — DNS created by Terraform on deploy. **Not yet reached by anyone**, see "What is still open" |
+| `apps.yaml` PR | [`30-apps-infra#100`](https://github.com/BreakthruDevelopment/30-apps-infra/pull/100), merged 2026-11-28 |
+| Image tag | `sha-d5358ad` — 2-platform OCI index; the `linux/arm64` digest is byte-identical to the manifest the arm64 native build exported after passing the AArch64 adapter check |
+| Live smoke | **still not run.** The 2026-11-28 session's egress proxy refuses `app20.breakthruventures.ai` (HTTP 403, host not allowed). CI smoke green on every merge; `scripts/smoke.sh --url` passes against a locally served instance |
 | Catalog status | `building` (bumped from `planned` in this PR, now every code slice is merged) |
+
+**Updated 2026-11-28.** The release is no longer blocked: three more PRs closed the two gaps that made the
+app undeployable, and the `apps.yaml` entry is merged. What remains is the README and a live smoke nobody
+has been able to run. The "Blocked, and why" section below is kept as written on 2026-11-23, because its
+diagnosis was right and the second gap it did not see is the more interesting half of the story.
 
 All six code slices are merged. **Both halves of exam scenario 3 are built**: 20.4 shipped the
 coordination half (statements 1.2, 1.3, 5.3) and 20.5 the cited-report half (5.6), so the repo is not in
@@ -137,10 +142,107 @@ the response body and status line. Writing the fix surfaced a third route the re
 (`self.command` is `None`, not just `self.path`) and a fifth call site reachable with a *valid* version.
 **Lesson for the next slice with a network surface: send it bad bytes.**
 
-## First three steps tomorrow
+## Release, 2026-11-28: three PRs, and a mistake that changed a decision
 
-1. **[#24](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/24) — publish workflow and a serving container.** Copy `30-apps-template`'s `publish.yml`; make the image serve by default, bind `0.0.0.0`, read `PORT`. Everything else waits on this.
-2. **[`infra#99`](https://github.com/BreakthruDevelopment/30-apps-infra/issues/99) — the `apps.yaml` entry**, once a `sha-` tag exists: aws, `app20.breakthruventures.ai`, `ai: demo`. Fold in [#22](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/22) **as part of this slice, not after** — `--url` currently checks a version constant across every commit and greps the map without its line numbers, so a stale revision still serving passes with exit 0, which is the one failure a post-deploy smoke exists to catch.
-3. **[#7](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/7) — README**, which unblocks when `infra#99` closes. Then `catalog.yaml` to `done`.
+| PR | Closes | What |
+| --- | --- | --- |
+| [#26](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/26) | #24 | `publish.yml`, byte-identical to the template's but for a comment. `CMD ["serve"]`, `EXPOSE`, `uv sync --locked`. `wb serve` binds every interface and reads `PORT`. Two CI steps that run the built container and curl it |
+| [#30](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/30) | #29 | The second gap #24 did not see: the stack runs a `package_type="Image"` Lambda behind the Web Adapter at `AWS_LWA_PORT=3000`. Adapter, `ENV PORT=3000`, absolute `ENTRYPOINT`, in-build ELF architecture check |
+| [#38](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/38) | #36 | `/api/health` as an alias of `/healthz`, after the health-gate mistake below |
+| [`infra#100`](https://github.com/BreakthruDevelopment/30-apps-infra/pull/100) | `infra#99` | The `apps.yaml` entry, `tag: sha-d5358ad` |
 
-Backlog after that, all `claude` and all small: [#22](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/22), [#23](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/23), [#17](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/17), [#18](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/18). [#12](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/12) and [#19](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/19) touch `workbench/core/` and are deliberately unlabelled for the planner to route.
+**The planning gap went one layer deeper than #24 found.** #24 correctly said there was no way to publish
+the image or make the container serve, and defined done as `docker run -p 8080:8080` answering. That is a
+plain container runtime, and AWS here is not one: `stacks/aws/main.tf` deploys every app as a Lambda
+behind the Web Adapter. So #26 shipped a publishable, serving image that **still could not have started**.
+Worth saying plainly for apps 21+: *"it builds"*, *"it serves"* and *"it deploys"* are three different
+claims, and this app had a test for only the first two.
+
+### The mistake, recorded because Michael decided on it
+
+I told him app 20's missing `/api/health` route was harmless, because "a 404 does not fail that gate, only
+a never-answers `000` does", and he reasonably chose to leave it and have me note it. That is true of
+**`deploy/health.sh` — which never runs for AWS**; only `apply-azure` and `apply-gcp` call it. The AWS gate
+is the inline block at `deploy/aws.sh:326-347`, which flags any non-200 and `exit 3`s under
+`DEPLOY_STRICT_HEALTH=1`, set by `deployer.sh:139`.
+
+And `exit 3` skips the `last_sha`/`last_hash` writes, so the "nothing AWS-relevant changed" short-circuit
+would never match again: **every later commit to `main`, docs-only included, would re-deploy all five AWS
+apps and report failure**, three attempts each, before giving up. "Leave it" was never an available
+option. He was told before the fix went in, not after, and the fix went app-side so `30-apps-infra` stayed
+untouched. Filed with a second defect review found and I had not — `health_deadline` is computed once
+before the loop, so it is one shared budget and starves whichever apps sort last — as
+[`infra#101`](https://github.com/BreakthruDevelopment/30-apps-infra/issues/101).
+
+### What review caught that the author did not
+
+Four rounds, each on something real:
+
+- **`ENTRYPOINT ["wb"]` would likely have failed Lambda init.** `wb` is at `/opt/venv/bin/wb`, which is not
+  on Lambda's default `PATH`. The PR's "byte-for-byte the template" argument did not reach it: the
+  template's first word is `node`, at `/usr/local/bin/node`, already on that path. App 20 is the first
+  image on this stack with an entry point outside `/usr/local/bin`, so there was no precedent either way.
+- **A guard that could be commented out and still pass.** The new architecture-check test grepped the raw
+  Dockerfile, so commenting the check out passed all eight tests *and* kept the build green. Comment lines
+  are stripped first now. The same file already had the right idiom two tests above it.
+- **`COPY --from` an external image can hand over a wrong-architecture binary**, and `ci.yml`'s `test -x`
+  cannot see it: that job runs on amd64 while the deployed image is arm64. Now proved inside both platform
+  builds by reading the adapter's ELF `e_machine`. A wrong-arch adapter now fails `publish.yml`'s arm64
+  job, and because `merge` has `needs: build`, **no tag is created at all**.
+- **`int()` accepts Unicode digits**, so `PORT="٨٠٨٠"` parsed as 8080 and bound a port nothing asked
+  for. Caught by its own test before review saw it.
+
+### Two process notes worth keeping
+
+- **`git checkout HEAD -- <file>` during a sabotage matrix reverts to the base branch**, not to work in
+  progress. It landed one commit carrying the `/api/health` tests, smoke check and CI step *without* the
+  dispatch line they test. Three tests failed at once, including a `test_smoke.py` the author had not known
+  existed, and it was fixed forward rather than force-pushed. **This is the second time this exact trap has
+  cost this app a re-apply** — it is already recorded above from 2026-11-23. Commit before sabotaging.
+- **Codex's receipt and its `codex-review-state` marker disagreed on the same head.** The receipt said
+  "Didn't find any major issues" while the marker said `has_unresolved_findings: true` and the inline P1 was
+  live and correct. The gate reads the marker; so should a human. Separately, Codex raised the same
+  `.github/workflows/` wave-1 finding on two PRs and **withdrew it itself both times** once a real new
+  commit gave it a fresh look — which is the right way to close a finding you disagree with. Resolving the
+  thread by hand was refused by the session's permission classifier, correctly.
+
+## What is still open
+
+1. **The live smoke has never run.** `scripts/smoke.sh --url https://app20.breakthruventures.ai`. The
+   2026-11-28 session's egress proxy refuses that domain outright (HTTP 403), so its ten `000`s were the
+   proxy and not the app. **Nobody has curled the arm64 artifact**; the first automatic deploy is the first
+   time that exact manifest runs. Pair it with
+   `aws lambda get-function --function-name 30apps-discovery-workbench --query 'Code.ImageUri'`, which turns
+   "the smoke passed" into "this exact image answered" — worth doing because `/healthz` reports a hardcoded
+   `0.1.0` rather than `APP_VERSION`, so the smoke alone cannot say which image is live. It is better than it
+   was: since `--url` now also checks `/api/health`, a pass positively rules out `sha-ee7f244` and earlier.
+2. **[#7](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/7) — README**, now
+   `grok`-labelled and unblocked. Needs the Mac runner started.
+3. **`catalog.yaml` stays `building`** until the README and the live smoke are both done.
+
+Backlog, all `claude` and all small:
+[#17](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/17),
+[#18](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/18),
+[#22](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/22),
+[#23](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/23),
+[#25](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/25),
+[#27](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/27),
+[#28](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/28).
+[#12](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/12) and
+[#19](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/19) touch `workbench/core/` and
+are deliberately unlabelled for the planner to route. Not yet filed: `smoke.sh`'s new `/api/health` check is
+not itself pinned by a test, and `/healthz` should report `APP_VERSION` — a generic win for every app.
+
+## Beyond app 20: the whole Python track
+
+Apps 17, 18 and 19 are all absent from `apps.yaml`, none has a publish workflow, and
+`grep -c lambda-adapter Dockerfile` is **0** in each. Prep was filed as issues only — no code, branches or
+clones touched — at [`17-agent-container#29`](https://github.com/BreakthruDevelopment/17-agent-container/issues/29),
+[`18-procure-to-pay#22`](https://github.com/BreakthruDevelopment/18-procure-to-pay/issues/22) and
+[`19-enablement-kit#28`](https://github.com/BreakthruDevelopment/19-enablement-kit/issues/28), each carrying
+the copy-paste patch and the reasoning above.
+
+**App 17 is the largest of the three**: its `CMD ["demo"]` runs once and exits and it has no `serve` command
+at all, so unlike apps 18 and 20 it needs a deployed surface designed, not just a Dockerfile edited. Worth
+asking at spec time for apps 21+ rather than at deploy time — which is the same lesson #24 drew, now with a
+second instance behind it.

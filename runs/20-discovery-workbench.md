@@ -20,10 +20,6 @@ rows, the reviewer's PR counts, "Open PRs: none", "Ready for Grok tonight: nothi
 release". **Where the two disagree, the 2026-11-28 sections are current.** They are kept rather than edited
 because the 2026-11-23 diagnosis was right and the gap it did not see is the more interesting half.
 
-The release is no longer blocked: three more PRs closed the two gaps that made the
-app undeployable, and the `apps.yaml` entry is merged. What remains is the README and a live smoke nobody
-has been able to run. The "Blocked, and why" section below is kept as written on 2026-11-23, because its
-diagnosis was right and the second gap it did not see is the more interesting half of the story.
 
 All six code slices are merged. **Both halves of exam scenario 3 are built**: 20.4 shipped the
 coordination half (statements 1.2, 1.3, 5.3) and 20.5 the cited-report half (5.6), so the repo is not in
@@ -177,7 +173,8 @@ would never match again: **every later commit to `main`, docs-only included, wou
 apps and report failure**, three attempts each, before giving up. "Leave it" was never an available
 option. **Credit where it belongs: the review of [`infra#100`](https://github.com/BreakthruDevelopment/30-apps-infra/pull/100)
 found this**, not I — #36 opens "Found while reviewing `30-apps-infra#100`", and #30's own review had
-earlier accepted the deferral without challenging it. Michael was told before the fix went in, not after,
+earlier accepted the premise while challenging only the cost — its third non-blocking finding said the
+404 cost about five minutes per deploy and that "misleading rather than broken" undersold it. Michael was told before the fix went in, not after,
 and the fix went app-side so `30-apps-infra` stayed untouched. Filed with a second defect review found and I had not — `health_deadline` is computed once
 before the loop, so it is one shared budget and starves whichever apps sort last — as
 [`infra#101`](https://github.com/BreakthruDevelopment/30-apps-infra/issues/101). That second one the review
@@ -227,10 +224,12 @@ which is the more common and more useful shape:
 
 ## Gates
 
+As of 2026-11-28. Times in this log are UTC, not Central.
+
 | Gate | State |
 | --- | --- |
 | 1 spec | done — `specs/20-discovery-workbench.md`, issues #1-#7 |
-| 2 build | done — all six code slices merged, plus #26, #30, #38 and seven defect PRs |
+| 2 build | done — **15 PRs merged**: six code slices (#8, #9, #10, #11, #15, #21), three release (#26, #30, #38) and six others (#14, #16, #20, #31, #32, #33). #34 closed unmerged |
 | 3 review | done on every merged PR; Codex on all seven `security-sensitive` ones |
 | 4 release | **partial.** `apps.yaml` merged and the image published; **the live smoke has never run** |
 | 5 close-out | **incomplete.** This log is current; the README is open; `catalog.yaml` is not `done` |
@@ -251,7 +250,7 @@ session" is not that**, and a session that spans five days makes the difference 
 | [#34](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/34) | #28 | closed unmerged — same issue as #33, and it had become conflicted |
 | [#35](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/35) | #7 | **open, draft** |
 
-The first four were cleared at 07:59-08:00Z by another actor on the shared account, not by this run.
+The first four were cleared at 07:59-08:00Z (UTC) — not by this run, though by whom is not checkable: agents and Michael share one GitHub account, so this rests on this session's own record of what it did and did not do.
 **#27 and #28 were issues this run filed** from #26's review, and Grok fixed both — so the filing worked as
 intended, and only the not-looking-again did not.
 
@@ -261,6 +260,17 @@ result invented — the right call. Its blocker is now closed, and it has a comm
 for each placeholder (the `apps.yaml` entry, the runtime, "no new IAM", and the three routes). **It was left
 as the author's draft rather than finished by this run**, because the one thing still missing is a live
 result nobody can obtain yet.
+
+## AI evals (live model)
+
+| | |
+| --- | --- |
+| Live-model run | **None, by design.** Replay is the default; Bedrock is reached only by `wb --live`, which the spec makes lead-only (`specs/20-discovery-workbench.md:39`, `:210`, `:336`) |
+| Deployed path | Makes **no** model call. `ai: demo` in `apps.yaml`; `/healthz` runs a recorded `ReplayProvider` round-trip through app 17's loop, and `/` serves a committed file |
+| Evals | `tests/test_discovery_evals.py`, on recorded replies |
+
+Recorded as a decision rather than left blank, since a blank table in an AI app's log reads as a gap.
+Same shape as `runs/17-agent-container.md`.
 
 ## What is still open
 
@@ -277,7 +287,9 @@ result nobody can obtain yet.
    from-scratch job: **[#35](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/35) already
    exists** as Grok's draft and is written. Lifting the draft and filling its three `TODO(deploy)` lines is
    the work, and the last of those needs a live smoke result.
-3. **`catalog.yaml` stays `building`** until the README and the live smoke are both done.
+3. **`catalog.yaml` is still `building`**, which no longer fits (see the header table): the app *is* in
+   `apps.yaml`. A passing live smoke is what makes `deployed` true, and the README plus that smoke are what
+   make `done` true — so the next status change is `deployed`, not straight to `done`.
 
 Backlog as of 2026-11-28, after Grok closed #23, #27 and #28:
 [#17](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/17),
@@ -301,11 +313,14 @@ clones touched — at [`17-agent-container#29`](https://github.com/BreakthruDeve
 the copy-paste patch and the reasoning above.
 
 **All three need a deployed surface designed, not just a Dockerfile edited** — app 20 was the only one of
-the four that already had an HTTP server. App 17 ends `CMD ["demo"]` and its only subcommand is `demo`;
-app 18 (`batch`, `demo`, `dispute`, `ingest`, `match`) and app 19 (`review`, `review-ci`, `session`) both
-end `CMD ["--version"]` and neither has an HTTP server at all. App 18's only server is `p2p/mcp/server.py`,
-an MCP **stdio** gateway, which the Web Adapter cannot front. So each of the three needs a `serve` command
-and a health route written before its Dockerfile matters.
+the four that already had an HTTP server. None of 17, 18 or 19 has a `serve` command, and
+`grep -rl "HTTPServer\|BaseHTTPRequestHandler\|socketserver\|uvicorn\|fastapi\|flask"` finds nothing in
+any of them. App 17 ends `CMD ["demo"]`; apps 18 and 19 end `CMD ["--version"]`. App 18's only server is
+`p2p/mcp/server.py`, an MCP **stdio** gateway, which the Web Adapter cannot front. So each needs a serving
+command and a health route written before its Dockerfile matters.
+
+(Deliberately not listing each app's subcommands here. Two attempts at that list were both wrong, and the
+claim that carries the weight — no `serve`, no HTTP server — is the one a grep settles in a second.)
 
 Worth asking at spec time for apps 21+ rather than at deploy time — the same lesson #24 drew, now with a
 second instance behind it.

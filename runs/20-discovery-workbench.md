@@ -324,3 +324,130 @@ claim that carries the weight — no `serve`, no HTTP server — is the one a gr
 
 Worth asking at spec time for apps 21+ rather than at deploy time — the same lesson #24 drew, now with a
 second instance behind it.
+
+## Queue cleared, 2026-11-28 (a second session, 06:35-09:00 UTC)
+
+Two Claude Code scheduled sessions ran against this repo at the same time this morning. Both push as the
+same GitHub account, so the split below is this session's own account of what it did rather than something
+a reader can reconstruct from authorship — the same caveat the section above records. The sections above
+are the first session's; this one picked up the same scheduled task and found most of its assigned work already
+done, so what it did was the part nobody else was doing: **Grok's four PRs, which had sat unreviewed since
+2026-11-24 and could not merge without a `Reviewer: claude-code` marker.** Three merged, one closed.
+
+| PR | Issue | Author | Outcome |
+| --- | --- | --- | --- |
+| [#30](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/30) | #29 | Claude Code | **Merged** `ee7f244`. Re-reviewed at its real head: its earlier `ready` was on `c3a9fc5`, and the gate had been red for four days for exactly that reason |
+| [#31](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/31) | #23 | Grok | **Merged** `661ef11`. `_send`'s writes guarded like `_send_unparsed`'s. Reviewed as not racy: 20 sabotaged runs → 20 detections, and still 15/15 with both `sleep(0.1)` calls set to `0.0` |
+| [#32](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/32) | #27 | Grok | **Merged** `2458c97`. Bind failures other than `OSError` exit with the fixed code. One finding recorded, not fixed: the `ValueError` arm is unreachable through `bind()` (every probe gave `TypeError` or `gaierror`), so it is untested breadth, and a bare `ValueError` there would report a future bug *inside* `bind()` as user input error |
+| [#33](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/33) | #28 | Grok | **Merged** `8070d4d`. It says "Refs #28", so nothing auto-closed; #28 was closed by hand after the merge, because #30 had already covered findings 2 and 3 |
+| [#34](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/34) | #28 | Grok | **Closed unmerged.** Same finding as #33, weaker fix, and its `test_image.py` hunk now fails against `main` (`assert '3000' == '8080'`, because #30 moved the image to `PORT=3000` for the Lambda adapter) |
+| [#40](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/40) | #17, #18 | Claude Code | **Merged** `6714a78`. `security-sensitive`: it moves where an access check runs |
+| [#41](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/41) | #25 | Claude Code | **Merged** `cff845d` |
+| [#37](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/37) | #36 | Claude Code | **Closed unmerged: a duplicate of this session's own #38.** See below |
+
+So the backlog listed in the 2026-11-28 section above is down to **#22** (make the live smoke able to say which build
+answered) and the new **#42**; #12 and #19 are still deliberately unlabelled for the planner, and **#7, the
+README, is still Grok's and still a draft** ([#35](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/35)) —
+it is unblocked now that `infra#99` is closed, but its three `TODO(deploy)` lines need a live smoke result
+nobody can get yet.
+
+### #33 vs #34: the recurring defect in a new shape
+
+Both fixed the same dead assertion (`assert bad not in caught.value.code`, implied by the equality on the
+line above). #33 deleted the implied line and moved the no-echo property to the serve-level test,
+parametrised over all six malformed values with exact output equality. #34 kept the dead line and
+**weakened its neighbour from `==` to `in`** so the dead one had something to do.
+
+The experiment that separated them is worth keeping, because "both are green" said nothing: make the
+message leak *metadata about* the value instead of the value — append `f" (len={len(raw)})"` for every
+malformed input except a 10-character one, so `"not-a-port"`, the single input #34's serve test uses, is
+the one input that shows nothing.
+
+| | #33 | #34 |
+| --- | --- | --- |
+| raw value interpolated into the message | 12 tests fail | 6 tests fail |
+| `len(raw)` leaked for every value but the 10-character one | **10 fail** | **0 — undetected** (also undetected on a merge with `main`) |
+
+**The rule to carry forward: the fix for an assertion that cannot fail is to delete it or move it somewhere
+it can, never to weaken a stronger neighbour so the dead one gets something to do.** That is the fourth
+distinct shape this defect has taken on this track, after the alphabetic markers, the `sys.path` import
+proof and the `startswith("{")` filter.
+
+### Two sessions, one repo: #36/#37/#38
+
+Both sessions reviewed `infra#100`, both found the same thing — **`deploy/health.sh` is not the AWS gate**,
+`deploy/aws.sh` is, and it `exit 3`s on a non-200 at `/api/health` under `DEPLOY_STRICT_HEALTH=1` — and
+both wrote the fix. #38 merged at 07:23:23Z; #37 was closed at 07:35:40Z once its author checked `main`
+rather than assuming. About 36 minutes of this session went into work that already existed.
+
+**Nothing on the PR list would have caught it.** #37 was opened at 07:03:12Z and #38 at 07:03:38Z — twenty-six
+seconds apart, so neither could have seen the other. What *was* visible was **#36, this session's issue,
+filed at 06:59:25Z**, four minutes before either PR. So the rule the episode actually supports is narrower
+and about issues, not PRs: **file the issue before writing the fix, and read the issue list — not just the PR
+list — immediately before starting.** The overlap itself was in the scheduler, not in either session.
+
+One difference between them is on the record and worth settling: #37 also added a `ci.yml` step curling
+`/api/health` against the built image, Codex posted a **P1 — "route the workflow edit through the
+designated foundation owner"** — and this session withdrew the step rather than decide the rule in its own
+favour at 7am. #38 kept its `ci.yml` edit and merged.
+
+The rule Codex cited is the **app repo's own `AGENTS.md`** ("Wave 1 (slices 20.1 and 20.2) owns them ...
+unless a security-sensitive `claude` slice names it as owner ... A quiet guard is not permission"), backed by
+`specs/20-discovery-workbench.md`, where slice 20.1 **owns `.github/workflows/`** outright. On that text
+**Codex's P1 was correct**, and the four PRs that have edited the file do not line up behind one practice:
+
+| PR | Label | Did its issue name the path? |
+| --- | --- | --- |
+| [#20](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/20) | **none** | no issue |
+| [#26](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/26) | `security-sensitive` | **yes** — #24 names it and says the PR should declare it |
+| [#30](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/30) | `security-sensitive` | no |
+| [#38](https://github.com/BreakthruDevelopment/20-discovery-workbench/pull/38) | `security-sensitive` | no |
+
+**The table scores the issues, not the PR bodies, and on PR bodies two rows read differently**: #20's is the
+most explicit declaration of the four — it names the path, the spec, slice 20.1 as owner and the guard gap —
+and #38's says it names `.github/workflows/ci.yml` as in scope and is a `security-sensitive` `claude` slice.
+Under the `AGENTS.md` wording as literally written ("unless a security-sensitive `claude` slice names it as
+owner", which does not say *where* it must name it) #38 arguably complies already, which is part of why this
+needs deciding rather than enforcing. On the strict reading — the naming belongs in the issue, because that
+is what `release-labels.py` and a later reader both see — only #26 is compliant, #30 and #38 are compliant
+only if the label alone suffices, and #20 is compliant on neither. **No mechanical guard enforces either reading**: `.github/workflows/` is in
+neither `WAVE1_PATHS` (`scripts/issuelib.py`) nor `WAVE1_RE` (`scripts/run-harness.sh`), by design — the spec
+says so in as many words. The question for Michael is one sentence: **does the `security-sensitive` label
+alone license a later slice to edit a spec-declared foundation path, or must its issue name the path?** It is
+cheap to settle once and expensive to re-litigate per PR.
+
+### What review caught that CI did not
+
+- **#30's gate had been red since 2026-11-24 for a stale-head reason, not a code reason.** Its last two
+  reviews, including the `Verdict: ready`, were pinned to `c3a9fc5`; the head was `8bd17c6`. Nobody re-read it, so the slice that unblocked the
+  deploy sat finished and unmerged for four days.
+- **23 sabotage experiments on #30's Dockerfile, 20 caught.** The three that survived are all inside the
+  ELF architecture check's *logic* rather than its presence; two of those are caught by the build itself,
+  and one (`if [ "$got" != "$want" ]` → `if false`) is caught by nothing. Recorded on the PR.
+- **#41 removed a latent hard failure its own issue had called "not urgent".** The serialised
+  `readout.coverage` crossed `MAX_SECTION_CHARS` (20,000) as questions accumulate — measured 18,892
+  characters at 60 questions, 62,954 at 200 — so `store.save_readout` would have raised `InvalidInput` and
+  `wb readout` would have stopped working at roughly 64 questions. Flat at about 10.1 kB now.
+- **#41 left four of its own assertions unpinned**, and an `ok` run state can still be listed in place of a
+  `failed` one (a `continue` where a `break` belongs; measured 8 of 9 failed runs listed and 2 `ok` ones at
+  the real 8,000-character cap). Non-blocking — nothing is mis-stated, the drop is counted, and `wb finalise`
+  reads the store rather than the message — and filed as
+  [#42](https://github.com/BreakthruDevelopment/20-discovery-workbench/issues/42).
+- **A reviewer can create the violation it then reports.** #37's `ci.yml` step existed because this
+  session's own reviewer asked for it one round earlier. Worth remembering before asking a builder to reach
+  into a protected path.
+
+### Still open at 09:00 UTC
+
+- **The live smoke is still unrun**, for the same reason as the first session: this environment's egress
+  proxy refuses `app20.breakthruventures.ai` (HTTP 403, host not allowed). Nothing here can reach it, so
+  `catalog.yaml` stays `building` and nobody should move it without a smoke result.
+- **The deployed image is `sha-d5358ad`**, which is now five commits behind `main` (`661ef11`, `2458c97`,
+  `8070d4d`, `6714a78`, `cff845d`). Nothing in those commits changes the deployed surface — they are HTTP
+  error paths, test quality and readout internals — so this is not urgent, but **the next `apps.yaml` tag
+  bump should be deliberate rather than a side effect**, and whoever runs the live smoke should know the
+  live build is not `main`.
+- **#22 is still the thing that makes the live smoke mean something.** It needs a build identity reaching
+  the container, which is either an `apps.yaml`/`deploy/aws.sh` change for every app or a build-time
+  argument in the image — both cross-repo, and this session left it rather than start a cross-repo change
+  at the end of a run with a second session active in the same repo.
